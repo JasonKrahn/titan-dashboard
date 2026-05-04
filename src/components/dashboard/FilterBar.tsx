@@ -1,0 +1,112 @@
+import { Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import type { ProjectFilters } from "@/lib/types";
+import type { User } from "@/lib/types";
+
+interface FilterBarProps {
+  filters: ProjectFilters;
+  search: string;
+  onSearchChange: (s: string) => void;
+  onChange: (next: ProjectFilters) => void;
+  pms: User[];
+  isAdmin: boolean;
+}
+
+export function FilterBar({ filters, search, onSearchChange, onChange, pms, isAdmin }: FilterBarProps) {
+  const statusValue = filters.status?.[0] ?? "all";
+  const pmValue = filters.assignedProjectManagerId ?? "all";
+
+  const hasActive =
+    !!search ||
+    !!filters.status?.length ||
+    !!filters.assignedProjectManagerId ||
+    !!filters.hasBlockedWork ||
+    !!filters.missingAtticEvidence;
+
+  return (
+    <div className="bg-card border border-border rounded-lg p-4 space-y-3 sticky top-2 z-10 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+      <div className="flex flex-col md:flex-row gap-3 md:items-center">
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search projects, numbers, addresses…"
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="pl-9 bg-background/60"
+          />
+        </div>
+
+        <Select
+          value={statusValue}
+          onValueChange={(v) => onChange({ ...filters, status: v === "all" ? undefined : [v as any] })}
+        >
+          <SelectTrigger className="w-full md:w-[150px] bg-background/60">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="archived">Archived</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {isAdmin && (
+          <Select
+            value={pmValue}
+            onValueChange={(v) => onChange({ ...filters, assignedProjectManagerId: v === "all" ? undefined : v })}
+          >
+            <SelectTrigger className="w-full md:w-[180px] bg-background/60">
+              <SelectValue placeholder="Project manager" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All PMs</SelectItem>
+              {pms.map((pm) => (
+                <SelectItem key={pm.id} value={pm.id}>
+                  {pm.fullName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <div className="flex items-center gap-2">
+          <Switch
+            id="blocked"
+            checked={!!filters.hasBlockedWork}
+            onCheckedChange={(v) => onChange({ ...filters, hasBlockedWork: v || undefined })}
+          />
+          <Label htmlFor="blocked" className="text-sm cursor-pointer">Has blocked work</Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch
+            id="attic"
+            checked={!!filters.missingAtticEvidence}
+            onCheckedChange={(v) => onChange({ ...filters, missingAtticEvidence: v || undefined })}
+          />
+          <Label htmlFor="attic" className="text-sm cursor-pointer">Missing attic evidence</Label>
+        </div>
+        {hasActive && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto text-muted-foreground hover:text-foreground"
+            onClick={() => {
+              onSearchChange("");
+              onChange({});
+            }}
+          >
+            Clear filters
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
