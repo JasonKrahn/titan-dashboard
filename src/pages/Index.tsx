@@ -27,7 +27,7 @@ import {
   setCurrentUser,
 } from "@/lib/api";
 import type { ProjectFilters } from "@/lib/types";
-import { projectHasBlocked } from "@/lib/derived";
+
 import { toast } from "sonner";
 
 type ActiveView = "clients" | "client-projects" | "dashboard";
