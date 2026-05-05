@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -6,20 +6,40 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { createClient, type CreateClientInput } from "@/lib/api";
+import { createClient, updateClient, type CreateClientInput } from "@/lib/api";
+import type { ClientRecord } from "@/lib/types";
 
 interface NewClientDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  client?: ClientRecord;
   onCreated?: (clientId: string) => void;
+  onUpdated?: (clientId: string) => void;
 }
 
 const empty: CreateClientInput = { name: "" };
 
-export function NewClientDialog({ open, onOpenChange, onCreated }: NewClientDialogProps) {
+export function NewClientDialog({ open, onOpenChange, client, onCreated, onUpdated }: NewClientDialogProps) {
   const qc = useQueryClient();
   const [form, setForm] = useState<CreateClientInput>(empty);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const isEdit = !!client;
+
+  useEffect(() => {
+    if (client) {
+      setForm({
+        name: client.name,
+        primaryContactName: client.primaryContactName,
+        phone: client.phone,
+        email: client.email,
+        billingAddress: client.billingAddress,
+        notes: client.notes,
+      });
+    } else {
+      setForm(empty);
+    }
+    setErrors({});
+  }, [client, open]);
 
   const reset = () => {
     setForm(empty);
@@ -27,14 +47,18 @@ export function NewClientDialog({ open, onOpenChange, onCreated }: NewClientDial
   };
 
   const mutation = useMutation({
-    mutationFn: createClient,
+    mutationFn: (data: CreateClientInput) => isEdit ? updateClient(client.id, data) : createClient(data),
     onSuccess: (res) => {
       if (res.ok === true) {
-        toast.success(`Client "${res.data.name}" created`);
+        toast.success(isEdit ? `Client "${res.data.name}" updated` : `Client "${res.data.name}" created`);
         qc.invalidateQueries({ queryKey: ["clients"] });
         reset();
         onOpenChange(false);
-        onCreated?.(res.data.id);
+        if (isEdit) {
+          onUpdated?.(res.data.id);
+        } else {
+          onCreated?.(res.data.id);
+        }
         return;
       }
       setErrors(res.error.fieldErrors ?? {});
@@ -57,8 +81,8 @@ export function NewClientDialog({ open, onOpenChange, onCreated }: NewClientDial
     >
       <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
-          <DialogTitle>New client</DialogTitle>
-          <DialogDescription>Add a customer record to attach projects to.</DialogDescription>
+          <DialogTitle>{isEdit ? "Edit client" : "New client"}</DialogTitle>
+          <DialogDescription>{isEdit ? "Update client details." : "Add a customer record to attach projects to."}</DialogDescription>
         </DialogHeader>
 
         <form
@@ -127,7 +151,7 @@ export function NewClientDialog({ open, onOpenChange, onCreated }: NewClientDial
               Cancel
             </Button>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? "Creating…" : "Create client"}
+              {mutation.isPending ? (isEdit ? "Saving…" : "Creating…") : (isEdit ? "Save changes" : "Create client")}
             </Button>
           </DialogFooter>
         </form>

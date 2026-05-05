@@ -1,4 +1,4 @@
-import { AlertOctagon, ArrowUpRight, Camera, MapPin } from "lucide-react";
+import { AlertOctagon, Archive, ArrowUpRight, Camera, MapPin } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { StatusBadge } from "./StatusBadge";
 import { PhaseProgress } from "./PhaseProgress";
@@ -29,6 +29,7 @@ interface ProjectCardProps {
   gates: Gate[];
   deficiencies: Deficiency[];
   onOpen?: (id: string) => void;
+  onArchive?: (id: string, name: string) => void;
 }
 
 const GATE_LABEL = {
@@ -62,6 +63,7 @@ export function ProjectCard({
   gates,
   deficiencies,
   onOpen,
+  onArchive,
 }: ProjectCardProps) {
   const phasesByType = projectPhases(project.id, phases);
   const projectGates = gates.filter((g) => g.projectId === project.id);
@@ -102,12 +104,12 @@ export function ProjectCard({
 
       {/* Phase progress */}
       <div className="mb-4">
-        <PhaseProgress phasesByType={phasesByType} />
+        <PhaseProgress phasesByType={phasesByType} gates={projectGates} deficiencies={deficiencies} />
       </div>
 
       {/* Gates row */}
       <div className="flex flex-wrap gap-1.5 mb-4">
-        {gateSummary.map((g) => (
+        {gateSummary.filter((g) => g.type !== "site_check" && g.type !== "inspection").map((g) => (
           <StatusBadge
             key={g.type}
             tone={gateStatusTone(g.status)}
@@ -133,6 +135,16 @@ export function ProjectCard({
           )}
         </div>
         <div className="flex items-center gap-2.5">
+          {project.status === "completed" && onArchive && (
+            <button
+              type="button"
+              title="Archive project"
+              className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              onClick={(e) => { e.stopPropagation(); onArchive(project.id, project.name); }}
+            >
+              <Archive className="h-3.5 w-3.5" />
+            </button>
+          )}
           <span className="text-[11px] text-muted-foreground">Updated {relativeTime(project.updatedAt)}</span>
           {pm ? (
             <div

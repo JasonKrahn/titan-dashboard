@@ -52,6 +52,8 @@ export const STATUS_LABEL: Record<string, string> = {
   active: "Active",
   completed: "Completed",
   archived: "Archived",
+  open: "Open",
+  resolved: "Resolved",
 };
 
 export function projectPhases(projectId: string, allPhases: Phase[]): Record<PhaseType, Phase | undefined> {
@@ -89,7 +91,7 @@ export interface PhaseHealth {
 
 const HEALTH_TONE_CLASSES: Record<PhaseHealthTone, { bg: string; text: string; border: string; dot: string }> = {
   blocked: { bg: "bg-status-blocked/15", text: "text-status-blocked", border: "border-status-blocked/40", dot: "bg-status-blocked" },
-  attention: { bg: "bg-status-ready/15", text: "text-status-ready", border: "border-status-ready/40", dot: "bg-status-ready" },
+  attention: { bg: "bg-status-attention/15", text: "text-status-attention", border: "border-status-attention/40", dot: "bg-status-attention" },
   "in-progress": { bg: "bg-status-in-progress/15", text: "text-status-in-progress", border: "border-status-in-progress/30", dot: "bg-status-in-progress" },
   ready: { bg: "bg-status-ready/15", text: "text-status-ready", border: "border-status-ready/40", dot: "bg-status-ready" },
   closed: { bg: "bg-status-closed/15", text: "text-status-closed", border: "border-status-closed/40", dot: "bg-status-closed" },
@@ -128,12 +130,12 @@ export function computePhaseHealth(
     return { tone: "attention", label: "Needs attention", reason: `${openDefs.length} open ${openDefs.length === 1 ? "issue" : "issues"}` };
   }
   if (phase.status === "in_progress") {
-    return { tone: "in-progress", label: "On track", reason: "Work in progress" };
+    return { tone: "in-progress", label: "In progress", reason: "Work in progress" };
   }
   if (phase.status === "closed") {
     return { tone: "closed", label: "Closed", reason: "Phase complete" };
   }
-  return { tone: "not-started", label: "Not started", reason: "Awaiting kickoff" };
+  return { tone: "not-started", label: "Not started", reason: "Awaiting site check" };
 }
 
 export const GATE_LABEL: Record<Gate["type"], string> = {

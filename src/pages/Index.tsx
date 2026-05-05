@@ -1,20 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Plus, HardHat, AlertCircle } from "lucide-react";
+import { useNavigate, useLocation, Link } from "react-router-dom";
+import { Plus, AlertCircle, Users, FileText, Settings } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { StatsRow } from "@/components/dashboard/StatsRow";
 import { FilterBar } from "@/components/dashboard/FilterBar";
-import { ProjectCard } from "@/components/dashboard/ProjectCard";
+import { ProjectResults } from "@/components/dashboard/ProjectResults";
 import { ClientDirectory } from "@/components/dashboard/ClientDirectory";
 import { ClientProjectsView, type ClientProjectFilter } from "@/components/dashboard/ClientProjectsView";
-import { AtticAlertsPanel, DueInspectionsPanel } from "@/components/dashboard/AlertPanels";
+import { ArchivePanel, DueInspectionsPanel } from "@/components/dashboard/AlertPanels";
 import { EmptyState } from "@/components/dashboard/EmptyState";
+import { ArchiveProjectDialog } from "@/components/dashboard/ArchiveProjectDialog";
 import { RoleSwitcher } from "@/components/dashboard/RoleSwitcher";
 import { NewClientDialog } from "@/components/dashboard/NewClientDialog";
 import { NewProjectDialog } from "@/components/dashboard/NewProjectDialog";
+import { SettingsDialog } from "@/components/dashboard/SettingsDialog";
 import {
   getAllDeficiencies,
   getAllGates,
@@ -34,17 +35,21 @@ type ActiveView = "clients" | "client-projects" | "dashboard";
 
 const DashboardPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const qc = useQueryClient();
   const [activeView, setActiveView] = useState<ActiveView>("clients");
   const [selectedClientId, setSelectedClientId] = useState<string | undefined>();
-  const [clientProjectFilter, setClientProjectFilter] = useState<ClientProjectFilter>("all");
+  const [clientProjectFilter, setClientProjectFilter] = useState<ClientProjectFilter>("active");
   const [filters, setFilters] = useState<ProjectFilters>({});
   const [search, setSearch] = useState("");
   const [clientSearch, setClientSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [newClientOpen, setNewClientOpen] = useState(false);
+  const [editClientId, setEditClientId] = useState<string | undefined>();
   const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState<{ id: string; name: string } | null>(null);
   const [newProjectClientId, setNewProjectClientId] = useState<string | undefined>();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 200);
@@ -90,7 +95,7 @@ const DashboardPage = () => {
     setCurrentUser(userId);
     setActiveView("clients");
     setSelectedClientId(undefined);
-    setClientProjectFilter("all");
+    setClientProjectFilter("active");
     qc.invalidateQueries();
     toast.success("Switched user");
   };
@@ -101,8 +106,21 @@ const DashboardPage = () => {
 
   const handleOpenClient = (id: string) => {
     setSelectedClientId(id);
-    setClientProjectFilter("all");
+    setClientProjectFilter("active");
     setActiveView("client-projects");
+  };
+
+  useEffect(() => {
+    const state = location.state as { clientId?: string } | null;
+    if (state?.clientId) {
+      handleOpenClient(state.clientId);
+      window.history.replaceState({}, "");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleEditClient = (id: string) => {
+    setEditClientId(id);
   };
 
   useEffect(() => {
@@ -162,86 +180,91 @@ const DashboardPage = () => {
       {/* Header */}
       <header className="border-b border-border sticky top-0 z-20 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
         <div className="container flex items-center justify-between h-16">
-          <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedClientId(undefined);
+              setActiveView("clients");
+            }}
+            className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
+          >
             <div className="h-9 w-9 rounded-lg bg-gradient-primary flex items-center justify-center shadow-glow">
-              <HardHat className="h-5 w-5 text-primary-foreground" />
+              <span className="text-lg font-bold text-primary-foreground leading-none">T</span>
             </div>
             <div>
               <div className="font-bold tracking-tight leading-tight">Titan PM</div>
               <div className="text-[10px] text-muted-foreground uppercase tracking-widest">Operations</div>
             </div>
-          </div>
+          </button>
           <div className="flex items-center gap-2">
-            {isAdmin && (
-              <Button
-                size="sm"
-                className="bg-primary hover:bg-primary/90 text-primary-foreground hidden sm:inline-flex"
-                onClick={() => {
-                  if (activeView === "clients") {
-                    setNewClientOpen(true);
-                  } else {
-                    setNewProjectClientId(undefined);
-                    setNewProjectOpen(true);
-                  }
-                }}
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                {activeView === "clients" ? "New client" : "New project"}
-              </Button>
+            {activeView !== "client-projects" && (
+              <div className="inline-flex w-fit rounded-lg border border-border bg-card p-1 shadow-card">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedClientId(undefined);
+                    setActiveView("clients");
+                  }}
+                  className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                    activeView === "clients"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  }`}
+                >
+                  Clients
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedClientId(undefined);
+                    setActiveView("dashboard");
+                  }}
+                  className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                    activeView === "dashboard"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  }`}
+                >
+                  All Projects
+                </button>
+              </div>
             )}
+            <Link
+              to="/subs"
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <Users className="h-4 w-4" />
+              Subcontractor Rolodex
+            </Link>
             {me && <RoleSwitcher current={me} users={users} onSwitch={handleSwitchUser} />}
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              className="inline-flex items-center justify-center rounded-md border border-border bg-card p-2 text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground"
+              aria-label="Settings"
+            >
+              <Settings className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </header>
 
       <main className="container py-6 space-y-6">
         {/* Title */}
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        {activeView !== "client-projects" && (
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold">
-              {activeView === "dashboard" ? "Dashboard" : activeView === "client-projects" && selectedClient ? selectedClient.name : "Clients"}
+              {activeView === "dashboard" ? "All Projects" : "Clients"}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
               {activeView === "dashboard"
                 ? isAdmin
-                  ? "All active jobs, blocked work, and inspections across the org."
-                  : "Your assigned projects and the work that needs attention."
-                : activeView === "client-projects"
-                  ? "Projects, addresses, and current status for the selected client."
-                  : "Customer records and the project load attached to each account."}
+                  ? "Org-wide project view for active jobs, blocked work, and inspections."
+                  : "All assigned projects and the work that needs attention."
+                : "Customer records and the project load attached to each account."}
             </p>
           </div>
-          <div className="inline-flex w-full rounded-lg border border-border bg-card p-1 shadow-card sm:w-auto">
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedClientId(undefined);
-                setActiveView("dashboard");
-              }}
-              className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors sm:flex-none ${
-                activeView === "dashboard"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              }`}
-            >
-              Dashboard
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedClientId(undefined);
-                setActiveView("clients");
-              }}
-              className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors sm:flex-none ${
-                activeView === "clients" || activeView === "client-projects"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              }`}
-            >
-              Clients
-            </button>
-          </div>
-        </div>
+        )}
 
         {/* Error */}
         {hasError && (
@@ -284,6 +307,7 @@ const DashboardPage = () => {
               setNewProjectOpen(true);
             }}
             onOpenProject={handleOpenProject}
+            onArchiveProject={(id, name) => setArchiveTarget({ id, name })}
           />
         ) : activeView === "clients" || activeView === "client-projects" ? (
           <ClientDirectory
@@ -293,6 +317,9 @@ const DashboardPage = () => {
             search={clientSearch}
             onSearchChange={setClientSearch}
             onOpenClient={handleOpenClient}
+            onEditClient={handleEditClient}
+            onNewClient={() => setNewClientOpen(true)}
+            isAdmin={!!isAdmin}
           />
         ) : (
           <>
@@ -304,42 +331,46 @@ const DashboardPage = () => {
               inspectionsDueThisWeek={stats.inspections}
             />
 
+            {/* Quick links */}
+            <div className="flex flex-wrap gap-2">
+              <Link
+                to="/activity"
+                className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <FileText className="h-4 w-4" />
+                Activity Log
+              </Link>
+            </div>
+
             {/* Filters */}
             <FilterBar
               filters={filters}
               search={search}
               onSearchChange={setSearch}
               onChange={setFilters}
+              clients={clients}
               pms={pms}
               isAdmin={!!isAdmin}
             />
 
             {/* Alert panels */}
-            {!isLoading && (atticMissing.size > 0 || visiblePhases.some((p) => p.status === "ready_for_inspection")) && (
+            {!isLoading && (projects.some(p => p.status === "completed") || visiblePhases.some((p) => p.status === "ready_for_inspection")) && (
               <div className="grid gap-4 md:grid-cols-2">
                 <DueInspectionsPanel projects={projects} phases={visiblePhases} onOpen={handleOpenProject} />
-                <AtticAlertsPanel projects={projects} missingProjectIds={atticMissing} onOpen={handleOpenProject} />
+                <ArchivePanel projects={projects} onOpen={handleOpenProject} onArchive={(id, name) => setArchiveTarget({ id, name })} />
               </div>
             )}
 
-            {/* Projects grid */}
-            <div>
-              <div className="flex items-baseline justify-between mb-3">
-                <h2 className="text-sm uppercase tracking-wider text-muted-foreground font-semibold">
-                  Projects
-                </h2>
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {isLoading ? "—" : `${projects.length} shown`}
-                </span>
-              </div>
-
-              {isLoading ? (
-                <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-                  {[0, 1, 2, 3, 4, 5].map((i) => (
-                    <Skeleton key={i} className="h-[260px] rounded-lg" />
-                  ))}
-                </div>
-              ) : projects.length === 0 ? (
+            <ProjectResults
+              title="Projects"
+              projects={projects}
+              clients={clients}
+              users={users}
+              phases={phases}
+              gates={gates}
+              deficiencies={defs}
+              loading={isLoading}
+              emptyState={
                 <EmptyState
                   variant={
                     Object.keys(filters).length === 0 && !debouncedSearch ? "no-projects" : "no-matches"
@@ -349,23 +380,10 @@ const DashboardPage = () => {
                     setSearch("");
                   }}
                 />
-              ) : (
-                <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-                  {projects.map((p) => (
-                    <ProjectCard
-                      key={p.id}
-                      project={p}
-                      client={clients.find((c) => c.id === p.clientId)}
-                      pm={users.find((u) => u.id === p.assignedProjectManagerId)}
-                      phases={phases}
-                      gates={gates}
-                      deficiencies={defs}
-                      onOpen={handleOpenProject}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
+              }
+              onOpenProject={handleOpenProject}
+              onArchiveProject={(id, name) => setArchiveTarget({ id, name })}
+            />
           </>
         )}
 
@@ -375,9 +393,22 @@ const DashboardPage = () => {
       </main>
 
       <NewClientDialog
-        open={newClientOpen}
-        onOpenChange={setNewClientOpen}
+        open={newClientOpen || !!editClientId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setNewClientOpen(false);
+            setEditClientId(undefined);
+          } else if (editClientId) {
+            setEditClientId(editClientId);
+          } else {
+            setNewClientOpen(true);
+          }
+        }}
+        client={clients.find((c) => c.id === editClientId)}
         onCreated={(id) => handleOpenClient(id)}
+        onUpdated={() => {
+          setEditClientId(undefined);
+        }}
       />
       <NewProjectDialog
         open={newProjectOpen}
@@ -385,6 +416,24 @@ const DashboardPage = () => {
         currentUser={me}
         presetClientId={newProjectClientId}
       />
+      {archiveTarget && (
+        <ArchiveProjectDialog
+          open={!!archiveTarget}
+          onOpenChange={(o) => { if (!o) setArchiveTarget(null); }}
+          projectId={archiveTarget.id}
+          projectName={archiveTarget.name}
+        />
+      )}
+      {me && (
+        <SettingsDialog
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          user={me}
+          onUpdated={() => {
+            // User data will be refreshed via query invalidation in the dialog
+          }}
+        />
+      )}
     </div>
   );
 };

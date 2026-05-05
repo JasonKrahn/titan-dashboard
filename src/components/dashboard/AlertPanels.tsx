@@ -1,4 +1,4 @@
-import { ArrowUpRight, Camera, ClipboardCheck } from "lucide-react";
+import { ArrowUpRight, Archive, ClipboardCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import type { Phase, Project } from "@/lib/types";
 
@@ -52,45 +52,54 @@ export function DueInspectionsPanel({ projects, phases, onOpen }: DueInspections
   );
 }
 
-interface AtticAlertsPanelProps {
+interface ArchivePanelProps {
   projects: Project[];
-  missingProjectIds: Set<string>;
   onOpen?: (projectId: string) => void;
+  onArchive?: (projectId: string, projectName: string) => void;
 }
 
-export function AtticAlertsPanel({ projects, missingProjectIds, onOpen }: AtticAlertsPanelProps) {
-  const items = projects.filter((p) => missingProjectIds.has(p.id));
+export function ArchivePanel({ projects, onOpen, onArchive }: ArchivePanelProps) {
+  const items = projects.filter((p) => p.status === "completed");
   if (!items.length) return null;
 
   return (
-    <Card className="bg-gradient-surface border-status-blocked/35 p-4 shadow-card">
+    <Card className="bg-gradient-surface border-status-success/35 p-4 shadow-card">
       <div className="flex items-center justify-between gap-3 mb-2">
         <div className="flex items-center gap-2">
-        <div className="h-8 w-8 rounded-lg bg-status-blocked/15 flex items-center justify-center">
-          <Camera className="h-4 w-4 text-status-blocked" />
+        <div className="h-8 w-8 rounded-lg bg-status-success/15 flex items-center justify-center">
+          <Archive className="h-4 w-4 text-status-success" />
         </div>
         <div>
-          <h3 className="font-semibold text-sm">Attic check required</h3>
-          <p className="text-xs text-muted-foreground">{items.length} project{items.length === 1 ? "" : "s"} missing photo evidence</p>
+          <h3 className="font-semibold text-sm">Ready to archive</h3>
+          <p className="text-xs text-muted-foreground">{items.length} project{items.length === 1 ? "" : "s"} ready</p>
         </div>
         </div>
-        <span className="rounded-full border border-status-blocked/25 bg-status-blocked/10 px-2.5 py-1 text-[11px] font-semibold uppercase text-status-blocked">
-          Blocker
+        <span className="rounded-full border border-status-success/25 bg-status-success/10 px-2.5 py-1 text-[11px] font-semibold uppercase text-status-success">
+          Complete
         </span>
       </div>
       <ul className="divide-y divide-border/60">
         {items.slice(0, 5).map((p) => (
           <li key={p.id}>
-            <button
-              onClick={() => onOpen?.(p.id)}
-              className="group w-full text-left flex items-center justify-between gap-3 py-2.5 rounded-md hover:bg-accent/40 transition-colors"
-            >
-              <div className="min-w-0">
+            <div className="group flex items-center justify-between gap-3 py-2.5 rounded-md hover:bg-accent/40 transition-colors">
+              <button
+                onClick={() => onOpen?.(p.id)}
+                className="min-w-0 flex-1 text-left"
+              >
                 <p className="text-sm font-medium truncate">{p.name}</p>
                 <p className="text-xs text-muted-foreground font-mono">{p.projectNumber}</p>
-              </div>
-              <ArrowUpRight className="h-4 w-4 shrink-0 text-status-blocked opacity-70 group-hover:opacity-100" />
-            </button>
+              </button>
+              {onArchive && (
+                <button
+                  type="button"
+                  title="Archive project"
+                  className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  onClick={(e) => { e.stopPropagation(); onArchive(p.id, p.name); }}
+                >
+                  <Archive className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           </li>
         ))}
       </ul>

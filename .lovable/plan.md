@@ -96,7 +96,7 @@ Submit:
 - All new colors stay on the existing semantic tokens (`status-*`, `primary`, `muted`, `card`). Add a derived helper `phaseHealth(phase, gates, deficiencies)` in `src/lib/derived.ts` returning `{ tone: StatusTone | "attention", label: string, reason: string }` — this single function powers the phase card indicator on both the dashboard project card (optional follow-up) and project detail.
 - Modals use existing `Dialog`, `Form`, `Input`, `Select`, `Textarea`, `Button` shadcn components. No new deps.
 - Adapter mutations append to in-memory arrays; surviving the session is fine for the prototype, matching how the rest of `seed.ts` is mutated nowhere.
-- No backend / Lovable Cloud changes — still pure prototype adapter.
+- No backend / Titan PM Cloud changes — still pure prototype adapter.
 
 ## Out of scope
 
