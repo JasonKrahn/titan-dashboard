@@ -176,9 +176,14 @@ const DashboardPage = () => {
               <Button
                 size="sm"
                 className="bg-primary hover:bg-primary/90 text-primary-foreground hidden sm:inline-flex"
-                onClick={() =>
-                  toast(activeView === "clients" ? "Client creation not in this iteration" : "Project creation not in this iteration")
-                }
+                onClick={() => {
+                  if (activeView === "clients") {
+                    setNewClientOpen(true);
+                  } else {
+                    setNewProjectClientId(undefined);
+                    setNewProjectOpen(true);
+                  }
+                }}
               >
                 <Plus className="h-4 w-4 mr-1" />
                 {activeView === "clients" ? "New client" : "New project"}
