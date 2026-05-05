@@ -39,7 +39,7 @@ const DashboardPage = () => {
   const qc = useQueryClient();
   const [activeView, setActiveView] = useState<ActiveView>("clients");
   const [selectedClientId, setSelectedClientId] = useState<string | undefined>();
-  const [clientProjectFilter, setClientProjectFilter] = useState<ClientProjectFilter>("active");
+  const [clientProjectFilter, setClientProjectFilter] = useState<ClientProjectFilter>("all");
   const [filters, setFilters] = useState<ProjectFilters>({});
   const [search, setSearch] = useState("");
   const [clientSearch, setClientSearch] = useState("");
@@ -47,6 +47,7 @@ const DashboardPage = () => {
   const [newClientOpen, setNewClientOpen] = useState(false);
   const [editClientId, setEditClientId] = useState<string | undefined>();
   const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [editProjectId, setEditProjectId] = useState<string | undefined>();
   const [archiveTarget, setArchiveTarget] = useState<{ id: string; name: string } | null>(null);
   const [newProjectClientId, setNewProjectClientId] = useState<string | undefined>();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -95,7 +96,7 @@ const DashboardPage = () => {
     setCurrentUser(userId);
     setActiveView("clients");
     setSelectedClientId(undefined);
-    setClientProjectFilter("active");
+    setClientProjectFilter("all");
     qc.invalidateQueries();
     toast.success("Switched user");
   };
@@ -106,7 +107,7 @@ const DashboardPage = () => {
 
   const handleOpenClient = (id: string) => {
     setSelectedClientId(id);
-    setClientProjectFilter("active");
+    setClientProjectFilter("all");
     setActiveView("client-projects");
   };
 
@@ -196,55 +197,67 @@ const DashboardPage = () => {
               <div className="text-[10px] text-muted-foreground uppercase tracking-widest">Operations</div>
             </div>
           </button>
-          <div className="flex items-center gap-2">
-            {activeView !== "client-projects" && (
-              <div className="inline-flex w-fit rounded-lg border border-border bg-card p-1 shadow-card">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedClientId(undefined);
-                    setActiveView("clients");
-                  }}
-                  className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                    activeView === "clients"
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                  }`}
-                >
-                  Clients
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedClientId(undefined);
-                    setActiveView("dashboard");
-                  }}
-                  className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                    activeView === "dashboard"
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                  }`}
-                >
-                  All Projects
-                </button>
-              </div>
-            )}
-            <Link
-              to="/subs"
-              className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground"
-            >
-              <Users className="h-4 w-4" />
-              Subcontractor Rolodex
-            </Link>
-            {me && <RoleSwitcher current={me} users={users} onSwitch={handleSwitchUser} />}
-            <button
-              type="button"
-              onClick={() => setSettingsOpen(true)}
-              className="inline-flex items-center justify-center rounded-md border border-border bg-card p-2 text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground"
-              aria-label="Settings"
-            >
-              <Settings className="h-4 w-4" />
-            </button>
+          <div className="flex items-center gap-4 sm:gap-8">
+            {/* Navigation items */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              {activeView !== "client-projects" && (
+                <div className="inline-flex w-fit rounded-lg border border-border bg-card p-1 shadow-card">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedClientId(undefined);
+                      setActiveView("clients");
+                    }}
+                    className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      activeView === "clients"
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                    }`}
+                  >
+                    Clients
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedClientId(undefined);
+                      setActiveView("dashboard");
+                    }}
+                    className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      activeView === "dashboard"
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                    }`}
+                  >
+                    All Projects
+                  </button>
+                </div>
+              )}
+              <Link
+                to="/subs"
+                className="hidden sm:inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <Users className="h-4 w-4" />
+                Subcontractor Rolodex
+              </Link>
+            </div>
+            {/* Decorative divider */}
+            <div className="hidden sm:flex items-center gap-2">
+              <div className="h-4 w-px bg-border/50"></div>
+              <div className="h-1.5 w-1.5 rounded-full bg-border/50"></div>
+              <div className="h-4 w-px bg-border/50"></div>
+            </div>
+            {/* User actions */}
+            <div className="flex items-center gap-2">
+              {me && <RoleSwitcher current={me} users={users} onSwitch={handleSwitchUser} />}
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(true)}
+                className="inline-flex items-center justify-center rounded-md border border-border bg-card p-2 text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground"
+                aria-label="Settings"
+              >
+                <Settings className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -308,6 +321,7 @@ const DashboardPage = () => {
             }}
             onOpenProject={handleOpenProject}
             onArchiveProject={(id, name) => setArchiveTarget({ id, name })}
+            onEditProject={(id) => setEditProjectId(id)}
           />
         ) : activeView === "clients" || activeView === "client-projects" ? (
           <ClientDirectory
@@ -383,6 +397,7 @@ const DashboardPage = () => {
               }
               onOpenProject={handleOpenProject}
               onArchiveProject={(id, name) => setArchiveTarget({ id, name })}
+              onEditProject={(id) => setEditProjectId(id)}
             />
           </>
         )}
@@ -415,6 +430,13 @@ const DashboardPage = () => {
         onOpenChange={setNewProjectOpen}
         currentUser={me}
         presetClientId={newProjectClientId}
+      />
+      <NewProjectDialog
+        open={!!editProjectId}
+        onOpenChange={(open) => { if (!open) setEditProjectId(undefined); }}
+        currentUser={me}
+        project={projects.find(p => p.id === editProjectId)}
+        onUpdated={() => setEditProjectId(undefined)}
       />
       {archiveTarget && (
         <ArchiveProjectDialog

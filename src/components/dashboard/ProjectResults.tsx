@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { AlertOctagon, Archive, ArrowDown, ArrowUp, Grid2X2, List, UserCircle } from "lucide-react";
+import { AlertOctagon, Archive, ArrowDown, ArrowUp, Grid2X2, List, Pencil, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -42,6 +42,7 @@ interface ProjectResultsProps {
   emptyState: ReactNode;
   onOpenProject?: (id: string) => void;
   onArchiveProject?: (id: string, name: string) => void;
+  onEditProject?: (id: string) => void;
   displayMode?: ProjectDisplayMode;
   onDisplayModeChange?: (mode: ProjectDisplayMode) => void;
   showTitle?: boolean;
@@ -112,6 +113,7 @@ export function ProjectResults({
   emptyState,
   onOpenProject,
   onArchiveProject,
+  onEditProject,
   displayMode: externalDisplayMode,
   onDisplayModeChange: externalOnDisplayModeChange,
   showTitle = true,
@@ -226,6 +228,7 @@ export function ProjectResults({
               deficiencies={deficiencies}
               onOpen={onOpenProject}
               onArchive={onArchiveProject}
+              onEdit={onEditProject}
             />
           ))}
         </div>
@@ -279,16 +282,29 @@ export function ProjectResults({
               {sortedRows.map((row) => (
                 <TableRow key={row.project.id}>
                   <TableCell>
-                    <button
-                      type="button"
-                      className="group block w-full min-w-0 text-left"
-                      onClick={() => onOpenProject?.(row.project.id)}
-                    >
-                      <div className="truncate font-mono text-xs text-muted-foreground">{row.project.projectNumber}</div>
-                      <div className="truncate font-semibold leading-tight text-foreground group-hover:text-primary">
-                        {row.project.name}
-                      </div>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="group block w-full min-w-0 text-left"
+                        onClick={() => onOpenProject?.(row.project.id)}
+                      >
+                        <div className="truncate font-mono text-xs text-muted-foreground">{row.project.projectNumber}</div>
+                        <div className="truncate font-semibold leading-tight text-foreground group-hover:text-primary">
+                          {row.project.name}
+                        </div>
+                      </button>
+                      {row.project.status !== "completed" && row.project.status !== "archived" && onEditProject && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0"
+                          onClick={() => onEditProject(row.project.id)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                   {includeClientColumn && (
                     <TableCell className="hidden truncate text-muted-foreground md:table-cell">

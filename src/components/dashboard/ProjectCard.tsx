@@ -1,4 +1,4 @@
-import { AlertOctagon, Archive, ArrowUpRight, Camera, MapPin } from "lucide-react";
+import { AlertOctagon, Archive, ArrowUpRight, Camera, MapPin, Pencil } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { StatusBadge } from "./StatusBadge";
 import { PhaseProgress } from "./PhaseProgress";
@@ -30,6 +30,7 @@ interface ProjectCardProps {
   deficiencies: Deficiency[];
   onOpen?: (id: string) => void;
   onArchive?: (id: string, name: string) => void;
+  onEdit?: (id: string) => void;
 }
 
 const GATE_LABEL = {
@@ -64,6 +65,7 @@ export function ProjectCard({
   deficiencies,
   onOpen,
   onArchive,
+  onEdit,
 }: ProjectCardProps) {
   const phasesByType = projectPhases(project.id, phases);
   const projectGates = gates.filter((g) => g.projectId === project.id);
@@ -98,6 +100,16 @@ export function ProjectCard({
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <StatusBadge tone={projectStatusTone(project.status)} label={STATUS_LABEL[project.status]} size="sm" />
+          {project.status !== "completed" && project.status !== "archived" && onEdit && (
+            <button
+              type="button"
+              title="Edit project"
+              className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground opacity-0 group-hover:opacity-100"
+              onClick={(e) => { e.stopPropagation(); onEdit(project.id); }}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
           <ArrowUpRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
       </div>
