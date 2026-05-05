@@ -29,16 +29,16 @@ export function NewClientDialog({ open, onOpenChange, onCreated }: NewClientDial
   const mutation = useMutation({
     mutationFn: createClient,
     onSuccess: (res) => {
-      if (!res.ok) {
+      if (res.ok) {
+        toast.success(`Client "${res.data.name}" created`);
+        qc.invalidateQueries({ queryKey: ["clients"] });
+        reset();
+        onOpenChange(false);
+        onCreated?.(res.data.id);
+      } else {
         setErrors(res.error.fieldErrors ?? {});
         toast.error(res.error.message);
-        return;
       }
-      toast.success(`Client "${res.data.name}" created`);
-      qc.invalidateQueries({ queryKey: ["clients"] });
-      reset();
-      onOpenChange(false);
-      onCreated?.(res.data.id);
     },
   });
 
