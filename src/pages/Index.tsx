@@ -13,6 +13,8 @@ import { ClientProjectsView, type ClientProjectFilter } from "@/components/dashb
 import { AtticAlertsPanel, DueInspectionsPanel } from "@/components/dashboard/AlertPanels";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { RoleSwitcher } from "@/components/dashboard/RoleSwitcher";
+import { NewClientDialog } from "@/components/dashboard/NewClientDialog";
+import { NewProjectDialog } from "@/components/dashboard/NewProjectDialog";
 import {
   getAllDeficiencies,
   getAllGates,
@@ -40,6 +42,9 @@ const DashboardPage = () => {
   const [search, setSearch] = useState("");
   const [clientSearch, setClientSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [newClientOpen, setNewClientOpen] = useState(false);
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [newProjectClientId, setNewProjectClientId] = useState<string | undefined>();
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 200);
