@@ -3,6 +3,10 @@ import type {
   ApiResult,
   AuditEvent,
   ClientRecord,
+  Deficiency,
+  Gate,
+  Phase,
+  PhaseDetail,
   Project,
   ProjectDetail,
   ProjectFilters,
@@ -168,7 +172,156 @@ export async function getAuditEvents(): Promise<ApiResult<AuditEvent[]>> {
   return delay(ok(seedAuditEvents));
 }
 
-export const __internal = {
-  projectHasBlockedWork,
-  projectMissingAtticEvidence,
-};
+export async function getPhase(phaseId: string): Promise<ApiResult<PhaseDetail>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+
+  const phase = seedPhases.find((p) => p.id === phaseId);
+  if (!phase) return delay({ ok: false, error: { code: "NOT_FOUND", message: "Phase not found" } });
+
+  const project = seedProjects.find((p) => p.id === phase.projectId);
+  if (!project) return delay({ ok: false, error: { code: "NOT_FOUND", message: "Project not found" } });
+
+  if (me.role === "project_manager" && project.assignedProjectManagerId !== me.id) {
+    return delay({ ok: false, error: { code: "FORBIDDEN", message: "Access denied" } });
+  }
+
+  const detail: PhaseDetail = {
+    phase,
+    project,
+    gates: seedGates.filter((g) => g.phaseId === phaseId),
+    deficiencies: seedDeficiencies.filter((d) => d.phaseId === phaseId),
+    photoEvidence: seedPhotos.filter((ph) => ph.phaseId === phaseId),
+    subcontractors: seedSubcontractors,
+    auditEvents: seedAuditEvents.filter((a) => a.entityId === phaseId).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
+  };
+  return delay(ok(detail));
+}
+
+export interface CreateClientInput {
+  name: string;
+  primaryContactName?: string;
+  phone?: string;
+  email?: string;
+  billingAddress?: string;
+  notes?: string;
+}
+
+export async function createClient(input: CreateClientInput): Promise<ApiResult<ClientRecord>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+  if (me.role !== "admin") return delay({ ok: false, error: { code: "FORBIDDEN", message: "Admins only" } });
+  if (!input.name?.trim()) {
+    return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Name is required", fieldErrors: { name: "Required" } } });
+  }
+  const nowIso = new Date().toISOString();
+  const client: ClientRecord = {
+    id: `client-${Date.now()}`,
+    name: input.name.trim(),
+    primaryContactName: input.primaryContactName?.trim() || undefined,
+    phone: input.phone?.trim() || undefined,
+    email: input.email?.trim() || undefined,
+    billingAddress: input.billingAddress?.trim() || undefined,
+    notes: input.notes?.trim() || undefined,
+    archived: false,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  };
+  seedClients.push(client);
+  return delay(ok(client));
+}
+
+export interface CreateProjectInput {
+  clientId: string;
+  projectNumber: string;
+  name: string;
+  siteAddress: string;
+  assignedProjectManagerId?: string;
+  scheduledStart?: string;
+  scheduledEnd?: string;
+}
+
+export async function createProject(input: CreateProjectInput): Promise<ApiResult<Project>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+
+  const fieldErrors: Record<string, string> = {};
+  if (!input.clientId) fieldErrors.clientId = "Required";
+  if (!input.projectNumber?.trim()) fieldErrors.projectNumber = "Required";
+  if (!input.name?.trim()) fieldErrors.name = "Required";
+  if (!input.siteAddress?.trim()) fieldErrors.siteAddress = "Required";
+  if (Object.keys(fieldErrors).length) {
+    return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Missing required fields", fieldErrors } });
+  }
+
+  const pmId = me.role === "project_manager" ? me.id : input.assignedProjectManagerId;
+  const nowIso = new Date().toISOString();
+  const id = `proj-${Date.now()}`;
+
+  const project: Project = {
+    id,
+    clientId: input.clientId,
+    projectNumber: input.projectNumber.trim(),
+    name: input.name.trim(),
+    siteAddress: input.siteAddress.trim(),
+    status: "draft",
+    assignedProjectManagerId: pmId,
+    scheduledStart: input.scheduledStart,
+    scheduledEnd: input.scheduledEnd,
+    atticCheckStatus: "not_started",
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  };
+  seedProjects.push(project);
+
+  // Auto-create the three default phases + standard gates per spec.
+  const phaseTypes: Phase["type"][] = ["insulation", "drywall", "finishing"];
+  phaseTypes.forEach((type) => {
+    const phaseId = `${id}-phase-${type}`;
+    const phase: Phase = {
+      id: phaseId,
+      projectId: id,
+      type,
+      status: "not_started",
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+    seedPhases.push(phase);
+
+    (["site_check", "inspection"] as const).forEach((gType, i) => {
+      const gate: Gate = {
+        id: `${id}-gate-${type}-${gType}-${i}`,
+        projectId: id,
+        phaseId,
+        type: gType,
+        status: "not_started",
+        requiredPhotoEvidence: gType === "site_check",
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+      seedGates.push(gate);
+    });
+  });
+
+  // Project-level attic gate
+  seedGates.push({
+    id: `${id}-gate-attic`,
+    projectId: id,
+    type: "attic_check",
+    status: "not_started",
+    requiredPhotoEvidence: true,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  });
+
+  seedAuditEvents.unshift({
+    id: `audit-${Date.now()}`,
+    entityType: "project",
+    entityId: id,
+    action: "created",
+    actorUserId: me.id,
+    createdAt: nowIso,
+  });
+
+  return delay(ok(project));
+}

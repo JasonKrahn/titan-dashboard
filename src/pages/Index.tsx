@@ -13,6 +13,8 @@ import { ClientProjectsView, type ClientProjectFilter } from "@/components/dashb
 import { AtticAlertsPanel, DueInspectionsPanel } from "@/components/dashboard/AlertPanels";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { RoleSwitcher } from "@/components/dashboard/RoleSwitcher";
+import { NewClientDialog } from "@/components/dashboard/NewClientDialog";
+import { NewProjectDialog } from "@/components/dashboard/NewProjectDialog";
 import {
   getAllDeficiencies,
   getAllGates,
@@ -25,7 +27,7 @@ import {
   setCurrentUser,
 } from "@/lib/api";
 import type { ProjectFilters } from "@/lib/types";
-import { projectHasBlocked } from "@/lib/derived";
+
 import { toast } from "sonner";
 
 type ActiveView = "clients" | "client-projects" | "dashboard";
@@ -40,6 +42,9 @@ const DashboardPage = () => {
   const [search, setSearch] = useState("");
   const [clientSearch, setClientSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [newClientOpen, setNewClientOpen] = useState(false);
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [newProjectClientId, setNewProjectClientId] = useState<string | undefined>();
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 200);
@@ -171,9 +176,14 @@ const DashboardPage = () => {
               <Button
                 size="sm"
                 className="bg-primary hover:bg-primary/90 text-primary-foreground hidden sm:inline-flex"
-                onClick={() =>
-                  toast(activeView === "clients" ? "Client creation not in this iteration" : "Project creation not in this iteration")
-                }
+                onClick={() => {
+                  if (activeView === "clients") {
+                    setNewClientOpen(true);
+                  } else {
+                    setNewProjectClientId(undefined);
+                    setNewProjectOpen(true);
+                  }
+                }}
               >
                 <Plus className="h-4 w-4 mr-1" />
                 {activeView === "clients" ? "New client" : "New project"}
@@ -269,7 +279,10 @@ const DashboardPage = () => {
               setSelectedClientId(undefined);
               setActiveView("clients");
             }}
-            onCreateProject={() => toast("Project creation not in this iteration")}
+            onCreateProject={() => {
+              setNewProjectClientId(selectedClient.id);
+              setNewProjectOpen(true);
+            }}
             onOpenProject={handleOpenProject}
           />
         ) : activeView === "clients" || activeView === "client-projects" ? (
@@ -360,6 +373,18 @@ const DashboardPage = () => {
           Prototype data · Backend swap-in via lib/api adapters
         </p>
       </main>
+
+      <NewClientDialog
+        open={newClientOpen}
+        onOpenChange={setNewClientOpen}
+        onCreated={(id) => handleOpenClient(id)}
+      />
+      <NewProjectDialog
+        open={newProjectOpen}
+        onOpenChange={setNewProjectOpen}
+        currentUser={me}
+        presetClientId={newProjectClientId}
+      />
     </div>
   );
 };
