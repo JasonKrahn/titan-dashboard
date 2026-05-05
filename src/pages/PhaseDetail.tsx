@@ -1,11 +1,12 @@
-import { useMemo } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState, useEffect, useRef } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   AlertTriangle,
   ArrowLeft,
   Camera,
+  ChevronRight,
   Clock,
   FileText,
   Image as ImageIcon,
@@ -17,9 +18,19 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { StatusBadge } from "@/components/dashboard/StatusBadge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { PhaseHealthPill } from "@/components/dashboard/PhaseHealthPill";
-import { getPhase } from "@/lib/api";
+import { SiteCheckDialog } from "@/components/dashboard/SiteCheckDialog";
+import { SiteBlockDialog } from "@/components/dashboard/SiteBlockDialog";
+import { SiteUnblockDialog } from "@/components/dashboard/SiteUnblockDialog";
+import { InspectionResultDialog } from "@/components/dashboard/InspectionResultDialog";
+import { DeficiencyDialog } from "@/components/dashboard/DeficiencyDialog";
+import { PhotoViewerDialog } from "@/components/dashboard/PhotoViewerDialog";
+import { PhotoUploadDialog } from "@/components/dashboard/PhotoUploadDialog";
+import { DatePicker } from "@/components/ui/date-picker";
+import { assignSubcontractorToPhase, getPhase, getPhotoViewUrl, markPhaseReadyForInspection, updatePhase } from "@/lib/api";
+import type { Deficiency, PhotoEvidence } from "@/lib/types";
 import {
   GATE_LABEL,
   PHASE_LABEL,
@@ -33,6 +44,8 @@ import {
 export default function PhaseDetailPage() {
   const { projectId, phaseId } = useParams<{ projectId: string; phaseId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get("tab") ?? "overview";
 
   const phaseQ = useQuery({
     queryKey: ["phase", phaseId],
@@ -42,6 +55,57 @@ export default function PhaseDetailPage() {
 
   const detail = phaseQ.data?.ok ? phaseQ.data.data : undefined;
   const error = phaseQ.data?.ok === false ? phaseQ.data.error : undefined;
+  const qc = useQueryClient();
+
+  const readyMutation = useMutation({
+    mutationFn: ({ phaseId, projectId }: { phaseId: string; projectId: string }) =>
+      markPhaseReadyForInspection({ phaseId, projectId }),
+    onSuccess: (res) => {
+      if (res.ok) {
+        qc.invalidateQueries({ queryKey: ["phase", phaseId] });
+      }
+    },
+  });
+
+  const updatePhaseMutation = useMutation({
+    mutationFn: ({ phaseId, scheduledStart, scheduledEnd }: { phaseId: string; scheduledStart?: string; scheduledEnd?: string }) =>
+      updatePhase({ phaseId, scheduledStart, scheduledEnd }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        setDateValidationError((res as { ok: false; error: { message: string } }).error.message);
+        return;
+      }
+      qc.invalidateQueries({ queryKey: ["phase", phaseId] });
+      setDateValidationError(null);
+    },
+  });
+
+  const [siteCheckOpen, setSiteCheckOpen] = useState(false);
+  const [siteBlockOpen, setSiteBlockOpen] = useState(false);
+  const [siteUnblockOpen, setSiteUnblockOpen] = useState(false);
+  const [inspectionResultOpen, setInspectionResultOpen] = useState(false);
+  const [inspectionResultMode, setInspectionResultMode] = useState<"passed" | "failed">("passed");
+  const [selectedGateId, setSelectedGateId] = useState<string | null>(null);
+  const [deficiencyDialogOpen, setDeficiencyDialogOpen] = useState(false);
+  const [deficiencyDialogMode, setDeficiencyDialogMode] = useState<"create" | "edit" | "resolve">("create");
+  const [selectedDeficiencyId, setSelectedDeficiencyId] = useState<string | null>(null);
+  const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<PhotoEvidence | null>(null);
+  const [photoUploadOpen, setPhotoUploadOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [highlightedDeficiencyId, setHighlightedDeficiencyId] = useState<string | null>(null);
+  const deficiencyRefs = useRef<Record<string, HTMLLIElement | null>>({});
+  const [dateValidationError, setDateValidationError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!highlightedDeficiencyId) return;
+    const el = deficiencyRefs.current[highlightedDeficiencyId];
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    const timer = setTimeout(() => setHighlightedDeficiencyId(null), 1500);
+    return () => clearTimeout(timer);
+  }, [highlightedDeficiencyId]);
 
   const health = useMemo(() => {
     if (!detail) return undefined;
@@ -86,22 +150,23 @@ export default function PhaseDetailPage() {
     );
   }
 
-  const { phase, project, gates, deficiencies, photoEvidence, auditEvents } = detail;
+  const { phase, project, gates, deficiencies, photoEvidence, auditEvents, subcontractors } = detail;
   const activeDefs = deficiencies.filter((d) => d.status === "open" || d.status === "in_progress");
 
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
         <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-2 text-sm">
-            <Button variant="ghost" size="sm" asChild>
-              <Link to={`/project/${project.id}`}>
-                <ArrowLeft className="mr-1 h-4 w-4" />
-                {project.name}
-              </Link>
+          <div className="flex items-center gap-1 text-sm">
+            <Button variant="ghost" size="sm" className="px-2" onClick={() => navigate(-1)}>
+              <ArrowLeft className="mr-1 h-4 w-4" />
+              Dashboard
             </Button>
+            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <Link to={`/project/${project.id}`} className="text-muted-foreground hover:text-foreground transition-colors">{project.name}</Link>
+            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="font-medium text-foreground">{PHASE_LABEL[phase.type]}</span>
           </div>
-          <StatusBadge tone={phaseStatusTone(phase.status)} label={STATUS_LABEL[phase.status]} size="sm" />
         </div>
       </header>
 
@@ -109,118 +174,363 @@ export default function PhaseDetailPage() {
         {/* Hero */}
         <section className="rounded-xl border border-border bg-gradient-surface p-6 shadow-card">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div>
+            <div className="flex-1">
               <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                 {project.projectNumber} · Phase
               </div>
               <h1 className="mt-1 text-2xl font-bold sm:text-3xl">{PHASE_LABEL[phase.type]}</h1>
               <p className="mt-1 text-sm text-muted-foreground">{health.reason}</p>
+              {dateValidationError && (
+                <Alert variant="destructive" className="mt-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Date validation error</AlertTitle>
+                  <AlertDescription>{dateValidationError}</AlertDescription>
+                </Alert>
+              )}
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <div className="text-xs text-muted-foreground">Scheduled start</div>
+                  <DatePicker
+                    value={phase.scheduledStart ? new Date(phase.scheduledStart) : undefined}
+                    onChange={(date) => {
+                      if (date) {
+                        updatePhaseMutation.mutate({
+                          phaseId: phase.id,
+                          scheduledStart: date.toISOString(),
+                        });
+                      }
+                    }}
+                    placeholder="Not set"
+                    disabled={updatePhaseMutation.isPending || phase.status === "closed"}
+                  />
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Scheduled end</div>
+                  <DatePicker
+                    value={phase.scheduledEnd ? new Date(phase.scheduledEnd) : undefined}
+                    onChange={(date) => {
+                      if (date) {
+                        updatePhaseMutation.mutate({
+                          phaseId: phase.id,
+                          scheduledEnd: date.toISOString(),
+                        });
+                      }
+                    }}
+                    placeholder="Not set"
+                    disabled={updatePhaseMutation.isPending || phase.status === "closed"}
+                  />
+                </div>
+                {phase.type === "finishing" && project.finishLevel && (
+                  <div>
+                    <div className="text-xs text-muted-foreground">Finish level</div>
+                    <div className="mt-1 text-sm font-medium">{project.finishLevel}</div>
+                  </div>
+                )}
+                <div>
+                  <div className="text-xs text-muted-foreground">Closed at</div>
+                  <div className="mt-1 text-sm font-medium">{fmt(phase.closedAt)}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Last updated</div>
+                  <div className="mt-1 text-sm font-medium">{relativeTime(phase.updatedAt)}</div>
+                </div>
+              </div>
             </div>
             <div className="flex flex-col items-start gap-3 md:items-end">
               <PhaseHealthPill health={health} size="lg" />
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" disabled title="Site check gate required">
-                  Start phase
-                </Button>
-                <Button size="sm" disabled title="Requires QC sign-off">
-                  Mark ready
-                </Button>
-              </div>
             </div>
           </div>
         </section>
 
-        <Tabs defaultValue="gates" className="space-y-4">
-          <TabsList className="bg-card">
-            <TabsTrigger value="gates">Gates</TabsTrigger>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="deficiencies">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="bg-card border border-border p-1 shadow-sm">
+            <TabsTrigger value="overview" className="font-semibold data-[state=active]:bg-background data-[state=active]:shadow-sm hover:bg-muted/50">Overview</TabsTrigger>
+            <TabsTrigger value="deficiencies" className="font-semibold data-[state=active]:bg-background data-[state=active]:shadow-sm hover:bg-muted/50">
               Deficiencies {activeDefs.length > 0 && <span className="ml-1 text-status-blocked">({activeDefs.length})</span>}
             </TabsTrigger>
-            <TabsTrigger value="photos">Photos</TabsTrigger>
-            <TabsTrigger value="activity">Activity</TabsTrigger>
+            <TabsTrigger value="photos" className="font-semibold data-[state=active]:bg-background data-[state=active]:shadow-sm hover:bg-muted/50">Photos</TabsTrigger>
           </TabsList>
 
-          {/* Gates */}
-          <TabsContent value="gates" className="grid gap-4 md:grid-cols-2">
-            {gates.length === 0 ? (
-              <EmptyCard icon={<ShieldCheck className="h-5 w-5" />} text="No gates configured for this phase yet." />
-            ) : (
-              gates.map((g) => (
-                <Card key={g.id} className="border-border bg-card p-5 shadow-card">
-                  <div className="mb-2 flex items-center justify-between">
-                    <h3 className="font-semibold">{GATE_LABEL[g.type]}</h3>
-                    <StatusBadge tone={gateStatusTone(g.status)} label={STATUS_LABEL[g.status]} size="sm" />
-                  </div>
-                  <div className="space-y-1.5 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-1.5">
-                      <Camera className="h-3.5 w-3.5" />
-                      {g.requiredPhotoEvidence ? "Photo evidence required" : "No photo required"}
+          {/* Overview (Gates + Schedule/Personnel) */}
+          <TabsContent value="overview" className="space-y-4">
+            {/* Gates */}
+            <div className="grid gap-4 md:grid-cols-2">
+              {gates.length === 0 ? (
+                <EmptyCard icon={<ShieldCheck className="h-5 w-5" />} text="No gates configured for this phase yet." />
+              ) : (
+                gates.map((g) => (
+                  <Card key={g.id} className="border-border bg-card p-5 shadow-card">
+                    <div className="mb-2 flex items-center justify-between">
+                      <h3 className="font-semibold">{GATE_LABEL[g.type]}</h3>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5" />
-                      Updated {relativeTime(g.updatedAt)}
+                    <div className="space-y-1.5 text-xs text-muted-foreground">
+                      {(() => {
+                        const gatePhotos = photoEvidence.filter((p) => p.gateId === g.id);
+                        if (gatePhotos.length > 0) {
+                          return (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <Camera className="h-3.5 w-3.5" />
+                              {gatePhotos.map((p) => (
+                                <button
+                                  key={p.id}
+                                  onClick={() => { setSelectedPhoto(p); setPhotoViewerOpen(true); }}
+                                  className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/30 px-2 py-0.5 text-xs hover:bg-muted/50"
+                                >
+                                  <ImageIcon className="h-3 w-3" />
+                                  {PURPOSE_LABEL[p.purpose] ?? p.purpose}
+                                </button>
+                              ))}
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className="flex items-center gap-1.5">
+                            <Camera className="h-3.5 w-3.5" />
+                            {g.requiredPhotoEvidence ? "Photo evidence required" : "No photo required"}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5" />
+                        Updated {relativeTime(g.updatedAt)}
+                      </div>
+                      {g.notes && <p className="text-foreground">{g.notes}</p>}
                     </div>
-                    {g.notes && <p className="text-foreground">{g.notes}</p>}
-                  </div>
-                </Card>
-              ))
-            )}
-          </TabsContent>
+                    {g.type === "site_check" && g.status === "not_started" && (
+                      <div className="mt-3 flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => setSiteCheckOpen(true)}
+                        >
+                          Site Checked
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => setSiteBlockOpen(true)}
+                        >
+                          Site Blocked
+                        </Button>
+                      </div>
+                    )}
+                    {g.type === "site_check" && g.status === "blocked" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="mt-3 w-full"
+                        onClick={() => setSiteUnblockOpen(true)}
+                      >
+                        Site Cleared
+                      </Button>
+                    )}
+                    {g.type === "inspection" && (() => {
+                      const unresolvedDefs = deficiencies.filter(
+                        (d) => d.phaseId === phase.id && (d.status === "open" || d.status === "in_progress")
+                      );
+                      const showReadyButton = (phase.status === "in_progress" || (phase.status === "blocked" && g.status === "failed")) && unresolvedDefs.length === 0;
+                      const showPassedFailed = phase.status === "ready_for_inspection" && unresolvedDefs.length === 0;
+                      if (!showReadyButton && !showPassedFailed) return null;
+                      return (
+                        <>
+                          {showReadyButton && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="mt-3 w-full"
+                              onClick={() => readyMutation.mutate({ phaseId: phase.id, projectId: project.id })}
+                              disabled={readyMutation.isPending}
+                            >
+                              {readyMutation.isPending ? "Marking ready…" : "Ready for Inspection"}
+                            </Button>
+                          )}
+                          {showPassedFailed && (
+                            <div className="mt-3 flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1"
+                                onClick={() => {
+                                  setSelectedGateId(g.id);
+                                  setInspectionResultMode("passed");
+                                  setInspectionResultOpen(true);
+                                }}
+                              >
+                                Passed
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1"
+                                onClick={() => {
+                                  setSelectedGateId(g.id);
+                                  setInspectionResultMode("failed");
+                                  setInspectionResultOpen(true);
+                                }}
+                              >
+                                Failed
+                              </Button>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </Card>
+                ))
+              )}
+            </div>
 
-          {/* Overview */}
-          <TabsContent value="overview">
+            {/* Personnel */}
             <Card className="border-border bg-card p-5 shadow-card">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Scheduled start" value={fmt(phase.scheduledStart)} />
-                <Field label="Scheduled end" value={fmt(phase.scheduledEnd)} />
-                <Field label="Closed at" value={fmt(phase.closedAt)} />
-                <Field label="Last updated" value={relativeTime(phase.updatedAt)} />
-              </div>
-              <div className="mt-6 border-t border-border pt-4">
-                <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Personnel</h4>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm">
-                    <UserIcon className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <div className="text-xs text-muted-foreground">Subcontractor</div>
-                      <div className="font-medium">Not assigned</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm">
-                    <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <div className="text-xs text-muted-foreground">Foreman / QC</div>
-                      <div className="font-medium">Pending sign-off</div>
-                    </div>
+              <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Personnel</h4>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm">
+                  <UserIcon className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex-1">
+                    <div className="text-xs text-muted-foreground">Subcontractor</div>
+                    <Select
+                      value={phase.assignedSubcontractorId || "unassigned"}
+                      onValueChange={(value) => {
+                        if (value === "unassigned") return;
+                        assignSubcontractorToPhase(phase.id, value).then((res) => {
+                          if (res.ok) {
+                            qc.invalidateQueries({ queryKey: ["phase", phaseId] });
+                          }
+                        });
+                      }}
+                    >
+                      <SelectTrigger className="h-7 text-xs">
+                        <SelectValue placeholder="Select subcontractor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">Not assigned</SelectItem>
+                        {subcontractors
+                          .filter((s) => s.trade === phase.type)
+                          .map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.displayName}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
             </Card>
+
+            {/* Activity */}
+            <section>
+              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Activity</h3>
+              {auditEvents.length === 0 ? (
+                <EmptyCard icon={<FileText className="h-5 w-5" />} text="No activity recorded for this phase yet." />
+              ) : (
+                <Card className="border-border bg-card p-5 shadow-card">
+                  <ol className="space-y-3">
+                    {auditEvents.map((a) => {
+                      const entityLabel = a.entityType.replace(/_/g, " ");
+                      const actionLabel = a.action.replace(/_/g, " ");
+                      return (
+                        <li key={a.id} className="flex items-start gap-3 text-sm">
+                          <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                          <div className="flex-1">
+                            <p className="font-medium capitalize">
+                              {entityLabel} {actionLabel}
+                            </p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {relativeTime(a.createdAt)}
+                            </p>
+                            {a.metadata && Object.keys(a.metadata).length > 0 && (
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {Object.entries(a.metadata).map(([key, value]) => {
+                                  if (key === "phaseId") return null;
+                                  if (key === "notes" && value) return `Notes: ${value}`;
+                                  if (key === "inspectorName" && value) return `Inspector: ${value}`;
+                                  return null;
+                                }).filter(Boolean).join(" · ")}
+                              </p>
+                            )}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </Card>
+              )}
+            </section>
           </TabsContent>
 
           {/* Deficiencies */}
           <TabsContent value="deficiencies">
+            <div className="mb-4 flex justify-end">
+              <Button size="sm" onClick={() => { setDeficiencyDialogMode("create"); setSelectedDeficiencyId(null); setDeficiencyDialogOpen(true); }}>
+                Add Deficiency
+              </Button>
+            </div>
             {deficiencies.length === 0 ? (
               <EmptyCard icon={<AlertTriangle className="h-5 w-5" />} text="No deficiencies logged for this phase." />
             ) : (
               <Card className="border-border bg-card p-2 shadow-card">
                 <ul className="divide-y divide-border">
-                  {deficiencies.map((d) => (
-                    <li key={d.id} className="flex items-start justify-between gap-3 px-3 py-3">
-                      <div className="min-w-0">
-                        <p className="font-medium">{d.title}</p>
-                        {d.description && <p className="mt-0.5 text-xs text-muted-foreground">{d.description}</p>}
-                        <p className="mt-1 text-xs text-muted-foreground">Severity: {d.severity}</p>
-                      </div>
-                      <StatusBadge
-                        tone={d.status === "open" ? "blocked" : d.status === "resolved" || d.status === "closed" ? "closed" : "in-progress"}
-                        label={STATUS_LABEL[d.status]}
-                        size="sm"
-                        dot={false}
-                      />
-                    </li>
-                  ))}
+                  {deficiencies.map((d) => {
+                    const deficiencyPhotos = photoEvidence.filter((p) => p.deficiencyId === d.id);
+                    const isHighlighted = highlightedDeficiencyId === d.id;
+                    return (
+                      <li
+                        key={d.id}
+                        ref={(el) => { deficiencyRefs.current[d.id] = el; }}
+                        className={`flex items-start justify-between gap-3 px-3 py-3 rounded-md transition-all duration-300 ${
+                          isHighlighted ? "ring-2 ring-primary bg-primary/5" : ""
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium">{d.title}</p>
+                          {d.description && <p className="mt-0.5 text-xs text-muted-foreground">{d.description}</p>}
+                          <p className="mt-1 text-xs text-muted-foreground">Severity: {d.severity}</p>
+                          {deficiencyPhotos.length > 0 && (
+                            <div className="mt-2 flex gap-2">
+                              {deficiencyPhotos.map((p) => (
+                                <button
+                                  key={p.id}
+                                  onClick={() => { setSelectedPhoto(p); setPhotoViewerOpen(true); }}
+                                  className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/30 px-2 py-1 text-xs hover:bg-muted/50"
+                                >
+                                  <ImageIcon className="h-3 w-3" />
+                                  {p.purpose === "deficiency_before" ? "Before" : "After"}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {(d.status === "open" || d.status === "in_progress") && (
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => { setDeficiencyDialogMode("edit"); setSelectedDeficiencyId(d.id); setDeficiencyDialogOpen(true); }}
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => { setDeficiencyDialogMode("resolve"); setSelectedDeficiencyId(d.id); setDeficiencyDialogOpen(true); }}
+                              >
+                                Resolve
+                              </Button>
+                            </div>
+                          )}
+                          {d.status === "resolved" && (
+                            <Badge variant="default">Resolved</Badge>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               </Card>
             )}
@@ -228,46 +538,105 @@ export default function PhaseDetailPage() {
 
           {/* Photos */}
           <TabsContent value="photos">
+            <div className="mb-4 flex justify-end">
+              <Button size="sm" onClick={() => setPhotoUploadOpen(true)}>
+                <Camera className="mr-1.5 h-4 w-4" />
+                Upload Photo
+              </Button>
+            </div>
             {photoEvidence.length === 0 ? (
               <EmptyCard icon={<ImageIcon className="h-5 w-5" />} text="No photos uploaded for this phase yet." />
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                {photoEvidence.map((p) => (
-                  <div
-                    key={p.id}
-                    className="flex aspect-square items-center justify-center rounded-md border border-border bg-muted/40 text-xs text-muted-foreground"
-                  >
-                    <ImageIcon className="h-6 w-6" />
-                  </div>
-                ))}
+                {photoEvidence.map((p) => {
+                  const linkedDef = p.deficiencyId ? deficiencies.find((d) => d.id === p.deficiencyId) : undefined;
+                  return (
+                    <PhotoCard
+                      key={p.id}
+                      photo={p}
+                      linkedDeficiency={linkedDef}
+                      onOpen={() => { setSelectedPhoto(p); setPhotoViewerOpen(true); }}
+                      onDeficiencyClick={() => {
+                        setActiveTab("deficiencies");
+                        setHighlightedDeficiencyId(p.deficiencyId!);
+                      }}
+                    />
+                  );
+                })}
               </div>
             )}
           </TabsContent>
 
-          {/* Activity */}
-          <TabsContent value="activity">
-            {auditEvents.length === 0 ? (
-              <EmptyCard icon={<FileText className="h-5 w-5" />} text="No activity recorded for this phase yet." />
-            ) : (
-              <Card className="border-border bg-card p-5 shadow-card">
-                <ol className="space-y-3">
-                  {auditEvents.map((a) => (
-                    <li key={a.id} className="flex items-start gap-3 text-sm">
-                      <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                      <div>
-                        <p className="font-medium capitalize">
-                          {a.action.replace(/_/g, " ")}
-                          <span className="ml-1 font-normal text-muted-foreground">· {relativeTime(a.createdAt)}</span>
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              </Card>
-            )}
-          </TabsContent>
         </Tabs>
       </main>
+
+      {detail && (() => {
+        const siteGate = gates.find((g) => g.type === "site_check");
+        return siteGate ? (
+          <>
+            <SiteCheckDialog
+              open={siteCheckOpen}
+              onOpenChange={setSiteCheckOpen}
+              gateId={siteGate.id}
+              phaseId={phase.id}
+              projectId={project.id}
+              phaseLabel={PHASE_LABEL[phase.type]}
+            />
+            <SiteBlockDialog
+              open={siteBlockOpen}
+              onOpenChange={setSiteBlockOpen}
+              gateId={siteGate.id}
+              phaseId={phase.id}
+              projectId={project.id}
+              phaseLabel={PHASE_LABEL[phase.type]}
+            />
+            <SiteUnblockDialog
+              open={siteUnblockOpen}
+              onOpenChange={setSiteUnblockOpen}
+              gateId={siteGate.id}
+              phaseId={phase.id}
+              projectId={project.id}
+              phaseLabel={PHASE_LABEL[phase.type]}
+            />
+          </>
+        ) : null;
+      })()}
+      {detail && selectedGateId && (
+        <InspectionResultDialog
+          open={inspectionResultOpen}
+          onOpenChange={setInspectionResultOpen}
+          gateId={selectedGateId}
+          phaseId={phase.id}
+          projectId={project.id}
+          phaseLabel={PHASE_LABEL[phase.type]}
+          mode={inspectionResultMode}
+        />
+      )}
+      {detail && (
+        <DeficiencyDialog
+          open={deficiencyDialogOpen}
+          onOpenChange={setDeficiencyDialogOpen}
+          phaseId={phase.id}
+          projectId={project.id}
+          phaseLabel={PHASE_LABEL[phase.type]}
+          mode={deficiencyDialogMode}
+          deficiency={deficiencies.find((d) => d.id === selectedDeficiencyId)}
+        />
+      )}
+      <PhotoViewerDialog
+        open={photoViewerOpen}
+        onOpenChange={setPhotoViewerOpen}
+        photo={selectedPhoto}
+      />
+      {detail && (
+        <PhotoUploadDialog
+          open={photoUploadOpen}
+          onOpenChange={setPhotoUploadOpen}
+          phaseId={phase.id}
+          projectId={project.id}
+          deficiencies={deficiencies}
+        />
+      )}
     </div>
   );
 }
@@ -291,5 +660,71 @@ function EmptyCard({ icon, text }: { icon: React.ReactNode; text: string }) {
       <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-muted">{icon}</div>
       {text}
     </Card>
+  );
+}
+
+const PURPOSE_LABEL: Record<string, string> = {
+  site_check: "Site Check",
+  inspection: "Inspection",
+  attic_check: "Attic Check",
+  deficiency_before: "Before",
+  deficiency_after: "After",
+  general: "General",
+};
+
+function PhotoCard({
+  photo,
+  linkedDeficiency,
+  onOpen,
+  onDeficiencyClick,
+}: {
+  photo: PhotoEvidence;
+  linkedDeficiency?: Deficiency;
+  onOpen: () => void;
+  onDeficiencyClick: () => void;
+}) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPhotoViewUrl(photo.id).then((res) => {
+      if (!cancelled && res.ok && res.data.url) {
+        setBlobUrl(res.data.url);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [photo.id]);
+
+  return (
+    <div className="group flex flex-col overflow-hidden rounded-md border border-border bg-card shadow-card">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="relative aspect-square w-full overflow-hidden bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {blobUrl ? (
+          <img src={blobUrl} alt={PURPOSE_LABEL[photo.purpose] ?? photo.purpose} className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <ImageIcon className="h-6 w-6 text-muted-foreground" />
+          </div>
+        )}
+      </button>
+      <div className="flex flex-col gap-0.5 p-2">
+        <span className="text-xs font-medium">{PURPOSE_LABEL[photo.purpose] ?? photo.purpose}</span>
+        {photo.fileSizeBytes && (
+          <span className="text-[10px] text-muted-foreground">{(photo.fileSizeBytes / 1024).toFixed(0)} KB</span>
+        )}
+        {linkedDeficiency && (
+          <button
+            type="button"
+            onClick={onDeficiencyClick}
+            className="mt-0.5 truncate text-left text-[10px] text-primary hover:text-primary/80"
+          >
+            Deficiency: {linkedDeficiency.title}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

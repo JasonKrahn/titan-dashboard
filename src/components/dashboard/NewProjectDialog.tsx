@@ -2,20 +2,24 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { format, parse, differenceInDays, isValid } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { createProject, getClients, getProjects, getUsers, type CreateProjectInput } from "@/lib/api";
-import type { User } from "@/lib/types";
+import { DatePicker } from "@/components/ui/date-picker";
+import { createProject, updateProject, getClients, getProjects, getUsers, type CreateProjectInput, type UpdateProjectInput } from "@/lib/api";
+import type { User, Project } from "@/lib/types";
 
 interface NewProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currentUser?: User;
   presetClientId?: string;
+  project?: Project;
   onCreated?: (projectId: string) => void;
+  onUpdated?: (projectId: string) => void;
 }
 
 type FormState = {
@@ -24,13 +28,15 @@ type FormState = {
   name: string;
   siteAddress: string;
   assignedProjectManagerId: string;
-  scheduledStart: string;
-  scheduledEnd: string;
+  scheduledStart: Date | undefined;
+  scheduledEnd: Date | undefined;
+  finishLevel: 1 | 2 | 3 | 4 | 5 | undefined;
 };
 
-export function NewProjectDialog({ open, onOpenChange, currentUser, presetClientId, onCreated }: NewProjectDialogProps) {
+export function NewProjectDialog({ open, onOpenChange, currentUser, presetClientId, project, onCreated, onUpdated }: NewProjectDialogProps) {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const isEdit = !!project;
 
   const clientsQ = useQuery({ queryKey: ["clients"], queryFn: getClients });
   const usersQ = useQuery({ queryKey: ["users"], queryFn: getUsers });
@@ -58,21 +64,37 @@ export function NewProjectDialog({ open, onOpenChange, currentUser, presetClient
     name: "",
     siteAddress: "",
     assignedProjectManagerId: isAdmin ? "" : currentUser?.id ?? "",
-    scheduledStart: "",
-    scheduledEnd: "",
+    scheduledStart: undefined,
+    scheduledEnd: undefined,
+    finishLevel: undefined,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Re-sync defaults when modal opens / data changes.
   useEffect(() => {
     if (!open) return;
-    setForm((f) => ({
-      ...f,
-      clientId: presetClientId ?? f.clientId,
-      projectNumber: f.projectNumber || initialNumber,
-      assignedProjectManagerId: isAdmin ? f.assignedProjectManagerId : currentUser?.id ?? "",
-    }));
-  }, [open, presetClientId, initialNumber, isAdmin, currentUser?.id]);
+    if (project) {
+      const parsedStart = project.scheduledStart ? parse(project.scheduledStart, "yyyy-MM-dd", new Date()) : undefined;
+      const parsedEnd = project.scheduledEnd ? parse(project.scheduledEnd, "yyyy-MM-dd", new Date()) : undefined;
+      setForm({
+        clientId: project.clientId,
+        projectNumber: project.projectNumber,
+        name: project.name,
+        siteAddress: project.siteAddress,
+        assignedProjectManagerId: project.assignedProjectManagerId || "",
+        scheduledStart: parsedStart && isValid(parsedStart) ? parsedStart : undefined,
+        scheduledEnd: parsedEnd && isValid(parsedEnd) ? parsedEnd : undefined,
+        finishLevel: project.finishLevel,
+      });
+    } else {
+      setForm((f) => ({
+        ...f,
+        clientId: presetClientId ?? f.clientId,
+        projectNumber: f.projectNumber || initialNumber,
+        assignedProjectManagerId: isAdmin ? f.assignedProjectManagerId : currentUser?.id ?? "",
+      }));
+    }
+  }, [open, presetClientId, initialNumber, isAdmin, currentUser?.id, project]);
 
   const reset = () => {
     setErrors({});
@@ -82,8 +104,9 @@ export function NewProjectDialog({ open, onOpenChange, currentUser, presetClient
       name: "",
       siteAddress: "",
       assignedProjectManagerId: isAdmin ? "" : currentUser?.id ?? "",
-      scheduledStart: "",
-      scheduledEnd: "",
+      scheduledStart: undefined,
+      scheduledEnd: undefined,
+      finishLevel: undefined,
     });
   };
 
@@ -92,19 +115,38 @@ export function NewProjectDialog({ open, onOpenChange, currentUser, presetClient
     if (errors[key as string]) setErrors((e) => ({ ...e, [key as string]: "" }));
   };
 
+  const validationError = useMemo(() => {
+    if (!form.scheduledStart || !form.scheduledEnd) return null;
+    const daysDiff = differenceInDays(form.scheduledEnd, form.scheduledStart);
+    if (daysDiff < 3) {
+      return "End date must be at least 3 days after start date";
+    }
+    return null;
+  }, [form.scheduledStart, form.scheduledEnd]);
+
   const mutation = useMutation({
-    mutationFn: (input: CreateProjectInput) => createProject(input),
+    mutationFn: isEdit
+      ? (input: UpdateProjectInput) => updateProject(project!.id, input)
+      : (input: CreateProjectInput) => createProject(input),
     onSuccess: (res) => {
       if (res.ok === true) {
-        toast.success(`Project "${res.data.name}" created`);
+        toast.success(isEdit ? `Project "${res.data.name}" updated` : `Project "${res.data.name}" created`);
         qc.invalidateQueries({ queryKey: ["projects"] });
-        qc.invalidateQueries({ queryKey: ["phases"] });
-        qc.invalidateQueries({ queryKey: ["gates"] });
+        qc.invalidateQueries({ queryKey: ["projects", "all-visible"] });
+        qc.invalidateQueries({ queryKey: ["project", project?.id] });
+        if (!isEdit) {
+          qc.invalidateQueries({ queryKey: ["phases"] });
+          qc.invalidateQueries({ queryKey: ["gates"] });
+        }
         const id = res.data.id;
         reset();
         onOpenChange(false);
-        onCreated?.(id);
-        navigate(`/project/${id}`);
+        if (isEdit) {
+          onUpdated?.(id);
+        } else {
+          onCreated?.(id);
+          navigate(`/project/${id}`);
+        }
         return;
       }
       setErrors(res.error.fieldErrors ?? {});
@@ -122,9 +164,9 @@ export function NewProjectDialog({ open, onOpenChange, currentUser, presetClient
     >
       <DialogContent className="sm:max-w-[560px]">
         <DialogHeader>
-          <DialogTitle>New project</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit project" : "New project"}</DialogTitle>
           <DialogDescription>
-            Default phases (Insulation, Drywall, Finishing) and gates are created automatically.
+            {isEdit ? "Update project details and dates." : "Default phases (Insulation, Drywall, Finishing) and gates are created automatically."}
           </DialogDescription>
         </DialogHeader>
 
@@ -132,15 +174,31 @@ export function NewProjectDialog({ open, onOpenChange, currentUser, presetClient
           className="grid gap-4 py-2"
           onSubmit={(e) => {
             e.preventDefault();
-            mutation.mutate({
-              clientId: form.clientId,
-              projectNumber: form.projectNumber,
-              name: form.name,
-              siteAddress: form.siteAddress,
-              assignedProjectManagerId: form.assignedProjectManagerId || undefined,
-              scheduledStart: form.scheduledStart || undefined,
-              scheduledEnd: form.scheduledEnd || undefined,
-            });
+            if (validationError) {
+              toast.error(validationError);
+              return;
+            }
+            if (isEdit) {
+              mutation.mutate({
+                name: form.name,
+                siteAddress: form.siteAddress,
+                assignedProjectManagerId: form.assignedProjectManagerId || undefined,
+                scheduledStart: form.scheduledStart ? format(form.scheduledStart, "yyyy-MM-dd") : undefined,
+                scheduledEnd: form.scheduledEnd ? format(form.scheduledEnd, "yyyy-MM-dd") : undefined,
+                finishLevel: form.finishLevel,
+              } as UpdateProjectInput);
+            } else {
+              mutation.mutate({
+                clientId: form.clientId,
+                projectNumber: form.projectNumber,
+                name: form.name,
+                siteAddress: form.siteAddress,
+                assignedProjectManagerId: form.assignedProjectManagerId || undefined,
+                scheduledStart: form.scheduledStart ? format(form.scheduledStart, "yyyy-MM-dd") : undefined,
+                scheduledEnd: form.scheduledEnd ? format(form.scheduledEnd, "yyyy-MM-dd") : undefined,
+                finishLevel: form.finishLevel,
+              } as CreateProjectInput);
+            }
           }}
         >
           <div className="grid gap-1.5">
@@ -148,7 +206,7 @@ export function NewProjectDialog({ open, onOpenChange, currentUser, presetClient
             <Select
               value={form.clientId}
               onValueChange={(v) => setField("clientId", v)}
-              disabled={!!presetClientId}
+              disabled={!!presetClientId || isEdit}
             >
               <SelectTrigger id="client">
                 <SelectValue placeholder="Select a client" />
@@ -171,6 +229,7 @@ export function NewProjectDialog({ open, onOpenChange, currentUser, presetClient
                 id="projectNumber"
                 value={form.projectNumber}
                 onChange={(e) => setField("projectNumber", e.target.value)}
+                disabled={isEdit}
               />
               {errors.projectNumber && <p className="text-xs text-destructive">{errors.projectNumber}</p>}
             </div>
@@ -222,21 +281,40 @@ export function NewProjectDialog({ open, onOpenChange, currentUser, presetClient
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-1.5">
               <Label htmlFor="start">Scheduled start</Label>
-              <Input
+              <DatePicker
                 id="start"
-                type="date"
                 value={form.scheduledStart}
-                onChange={(e) => setField("scheduledStart", e.target.value)}
+                onChange={(date) => setField("scheduledStart", date)}
+                placeholder="Select start date"
               />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="end">Scheduled end</Label>
-              <Input
+              <DatePicker
                 id="end"
-                type="date"
                 value={form.scheduledEnd}
-                onChange={(e) => setField("scheduledEnd", e.target.value)}
+                onChange={(date) => setField("scheduledEnd", date)}
+                placeholder="Select end date"
               />
+            </div>
+          </div>
+          {validationError && <p className="text-xs text-destructive">{validationError}</p>}
+
+          <div className="grid gap-1.5">
+            <Label>Finish level</Label>
+            <div className="flex gap-2">
+              {[1, 2, 3, 4, 5].map((level) => (
+                <Button
+                  key={level}
+                  type="button"
+                  variant={form.finishLevel === level ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setField("finishLevel", level as 1 | 2 | 3 | 4 | 5)}
+                  className="flex-1"
+                >
+                  {level}
+                </Button>
+              ))}
             </div>
           </div>
 
@@ -244,8 +322,8 @@ export function NewProjectDialog({ open, onOpenChange, currentUser, presetClient
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? "Creating…" : "Create project"}
+            <Button type="submit" disabled={mutation.isPending || !!validationError}>
+              {mutation.isPending ? (isEdit ? "Saving…" : "Creating…") : (isEdit ? "Save changes" : "Create project")}
             </Button>
           </DialogFooter>
         </form>

@@ -41,7 +41,11 @@ export interface Project {
   scheduledStart?: string;
   scheduledEnd?: string;
   atticCheckStatus: GateStatus;
+  finishLevel?: 1 | 2 | 3 | 4 | 5;
   completedAt?: string;
+  notes?: string;
+  notesLastEditedBy?: string;
+  notesLastEditedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -62,6 +66,7 @@ export interface Phase {
   scheduledStart?: string;
   scheduledEnd?: string;
   closedAt?: string;
+  assignedSubcontractorId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -78,6 +83,9 @@ export interface Gate {
   completedAt?: string;
   requiredPhotoEvidence: boolean;
   notes?: string;
+  callInDate?: string;
+  installDate?: string;
+  callInSubcontractorId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -94,6 +102,8 @@ export interface Deficiency {
   severity: DeficiencySeverity;
   status: DeficiencyStatus;
   assignedSubcontractorId?: string;
+  resolvedAt?: string;
+  resolvedByUserId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -212,4 +222,54 @@ export interface ProjectFilters {
   assignedProjectManagerId?: string;
   hasBlockedWork?: boolean;
   missingAtticEvidence?: boolean;
+}
+
+export interface CompleteInspectionInput {
+  gateId: string;
+  phaseId: string;
+  projectId: string;
+  passed: boolean;
+  inspectorName: string;
+  inspectionDate: string;
+  notes?: string;
+  photo?: File;
+  deficiencyTitle?: string;
+  deficiencyDescription?: string;
+  deficiencySeverity?: DeficiencySeverity;
+}
+
+export interface CreateDeficiencyInput {
+  projectId: string;
+  phaseId: string;
+  title: string;
+  description?: string;
+  severity: DeficiencySeverity;
+  photo?: File;
+}
+
+export interface UpdateDeficiencyInput {
+  title?: string;
+  description?: string;
+  severity?: DeficiencySeverity;
+  status?: DeficiencyStatus;
+  photo?: File;
+}
+
+export interface CreateSubcontractorInput {
+  displayName: string;
+  trade: TradeType;
+  companyName: string;
+  phone: string;
+  email: string;
+  notes?: string;
+}
+
+export interface UpdateSubcontractorInput {
+  displayName?: string;
+  trade?: TradeType;
+  companyName?: string;
+  phone?: string;
+  email?: string;
+  notes?: string;
+  active?: boolean;
 }

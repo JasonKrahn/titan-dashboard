@@ -71,6 +71,10 @@ export default {
             DEFAULT: "hsl(var(--status-closed))",
             foreground: "hsl(var(--status-closed-fg))",
           },
+          attention: {
+            DEFAULT: "hsl(var(--status-attention))",
+            foreground: "hsl(var(--status-attention-fg))",
+          },
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",

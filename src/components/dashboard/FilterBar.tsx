@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import type { ProjectFilters, ProjectStatus } from "@/lib/types";
+import type { ClientRecord, ProjectFilters, ProjectStatus } from "@/lib/types";
 import type { User } from "@/lib/types";
 
 interface FilterBarProps {
@@ -12,17 +12,21 @@ interface FilterBarProps {
   search: string;
   onSearchChange: (s: string) => void;
   onChange: (next: ProjectFilters) => void;
+  clients: ClientRecord[];
   pms: User[];
   isAdmin: boolean;
 }
 
-export function FilterBar({ filters, search, onSearchChange, onChange, pms, isAdmin }: FilterBarProps) {
+export function FilterBar({ filters, search, onSearchChange, onChange, clients, pms, isAdmin }: FilterBarProps) {
+  const clientValue = filters.clientId ?? "all";
   const statusValue = filters.status?.[0] ?? "all";
   const pmValue = filters.assignedProjectManagerId ?? "all";
+  const sortedClients = [...clients].sort((a, b) => a.name.localeCompare(b.name));
   const projectStatuses: ProjectStatus[] = ["active", "completed", "draft", "archived"];
 
   const hasActive =
     !!search ||
+    !!filters.clientId ||
     !!filters.status?.length ||
     !!filters.assignedProjectManagerId ||
     !!filters.hasBlockedWork ||
@@ -30,7 +34,7 @@ export function FilterBar({ filters, search, onSearchChange, onChange, pms, isAd
 
   return (
     <div className="bg-card border border-border rounded-lg p-4 space-y-3 sticky top-2 z-10 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-      <div className="flex flex-col md:flex-row gap-3 md:items-center">
+      <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
         <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -42,6 +46,28 @@ export function FilterBar({ filters, search, onSearchChange, onChange, pms, isAd
         </div>
 
         <Select
+          value={clientValue}
+          onValueChange={(v) =>
+            onChange({
+              ...filters,
+              clientId: v === "all" ? undefined : v,
+            })
+          }
+        >
+          <SelectTrigger className="w-full bg-background/60 md:w-[180px]">
+            <SelectValue placeholder="Client" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Clients</SelectItem>
+            {sortedClients.map((client) => (
+              <SelectItem key={client.id} value={client.id}>
+                {client.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select
           value={statusValue}
           onValueChange={(v) =>
             onChange({
@@ -50,7 +76,7 @@ export function FilterBar({ filters, search, onSearchChange, onChange, pms, isAd
             })
           }
         >
-          <SelectTrigger className="w-full md:w-[150px] bg-background/60">
+          <SelectTrigger className="w-full bg-background/60 md:w-[150px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -68,7 +94,7 @@ export function FilterBar({ filters, search, onSearchChange, onChange, pms, isAd
             value={pmValue}
             onValueChange={(v) => onChange({ ...filters, assignedProjectManagerId: v === "all" ? undefined : v })}
           >
-            <SelectTrigger className="w-full md:w-[180px] bg-background/60">
+            <SelectTrigger className="w-full bg-background/60 md:w-[180px]">
               <SelectValue placeholder="Project manager" />
             </SelectTrigger>
             <SelectContent>

@@ -1,3 +1,3 @@
-# Welcome to your Lovable project
+# Welcome to Titan PM
 
 TODO: Document your project here
