@@ -79,6 +79,73 @@ export function dueInspectionPhases(projectId: string, phases: Phase[]): Phase[]
   return phases.filter((p) => p.projectId === projectId && p.status === "ready_for_inspection");
 }
 
+export type PhaseHealthTone = StatusTone | "attention";
+
+export interface PhaseHealth {
+  tone: PhaseHealthTone;
+  label: string;
+  reason: string;
+}
+
+const HEALTH_TONE_CLASSES: Record<PhaseHealthTone, { bg: string; text: string; border: string; dot: string }> = {
+  blocked: { bg: "bg-status-blocked/15", text: "text-status-blocked", border: "border-status-blocked/40", dot: "bg-status-blocked" },
+  attention: { bg: "bg-status-ready/15", text: "text-status-ready", border: "border-status-ready/40", dot: "bg-status-ready" },
+  "in-progress": { bg: "bg-status-in-progress/15", text: "text-status-in-progress", border: "border-status-in-progress/30", dot: "bg-status-in-progress" },
+  ready: { bg: "bg-status-ready/15", text: "text-status-ready", border: "border-status-ready/40", dot: "bg-status-ready" },
+  closed: { bg: "bg-status-closed/15", text: "text-status-closed", border: "border-status-closed/40", dot: "bg-status-closed" },
+  "not-started": { bg: "bg-status-not-started/15", text: "text-status-not-started", border: "border-status-not-started/30", dot: "bg-status-not-started" },
+};
+
+export function phaseHealthClasses(tone: PhaseHealthTone) {
+  return HEALTH_TONE_CLASSES[tone];
+}
+
+export function computePhaseHealth(
+  phase: Phase | undefined,
+  phaseGates: Gate[],
+  phaseDefs: Deficiency[],
+): PhaseHealth {
+  if (!phase) return { tone: "not-started", label: "Not started", reason: "Phase not yet created" };
+
+  const openDefs = phaseDefs.filter((d) => d.status === "open" || d.status === "in_progress");
+  const severeDefs = openDefs.filter((d) => d.severity === "high" || d.severity === "critical");
+  const failedGate = phaseGates.find((g) => g.status === "failed");
+  const blockedGate = phaseGates.find((g) => g.status === "blocked");
+
+  if (phase.status === "blocked" || blockedGate) {
+    return { tone: "blocked", label: "Blocked", reason: blockedGate ? `${gateLabel(blockedGate.type)} blocked` : "Phase blocked" };
+  }
+  if (failedGate) {
+    return { tone: "blocked", label: "Blocked", reason: `${gateLabel(failedGate.type)} failed` };
+  }
+  if (severeDefs.length > 0) {
+    return { tone: "blocked", label: "Critical issue", reason: `${severeDefs.length} high-severity ${severeDefs.length === 1 ? "issue" : "issues"}` };
+  }
+  if (phase.status === "ready_for_inspection") {
+    return { tone: "attention", label: "Awaiting inspection", reason: "Ready for inspection" };
+  }
+  if (openDefs.length > 0) {
+    return { tone: "attention", label: "Needs attention", reason: `${openDefs.length} open ${openDefs.length === 1 ? "issue" : "issues"}` };
+  }
+  if (phase.status === "in_progress") {
+    return { tone: "in-progress", label: "On track", reason: "Work in progress" };
+  }
+  if (phase.status === "closed") {
+    return { tone: "closed", label: "Closed", reason: "Phase complete" };
+  }
+  return { tone: "not-started", label: "Not started", reason: "Awaiting kickoff" };
+}
+
+export const GATE_LABEL: Record<Gate["type"], string> = {
+  site_check: "Site check",
+  inspection: "Inspection",
+  attic_check: "Attic check",
+};
+
+function gateLabel(type: Gate["type"]) {
+  return GATE_LABEL[type];
+}
+
 export function relativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const m = Math.round(diffMs / 60000);
