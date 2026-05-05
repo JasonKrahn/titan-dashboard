@@ -373,6 +373,18 @@ const DashboardPage = () => {
           Prototype data · Backend swap-in via lib/api adapters
         </p>
       </main>
+
+      <NewClientDialog
+        open={newClientOpen}
+        onOpenChange={setNewClientOpen}
+        onCreated={(id) => handleOpenClient(id)}
+      />
+      <NewProjectDialog
+        open={newProjectOpen}
+        onOpenChange={setNewProjectOpen}
+        currentUser={me}
+        presetClientId={newProjectClientId}
+      />
     </div>
   );
 };
