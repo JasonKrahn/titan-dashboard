@@ -4,6 +4,7 @@ import type {
   AuditEvent,
   ClientRecord,
   Project,
+  ProjectDetail,
   ProjectFilters,
   SubcontractorContact,
   User,
@@ -47,6 +48,18 @@ export async function getUsers(): Promise<ApiResult<User[]>> {
 }
 
 export async function getClients(): Promise<ApiResult<ClientRecord[]>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+
+  if (me.role === "project_manager") {
+    const visibleClientIds = new Set(
+      seedProjects
+        .filter((p) => p.assignedProjectManagerId === me.id)
+        .map((p) => p.clientId),
+    );
+    return delay(ok(seedClients.filter((client) => visibleClientIds.has(client.id))));
+  }
+
   return delay(ok(seedClients));
 }
 
@@ -87,6 +100,9 @@ export async function getProjects(filters?: ProjectFilters): Promise<ApiResult<P
         p.siteAddress.toLowerCase().includes(q),
     );
   }
+  if (filters?.clientId) {
+    result = result.filter((p) => p.clientId === filters.clientId);
+  }
   if (filters?.status?.length) {
     result = result.filter((p) => filters.status!.includes(p.status));
   }
@@ -103,6 +119,40 @@ export async function getProjects(filters?: ProjectFilters): Promise<ApiResult<P
   // Sort by most recently updated.
   result.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
   return delay(ok(result));
+}
+
+export async function getProject(id: string): Promise<ApiResult<ProjectDetail>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+
+  const project = seedProjects.find((p) => p.id === id);
+  if (!project) {
+    return delay({ ok: false, error: { code: "NOT_FOUND", message: "Project not found" } });
+  }
+
+  // PM permission boundary
+  if (me.role === "project_manager" && project.assignedProjectManagerId !== me.id) {
+    return delay({ ok: false, error: { code: "FORBIDDEN", message: "Access denied" } });
+  }
+
+  const client = seedClients.find((c) => c.id === project.clientId);
+  if (!client) {
+    return delay({ ok: false, error: { code: "NOT_FOUND", message: "Client not found" } });
+  }
+
+  const detail: ProjectDetail = {
+    project,
+    client,
+    assignedProjectManager: seedUsers.find((u) => u.id === project.assignedProjectManagerId),
+    phases: seedPhases.filter((p) => p.projectId === id),
+    gates: seedGates.filter((g) => g.projectId === id),
+    deficiencies: seedDeficiencies.filter((d) => d.projectId === id),
+    photoEvidence: seedPhotos.filter((ph) => ph.projectId === id),
+    subcontractors: seedSubcontractors,
+    auditEvents: seedAuditEvents.filter((a) => a.entityId === id).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
+  };
+
+  return delay(ok(detail));
 }
 
 export async function getAllPhases() { return delay(ok(seedPhases)); }
