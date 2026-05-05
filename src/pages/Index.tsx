@@ -279,7 +279,10 @@ const DashboardPage = () => {
               setSelectedClientId(undefined);
               setActiveView("clients");
             }}
-            onCreateProject={() => toast("Project creation not in this iteration")}
+            onCreateProject={() => {
+              setNewProjectClientId(selectedClient.id);
+              setNewProjectOpen(true);
+            }}
             onOpenProject={handleOpenProject}
           />
         ) : activeView === "clients" || activeView === "client-projects" ? (
