@@ -22,6 +22,7 @@ interface ClientProjectsViewProps {
   onCreateProject?: () => void;
   onOpenProject?: (id: string) => void;
   onArchiveProject?: (id: string, name: string) => void;
+  onEditProject?: (id: string) => void;
 }
 
 const filters: { value: ClientProjectFilter; label: string }[] = [
@@ -45,6 +46,7 @@ export function ClientProjectsView({
   onCreateProject,
   onOpenProject,
   onArchiveProject,
+  onEditProject,
 }: ClientProjectsViewProps) {
   const [displayMode, setDisplayMode] = useState<ProjectDisplayMode>(() => {
     const saved = localStorage.getItem("clientProjectViewMode");
@@ -179,6 +181,7 @@ export function ClientProjectsView({
         }
         onOpenProject={onOpenProject}
         onArchiveProject={onArchiveProject}
+        onEditProject={onEditProject}
         displayMode={displayMode}
         onDisplayModeChange={setDisplayMode}
         showTitle={false}
