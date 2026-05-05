@@ -1,119 +1,106 @@
-# Titan PM Dashboard — MVP Prototype Plan
+# Plan — Project Detail redesign + Phase Details + Create modals
 
-Build the Dashboard screen as an interactive prototype, wired through a typed API contract layer with in-memory seed data. UI components never import fixtures directly — they call `lib/api/` functions, matching the architecture docs so the backend can be swapped in later.
+## 1. Project Detail page redesign (`src/pages/ProjectDetail.tsx`)
 
-## Scope (this iteration)
+Replace the current flat layout with a focused, scannable layout:
 
-Just the **Dashboard** screen. Other screens (project detail, phase detail, photo upload, audit) are stubbed routes for later. No auth screen yet — assume an Admin user as the current user, with a toggle to switch to a PM to demonstrate permission filtering.
+**Header band (sticky)**
+- Back button, project number, project status badge
+- Title block: project name (h1), client, address, assigned PM avatar+name, scheduled dates
+- Right side: KPI chips — Open deficiencies, Attic gate status, Last activity
 
-## Design System
+**Three big phase cards (grid: 1 col mobile, 3 col md+)**
+- Each card = one phase (Insulation / Drywall / Finishing)
+- **Single high-level indicator per card** = a colored "phase health" pill that summarizes everything in that phase using priority rules:
+  1. `blocked` (red) — phase blocked OR any failed/blocked gate OR critical/high open deficiency
+  2. `attention` (amber) — ready for inspection OR open deficiencies
+  3. `in progress` (blue) — phase active, no issues
+  4. `not started` (gray)
+  5. `closed` (green)
+- Card body: phase label, the indicator pill with one-line reason ("2 open issues", "Awaiting inspection", "Site check failed"), small meta row (subcontractor / scheduled dates if present)
+- Card is clickable → navigates to `/project/:id/phase/:phaseId`
+- Hover shows "View details →"
 
-Dark theme with Titan orange accent. All tokens defined in `index.css` + `tailwind.config.ts` — no raw colors in components.
+**Project-wide sections below the phases (collapsible / tabbed)**
+- Attic Gate card (kept, cleaner): status, photo evidence indicator, call-in/install dates placeholder
+- Deficiencies summary table (across all phases) with phase column, severity, status
+- Recent activity timeline (current audit list, polished)
 
-- Background: near-black slate (`hsl(222 20% 7%)`)
-- Surface / card: elevated slate (`hsl(222 18% 11%)`)
-- Border: subtle slate (`hsl(222 14% 18%)`)
-- Foreground: off-white
-- Primary (Titan orange): `hsl(20 95% 53%)` (#F97316) + glow variant
-- Status tokens (semantic, used by badges + progress):
-  - `--status-not-started` neutral gray
-  - `--status-in-progress` blue
-  - `--status-ready` amber/yellow
-  - `--status-blocked` red
-  - `--status-closed` green
-- Typography: Inter via Google Fonts, generous tracking on headings
-- Radius: `0.75rem`
-- Subtle gradient + soft shadow tokens for hero stat cards
+Goal: at a glance, the user sees one indicator per phase and the overall project pulse — drill-in lives on the Phase Details page.
 
-Mobile-first responsive grid: 1 col → 2 col (md) → 3 col (xl) for project cards. Sticky filter bar on mobile.
+## 2. New Phase Details page (`src/pages/PhaseDetail.tsx`)
 
-## Architecture
+Route: `/project/:projectId/phase/:phaseId` (added in `App.tsx`).
 
-```text
-src/
-  lib/
-    types.ts                  # All entity types from DATA_MODEL.md
-    api/
-      index.ts                # Re-exports the active adapter
-      contract.ts             # Function signatures + ApiResult<T>
-      adapters/
-        prototype/
-          index.ts            # Implements contract against seed data
-          seed.ts             # Seed fixtures (4+ clients, 10+ projects, etc.)
-    derived.ts                # Pure helpers: phaseProgress, hasBlockedWork,
-                              # missingAtticEvidence, dueInspections, lastActivity
-  hooks/
-    useCurrentUser.ts
-    useProjects.ts            # React Query wrappers around contract calls
-  components/
-    dashboard/
-      StatsRow.tsx            # 3 KPI cards: active projects, blocked, due this week
-      FilterBar.tsx           # status, assigned PM, has blocked, missing attic
-      ProjectCard.tsx         # main card per spec
-      PhaseProgress.tsx       # 3-segment bar for Insulation/Drywall/Finishing
-      StatusBadge.tsx         # token-driven variants for all status enums
-      DueInspectionsPanel.tsx
-      AtticAlertsPanel.tsx
-      EmptyState.tsx
-      RoleSwitcher.tsx        # demo-only Admin ⇄ PM toggle
-    ui/...                    # existing shadcn
-  pages/
-    Index.tsx                 # Dashboard
-```
+Layout:
+- Header: breadcrumb (Project › Phase), phase title, the same health indicator pill, current status badge
+- Action row: "Start phase" / "Mark ready for inspection" placeholders (disabled with tooltip — gates required)
+- Tabs (using existing shadcn `tabs.tsx`):
+  - **Overview** — schedule, assigned subcontractor, foreman/QC info placeholder
+  - **Gates** — Site Check + Inspection cards with status, photo evidence count, completed-by
+  - **Deficiencies** — list scoped to this phase, severity, status, before/after photo placeholders
+  - **Photos** — grid of photo evidence for this phase (placeholders if none)
+  - **Activity** — audit events filtered to this phase
 
-Contract returns `ApiResult<T>` exactly as in `API_CONTRACT.md`. PM role filters projects to those where `assignedProjectManagerId` matches current user — enforced inside the adapter, not the UI.
+API additions in `src/lib/api/adapters/prototype/index.ts`:
+- `getPhase(phaseId): ApiResult<PhaseDetail>` — returns the existing `PhaseDetail` shape (already in `types.ts`), enforces PM permission via parent project.
 
-## Dashboard Layout
+## 3. "New Client" modal (`src/components/dashboard/NewClientDialog.tsx`)
 
-```text
-┌───────────────────────────────────────────────────────────┐
-│  Titan PM         Dashboard           [Admin ▾] [+ New]  │  header
-├───────────────────────────────────────────────────────────┤
-│  [Active 12]   [Blocked 3]   [Inspections due 5]         │  StatsRow
-├───────────────────────────────────────────────────────────┤
-│  Filters: Status ▾  PM ▾  ☐ Blocked  ☐ Missing attic     │  FilterBar
-├───────────────────────────────────────────────────────────┤
-│  ⚠ Attic Check Required (2)     |   ⏰ Due Inspections (5)│  alert panels
-├───────────────────────────────────────────────────────────┤
-│  ┌ ProjectCard ┐  ┌ ProjectCard ┐  ┌ ProjectCard ┐       │
-│  │ name+client │  │             │  │             │       │  grid
-│  │ phase bar   │  │             │  │             │       │
-│  │ gates row   │  │             │  │             │       │
-│  │ defs · PM   │  │             │  │             │       │
-│  └─────────────┘  └─────────────┘  └─────────────┘       │
-└───────────────────────────────────────────────────────────┘
-```
+Triggered from header "New client" button (clients view) and a future empty state CTA.
 
-### ProjectCard contents
-- Project name (clickable, routes to `/projects/:id` placeholder) + client company underneath
-- Status badge for project status (top-right)
-- `PhaseProgress`: three labeled segments (Insulation / Drywall / Finishing), each colored by phase status token, with a tooltip showing the status name
-- Gate row: three pill chips — Site Check, Inspection, Attic Check — colored by gate status
-- Footer: open deficiencies count (red dot if > 0), assigned PM avatar (initials fallback), last activity timestamp ("2h ago" via lightweight relative-time helper)
+Fields (react-hook-form + zod):
+- Name * (required)
+- Primary contact name
+- Phone
+- Email (validated)
+- Billing address (textarea)
+- Notes (textarea)
 
-### Empty state
-Friendly illustration block + message + "Clear filters" action when filters yield zero results, distinct from "no projects exist yet".
+Submit:
+- Calls new `createClient(input)` in prototype adapter — appends to `seedClients`, returns the created record, invalidates `["clients"]`.
+- Toast success, closes modal, navigates to that client's projects.
 
-## Seed Data
+## 4. "New Project" modal (`src/components/dashboard/NewProjectDialog.tsx`)
 
-Per `DATA_MODEL.md` §Seed Data Requirements: 2 users (1 admin, 1 PM), 4+ clients, 10+ projects across all statuses, all three phase types, ≥1 blocked phase, ≥1 failed inspection, ≥1 project missing attic photo evidence, ≥1 ready-to-complete, ≥20 audit events. Timestamps are relative to "now" so the dashboard always feels fresh.
+Triggered from:
+- Header "New project" (when on dashboard or inside client-projects view)
+- Empty state inside `ClientProjectsView`
 
-## States Covered
+Fields:
+- Client * (Select; pre-filled & locked when opened from a client context)
+- Project number * (auto-suggest "TPM-XXXX" based on count, editable)
+- Project name *
+- Site address *
+- Assigned Project Manager (Select of PMs; admin only — for PM users defaults to self and is hidden)
+- Scheduled start / end (date inputs)
+- Status (defaults to `draft`)
 
-- Loading: skeletons on stats + cards
-- Error: inline alert with retry
-- Empty (no projects, no filter matches)
-- Success
-- Permission: PM sees only their projects; Admin-only "+ New Project" button hidden for PM
+Submit:
+- Calls new `createProject(input)` in prototype adapter:
+  - Appends `Project` to `seedProjects`
+  - Auto-generates the three default `Phase` rows (insulation/drywall/finishing, status `not_started`) per the spec ("Generates default phases")
+  - Auto-generates the standard `Gate` rows (site_check + inspection per phase, attic_check per project)
+  - Writes an `AuditEvent`
+- Invalidates `["projects", …]`, `["phases"]`, `["gates"]`.
+- Toast success, navigates to the new project's detail page.
 
-## Out of Scope (this iteration)
+## 5. Wire-up changes
 
-Project detail page, phase detail, photo upload flow, audit trail page, settings, real auth. Routes exist as placeholder pages so cards can link without 404s.
+- `src/pages/Index.tsx`: replace the two `toast(...)` placeholders on the New client / New project buttons with the new dialogs (state-controlled `open`).
+- `src/components/dashboard/ClientProjectsView.tsx`: pass through a real `onCreateProject` that opens the project dialog with `clientId` pre-filled.
+- `src/App.tsx`: add `/project/:projectId/phase/:phaseId` route.
 
-## Definition of Done
+## Technical notes
 
-- Dashboard renders on mobile (375px) and desktop with the layout above
-- All status colors come from semantic tokens, no hardcoded hex in components
-- All data flows through `lib/api/` — no fixture imports in components
-- Role switcher demonstrates PM filtering and hidden Admin controls
-- Loading, empty, and error states verified
+- All new colors stay on the existing semantic tokens (`status-*`, `primary`, `muted`, `card`). Add a derived helper `phaseHealth(phase, gates, deficiencies)` in `src/lib/derived.ts` returning `{ tone: StatusTone | "attention", label: string, reason: string }` — this single function powers the phase card indicator on both the dashboard project card (optional follow-up) and project detail.
+- Modals use existing `Dialog`, `Form`, `Input`, `Select`, `Textarea`, `Button` shadcn components. No new deps.
+- Adapter mutations append to in-memory arrays; surviving the session is fine for the prototype, matching how the rest of `seed.ts` is mutated nowhere.
+- No backend / Lovable Cloud changes — still pure prototype adapter.
+
+## Out of scope
+
+- Photo upload UI (placeholders only)
+- Editing existing projects / phases
+- Recycle bin & client deletion
+- Real auth, real audit writes for non-create actions
