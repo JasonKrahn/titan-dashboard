@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import type { ProjectFilters } from "@/lib/types";
+import type { ProjectFilters, ProjectStatus } from "@/lib/types";
 import type { User } from "@/lib/types";
 
 interface FilterBarProps {
@@ -19,6 +19,7 @@ interface FilterBarProps {
 export function FilterBar({ filters, search, onSearchChange, onChange, pms, isAdmin }: FilterBarProps) {
   const statusValue = filters.status?.[0] ?? "all";
   const pmValue = filters.assignedProjectManagerId ?? "all";
+  const projectStatuses: ProjectStatus[] = ["active", "completed", "draft", "archived"];
 
   const hasActive =
     !!search ||
@@ -42,17 +43,23 @@ export function FilterBar({ filters, search, onSearchChange, onChange, pms, isAd
 
         <Select
           value={statusValue}
-          onValueChange={(v) => onChange({ ...filters, status: v === "all" ? undefined : [v as any] })}
+          onValueChange={(v) =>
+            onChange({
+              ...filters,
+              status: v === "all" ? undefined : [v as ProjectStatus],
+            })
+          }
         >
           <SelectTrigger className="w-full md:w-[150px] bg-background/60">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-            <SelectItem value="draft">Draft</SelectItem>
-            <SelectItem value="archived">Archived</SelectItem>
+            {projectStatuses.map((status) => (
+              <SelectItem key={status} value={status}>
+                {status[0].toUpperCase() + status.slice(1)}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
 
