@@ -1,4 +1,4 @@
-import { AlertOctagon, ArrowUpRight, Camera } from "lucide-react";
+import { AlertOctagon, ArrowUpRight, Camera, MapPin } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { StatusBadge } from "./StatusBadge";
 import { PhaseProgress } from "./PhaseProgress";
@@ -72,8 +72,8 @@ export function ProjectCard({
     <Card
       onClick={() => onOpen?.(project.id)}
       className={cn(
-        "group bg-gradient-surface border-border p-5 cursor-pointer",
-        "transition-all hover:border-primary/40 hover:shadow-glow",
+        "group bg-gradient-surface border-border p-5 cursor-pointer shadow-card",
+        "transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-glow",
         "animate-fade-in",
       )}
     >
@@ -88,6 +88,10 @@ export function ProjectCard({
           </h3>
           <p className="text-sm text-muted-foreground truncate mt-0.5">
             {client?.name ?? "Unknown client"}
+          </p>
+          <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground/85">
+            <MapPin className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">{project.siteAddress}</span>
           </p>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
@@ -129,7 +133,7 @@ export function ProjectCard({
           )}
         </div>
         <div className="flex items-center gap-2.5">
-          <span className="text-[11px] text-muted-foreground">{relativeTime(project.updatedAt)}</span>
+          <span className="text-[11px] text-muted-foreground">Updated {relativeTime(project.updatedAt)}</span>
           {pm ? (
             <div
               className="h-7 w-7 rounded-full bg-primary/15 text-primary text-[11px] font-semibold flex items-center justify-center border border-primary/30"

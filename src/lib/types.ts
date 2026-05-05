@@ -182,6 +182,28 @@ export type ApiResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: ApiError };
 
+export interface ProjectDetail {
+  project: Project;
+  client: ClientRecord;
+  assignedProjectManager?: User;
+  phases: Phase[];
+  gates: Gate[];
+  deficiencies: Deficiency[];
+  photoEvidence: PhotoEvidence[];
+  subcontractors: SubcontractorContact[];
+  auditEvents: AuditEvent[];
+}
+
+export interface PhaseDetail {
+  phase: Phase;
+  project: Project;
+  gates: Gate[];
+  deficiencies: Deficiency[];
+  photoEvidence: PhotoEvidence[];
+  subcontractors: SubcontractorContact[];
+  auditEvents: AuditEvent[];
+}
+
 export interface ProjectFilters {
   search?: string;
   clientId?: string;
