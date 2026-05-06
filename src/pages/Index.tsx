@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useLocation, Link } from "react-router-dom";
-import { Plus, AlertCircle, Users, FileText, Settings } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate, useLocation } from "react-router-dom";
+import { AlertCircle } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AppHeader, type DashboardViewTarget } from "@/components/dashboard/AppHeader";
 import { StatsRow } from "@/components/dashboard/StatsRow";
 import { FilterBar } from "@/components/dashboard/FilterBar";
 import { ProjectResults } from "@/components/dashboard/ProjectResults";
@@ -12,10 +13,8 @@ import { ClientProjectsView, type ClientProjectFilter } from "@/components/dashb
 import { ArchivePanel, DueInspectionsPanel } from "@/components/dashboard/AlertPanels";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { ArchiveProjectDialog } from "@/components/dashboard/ArchiveProjectDialog";
-import { RoleSwitcher } from "@/components/dashboard/RoleSwitcher";
 import { NewClientDialog } from "@/components/dashboard/NewClientDialog";
 import { NewProjectDialog } from "@/components/dashboard/NewProjectDialog";
-import { SettingsDialog } from "@/components/dashboard/SettingsDialog";
 import {
   getAllDeficiencies,
   getAllGates,
@@ -25,18 +24,15 @@ import {
   getCurrentUser,
   getProjects,
   getUsers,
-  setCurrentUser,
 } from "@/lib/api";
 import type { ProjectFilters } from "@/lib/types";
 
-import { toast } from "sonner";
-
 type ActiveView = "clients" | "client-projects" | "dashboard";
+type DashboardRouteState = { clientId?: string; view?: DashboardViewTarget } | null;
 
 const DashboardPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const qc = useQueryClient();
   const [activeView, setActiveView] = useState<ActiveView>("clients");
   const [selectedClientId, setSelectedClientId] = useState<string | undefined>();
   const [clientProjectFilter, setClientProjectFilter] = useState<ClientProjectFilter>("all");
@@ -50,7 +46,6 @@ const DashboardPage = () => {
   const [editProjectId, setEditProjectId] = useState<string | undefined>();
   const [archiveTarget, setArchiveTarget] = useState<{ id: string; name: string } | null>(null);
   const [newProjectClientId, setNewProjectClientId] = useState<string | undefined>();
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 200);
@@ -92,17 +87,14 @@ const DashboardPage = () => {
 
   const isAdmin = me?.role === "admin";
 
-  const handleSwitchUser = (userId: string) => {
-    setCurrentUser(userId);
-    setActiveView("clients");
-    setSelectedClientId(undefined);
-    setClientProjectFilter("all");
-    qc.invalidateQueries();
-    toast.success("Switched user");
-  };
-
   const handleOpenProject = (id: string) => {
     navigate(`/project/${id}`);
+  };
+
+  const handleSelectDashboardView = (view: DashboardViewTarget) => {
+    setSelectedClientId(undefined);
+    setClientProjectFilter("all");
+    setActiveView(view);
   };
 
   const handleOpenClient = (id: string) => {
@@ -112,13 +104,17 @@ const DashboardPage = () => {
   };
 
   useEffect(() => {
-    const state = location.state as { clientId?: string } | null;
+    const state = location.state as DashboardRouteState;
     if (state?.clientId) {
       handleOpenClient(state.clientId);
       window.history.replaceState({}, "");
+      return;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (state?.view) {
+      handleSelectDashboardView(state.view);
+      window.history.replaceState({}, "");
+    }
+  }, [location.state]);
 
   const handleEditClient = (id: string) => {
     setEditClientId(id);
@@ -178,89 +174,11 @@ const DashboardPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border sticky top-0 z-20 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div className="container flex items-center justify-between h-16">
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedClientId(undefined);
-              setActiveView("clients");
-            }}
-            className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
-          >
-            <div className="h-9 w-9 rounded-lg bg-gradient-primary flex items-center justify-center shadow-glow">
-              <span className="text-lg font-bold text-primary-foreground leading-none">T</span>
-            </div>
-            <div>
-              <div className="font-bold tracking-tight leading-tight">Titan PM</div>
-              <div className="text-[10px] text-muted-foreground uppercase tracking-widest">Operations</div>
-            </div>
-          </button>
-          <div className="flex items-center gap-4 sm:gap-8">
-            {/* Navigation items */}
-            <div className="flex items-center gap-2 sm:gap-3">
-              {activeView !== "client-projects" && (
-                <div className="inline-flex w-fit rounded-lg border border-border bg-card p-1 shadow-card">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedClientId(undefined);
-                      setActiveView("clients");
-                    }}
-                    className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                      activeView === "clients"
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                    }`}
-                  >
-                    Clients
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedClientId(undefined);
-                      setActiveView("dashboard");
-                    }}
-                    className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                      activeView === "dashboard"
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                    }`}
-                  >
-                    All Projects
-                  </button>
-                </div>
-              )}
-              <Link
-                to="/subs"
-                className="hidden sm:inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground"
-              >
-                <Users className="h-4 w-4" />
-                Subcontractor Rolodex
-              </Link>
-            </div>
-            {/* Decorative divider */}
-            <div className="hidden sm:flex items-center gap-2">
-              <div className="h-4 w-px bg-border/50"></div>
-              <div className="h-1.5 w-1.5 rounded-full bg-border/50"></div>
-              <div className="h-4 w-px bg-border/50"></div>
-            </div>
-            {/* User actions */}
-            <div className="flex items-center gap-2">
-              {me && <RoleSwitcher current={me} users={users} onSwitch={handleSwitchUser} />}
-              <button
-                type="button"
-                onClick={() => setSettingsOpen(true)}
-                className="inline-flex items-center justify-center rounded-md border border-border bg-card p-2 text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground"
-                aria-label="Settings"
-              >
-                <Settings className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <AppHeader
+        activeSection={activeView === "dashboard" ? "dashboard" : "clients"}
+        onSelectDashboardView={handleSelectDashboardView}
+        onUserSwitch={() => handleSelectDashboardView("clients")}
+      />
 
       <main className="container py-6 space-y-6">
         {/* Title */}
@@ -344,17 +262,6 @@ const DashboardPage = () => {
               blockedItems={stats.blockedItems}
               inspectionsDueThisWeek={stats.inspections}
             />
-
-            {/* Quick links */}
-            <div className="flex flex-wrap gap-2">
-              <Link
-                to="/activity"
-                className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground"
-              >
-                <FileText className="h-4 w-4" />
-                Activity Log
-              </Link>
-            </div>
 
             {/* Filters */}
             <FilterBar
@@ -444,16 +351,6 @@ const DashboardPage = () => {
           onOpenChange={(o) => { if (!o) setArchiveTarget(null); }}
           projectId={archiveTarget.id}
           projectName={archiveTarget.name}
-        />
-      )}
-      {me && (
-        <SettingsDialog
-          open={settingsOpen}
-          onOpenChange={setSettingsOpen}
-          user={me}
-          onUpdated={() => {
-            // User data will be refreshed via query invalidation in the dialog
-          }}
         />
       )}
     </div>

@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   ArrowLeft,
   Camera,
-  ChevronRight,
   Clock,
   FileText,
   Image as ImageIcon,
@@ -17,6 +16,15 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AppHeader } from "@/components/dashboard/AppHeader";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -115,11 +123,7 @@ export default function PhaseDetailPage() {
   if (phaseQ.isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="border-b border-border">
-          <div className="container flex h-16 items-center">
-            <Skeleton className="h-9 w-24" />
-          </div>
-        </header>
+        <AppHeader activeSection="dashboard" />
         <main className="container space-y-6 py-6">
           <Skeleton className="h-24" />
           <Skeleton className="h-64" />
@@ -131,15 +135,14 @@ export default function PhaseDetailPage() {
   if (error || !detail || !health) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="border-b border-border">
-          <div className="container flex h-16 items-center">
+        <AppHeader activeSection="dashboard" />
+        <main className="container py-6">
+          <div className="mb-4">
             <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
               <ArrowLeft className="mr-1 h-4 w-4" />
               Back
             </Button>
           </div>
-        </header>
-        <main className="container py-6">
           <Alert variant={error ? "destructive" : "default"}>
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>{error ? "Couldn't load phase" : "Phase not found"}</AlertTitle>
@@ -155,22 +158,33 @@ export default function PhaseDetailPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-1 text-sm">
-            <Button variant="ghost" size="sm" className="px-2" onClick={() => navigate(-1)}>
-              <ArrowLeft className="mr-1 h-4 w-4" />
-              Dashboard
-            </Button>
-            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <Link to={`/project/${project.id}`} className="text-muted-foreground hover:text-foreground transition-colors">{project.name}</Link>
-            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span className="font-medium text-foreground">{PHASE_LABEL[phase.type]}</span>
-          </div>
-        </div>
-      </header>
+      <AppHeader activeSection="dashboard" />
 
       <main className="container space-y-6 py-6">
+        <Breadcrumb>
+          <BreadcrumbList className="flex-nowrap overflow-hidden">
+            <BreadcrumbItem className="shrink-0">
+              <BreadcrumbLink asChild>
+                <Link to="/" state={{ view: "dashboard" }}>
+                  All Projects
+                </Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem className="min-w-0">
+              <BreadcrumbLink asChild className="block max-w-[190px] truncate sm:max-w-[320px]">
+                <Link to={`/project/${project.id}`}>{project.name}</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem className="min-w-0">
+              <BreadcrumbPage className="block max-w-[150px] truncate sm:max-w-[240px]">
+                {PHASE_LABEL[phase.type]}
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
         {/* Hero */}
         <section className="rounded-xl border border-border bg-gradient-surface p-6 shadow-card">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">

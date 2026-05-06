@@ -23,6 +23,7 @@ export function SettingsDialog({ open, onOpenChange, user, onUpdated }: Settings
   const [form, setForm] = useState<UpdateUserInput>(empty);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("theme") !== "light");
+  const [accentColor, setAccentColor] = useState(() => localStorage.getItem("accentColor") ?? "blue");
 
   useEffect(() => {
     if (user) {
@@ -128,6 +129,46 @@ export function SettingsDialog({ open, onOpenChange, user, onUpdated }: Settings
                 localStorage.setItem("theme", isDark ? "dark" : "light");
               }}
             />
+          </div>
+
+          <div className="space-y-2 py-2">
+            <div className="space-y-0.5">
+              <Label>Primary color</Label>
+              <p className="text-xs text-muted-foreground">Choose your preferred accent color</p>
+            </div>
+            <div className="flex gap-2">
+              {([
+                { key: "blue",    hex: "#3b82f6", label: "Blue" },
+                { key: "green",   hex: "#22c55e", label: "Green" },
+                { key: "purple",  hex: "#8b5cf6", label: "Purple" },
+                { key: "orange",  hex: "#f97316", label: "Orange" },
+                { key: "magenta", hex: "#ec4899", label: "Magenta" },
+              ] as const).map(({ key, hex, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  title={label}
+                  aria-label={`Set primary color to ${label}`}
+                  className="relative h-8 w-8 rounded-full transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  style={{
+                    backgroundColor: hex,
+                    boxShadow: accentColor === key
+                      ? `0 0 0 2px hsl(var(--background)), 0 0 0 4px ${hex}`
+                      : undefined,
+                  }}
+                  onClick={() => {
+                    setAccentColor(key);
+                    if (key === "blue") {
+                      document.documentElement.removeAttribute("data-accent");
+                      localStorage.removeItem("accentColor");
+                    } else {
+                      document.documentElement.setAttribute("data-accent", key);
+                      localStorage.setItem("accentColor", key);
+                    }
+                  }}
+                />
+              ))}
+            </div>
           </div>
 
           <DialogFooter className="pt-2">

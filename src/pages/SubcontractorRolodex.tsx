@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Building2, Mail, Phone, Search, Wrench, Plus, Pencil, Trash2 } from "lucide-react";
+import { Building2, Mail, Phone, Search, Wrench, Plus, Pencil, Trash2 } from "lucide-react";
+import { AppHeader } from "@/components/dashboard/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,7 +30,6 @@ const TRADE_COLOR: Record<string, string> = {
 };
 
 export default function SubcontractorRolodexPage() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -251,11 +251,7 @@ export default function SubcontractorRolodexPage() {
   if (subsQ.isLoading || phasesQ.isLoading || projectsQ.isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="border-b border-border sticky top-0 z-20 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-          <div className="container flex items-center h-16">
-            <Skeleton className="h-9 w-20" />
-          </div>
-        </header>
+        <AppHeader activeSection="subs" />
         <main className="container py-6 space-y-6">
           <Skeleton className="h-10 w-full max-w-sm" />
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -277,14 +273,7 @@ export default function SubcontractorRolodexPage() {
                   projectsData?.error;
     return (
       <div className="min-h-screen bg-background">
-        <header className="border-b border-border sticky top-0 z-20 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-          <div className="container flex items-center h-16">
-            <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              Back
-            </Button>
-          </div>
-        </header>
+        <AppHeader activeSection="subs" />
         <main className="container py-6">
           <Alert variant="destructive">
             <AlertTitle>Couldn&apos;t load data</AlertTitle>
@@ -297,33 +286,25 @@ export default function SubcontractorRolodexPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border sticky top-0 z-20 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div className="container flex items-center justify-between h-16">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back
-          </Button>
-          <div className="text-sm font-medium">Subcontractor Rolodex</div>
-        </div>
-      </header>
+      <AppHeader activeSection="subs" />
 
       <main className="container py-6 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+        <div className="space-y-3">
           <h1 className="text-2xl font-bold">Subcontractor Rolodex</h1>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name, company, or trade..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <Button onClick={() => setIsAddDialogOpen(true)}>
+          <div className="sticky top-[4.5rem] z-10 -mx-1 rounded-lg bg-background/95 px-1 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:py-0">
+            <Button className="h-10 w-full sm:w-auto" onClick={() => setIsAddDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-1" />
               Add Subcontractor
             </Button>
+          </div>
+          <div className="relative w-full sm:max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, company, or trade..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
           </div>
         </div>
 
