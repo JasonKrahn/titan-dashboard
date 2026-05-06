@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Clock, FileText, Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Clock, FileText, Search } from "lucide-react";
+import { AppHeader } from "@/components/dashboard/AppHeader";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -106,7 +105,6 @@ function eventTitle(a: AuditEvent) {
 }
 
 export default function ActivityLogPage() {
-  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [actionFilter, setActionFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
@@ -262,11 +260,7 @@ export default function ActivityLogPage() {
   ) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="border-b border-border sticky top-0 z-20 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-          <div className="container flex items-center h-16">
-            <Skeleton className="h-9 w-20" />
-          </div>
-        </header>
+        <AppHeader activeSection="activity" />
         <main className="container py-6 space-y-6">
           <Skeleton className="h-10 w-full max-w-sm" />
           <div className="space-y-3">
@@ -282,14 +276,7 @@ export default function ActivityLogPage() {
   if (auditQ.data?.ok === false) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="border-b border-border sticky top-0 z-20 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-          <div className="container flex items-center h-16">
-            <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              Back
-            </Button>
-          </div>
-        </header>
+        <AppHeader activeSection="activity" />
         <main className="container py-6">
           <Alert variant="destructive">
             <AlertTitle>Couldn&apos;t load activity</AlertTitle>
@@ -302,19 +289,12 @@ export default function ActivityLogPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border sticky top-0 z-20 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div className="container flex items-center h-16">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back
-          </Button>
-        </div>
-      </header>
+      <AppHeader activeSection="activity" />
 
       <main className="container py-6 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-bold">Activity Log</h1>
-          <div className="relative w-full sm:w-72">
+          <div className="relative w-full sm:max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search events..."
@@ -326,9 +306,9 @@ export default function ActivityLogPage() {
         </div>
 
         {/* Filter dropdowns */}
-        <div className="flex flex-wrap gap-2">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <Select value={actionFilter} onValueChange={setActionFilter}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="All action types" />
             </SelectTrigger>
             <SelectContent>
@@ -342,7 +322,7 @@ export default function ActivityLogPage() {
           </Select>
 
           <Select value={clientFilter} onValueChange={setClientFilter}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="All clients" />
             </SelectTrigger>
             <SelectContent>
@@ -354,7 +334,7 @@ export default function ActivityLogPage() {
           </Select>
 
           <Select value={pmFilter} onValueChange={setPmFilter}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="All project managers" />
             </SelectTrigger>
             <SelectContent>
@@ -366,7 +346,7 @@ export default function ActivityLogPage() {
           </Select>
 
           <Select value={projectFilter} onValueChange={setProjectFilter}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="All projects" />
             </SelectTrigger>
             <SelectContent>

@@ -24,6 +24,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AppHeader } from "@/components/dashboard/AppHeader";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -184,11 +193,7 @@ export default function ProjectDetailPage() {
   if (projectQ.isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="border-b border-border">
-          <div className="container flex h-16 items-center">
-            <Skeleton className="h-9 w-20" />
-          </div>
-        </header>
+        <AppHeader activeSection="dashboard" />
         <main className="container space-y-6 py-6">
           <Skeleton className="h-24" />
           <div className="grid gap-4 md:grid-cols-3">
@@ -205,15 +210,14 @@ export default function ProjectDetailPage() {
   if (error || !detail) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="border-b border-border">
-          <div className="container flex h-16 items-center">
+        <AppHeader activeSection="dashboard" />
+        <main className="container py-6">
+          <div className="mb-4">
             <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
               <ArrowLeft className="mr-1 h-4 w-4" />
               Back
             </Button>
           </div>
-        </header>
-        <main className="container py-6">
           <Alert variant={error ? "destructive" : "default"}>
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>{error ? "Couldn't load project" : "Project not found"}</AlertTitle>
@@ -229,39 +233,33 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Top bar */}
-      <header className="sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div className="container flex h-16 items-center justify-between">
-          <div className="flex min-w-0 items-center gap-1 text-sm">
-            <Button variant="ghost" size="sm" className="shrink-0 px-2" onClick={() => navigate(-1)}>
-              <ArrowLeft className="mr-1 h-4 w-4" />
-              Dashboard
-            </Button>
-            <ChevronRight className="shrink-0 h-3.5 w-3.5 text-muted-foreground" />
-            <button
-              type="button"
-              className="truncate max-w-[120px] sm:max-w-[200px] text-muted-foreground hover:text-foreground transition-colors"
-              onClick={() => navigate("/", { state: { clientId: detail.client.id } })}
-            >
-              {detail.client.name}
-            </button>
-            <ChevronRight className="shrink-0 h-3.5 w-3.5 text-muted-foreground" />
-            <span className="truncate max-w-[120px] sm:max-w-[200px] font-medium text-foreground">{p.name}</span>
-          </div>
-          <div className="hidden md:flex items-center gap-3 text-sm">
-            <span className="font-mono text-xs text-muted-foreground">{p.projectNumber}</span>
-            <StatusBadge tone={projectStatusTone(p.status)} label={STATUS_LABEL[p.status]} size="sm" />
-            {p.status === "completed" && (
-              <Button variant="outline" size="sm" onClick={() => setArchiveOpen(true)}>
-                <Archive className="mr-1 h-4 w-4" />
-                Archive
-              </Button>
-            )}
-          </div>
-        </div>
-      </header>
+      <AppHeader activeSection="dashboard" />
 
       <main className="container space-y-8 py-6">
+        <Breadcrumb>
+          <BreadcrumbList className="flex-nowrap overflow-hidden">
+            <BreadcrumbItem className="shrink-0">
+              <BreadcrumbLink asChild>
+                <Link to="/" state={{ view: "dashboard" }}>
+                  All Projects
+                </Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem className="min-w-0">
+              <BreadcrumbLink asChild className="block max-w-[180px] truncate sm:max-w-[260px]">
+                <Link to="/" state={{ clientId: detail.client.id }}>
+                  {detail.client.name}
+                </Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem className="min-w-0">
+              <BreadcrumbPage className="block max-w-[190px] truncate sm:max-w-[320px]">{p.name}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
         {/* Hero / project header */}
         <section className="rounded-xl border border-border bg-gradient-surface p-6 shadow-card">
           <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
@@ -297,10 +295,17 @@ export default function ProjectDetailPage() {
 
             {/* KPI chips */}
             <div className="flex flex-wrap gap-3 lg:flex-col lg:items-end">
+              <StatusBadge tone={projectStatusTone(p.status)} label={STATUS_LABEL[p.status]} size="sm" />
               {p.status !== "completed" && p.status !== "archived" && (
                 <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
                   <Pencil className="mr-1 h-4 w-4" />
                   Edit
+                </Button>
+              )}
+              {p.status === "completed" && (
+                <Button variant="outline" size="sm" onClick={() => setArchiveOpen(true)}>
+                  <Archive className="mr-1 h-4 w-4" />
+                  Archive
                 </Button>
               )}
               <KpiChip

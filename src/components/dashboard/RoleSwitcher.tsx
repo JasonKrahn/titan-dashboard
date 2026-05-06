@@ -19,12 +19,12 @@ interface RoleSwitcherProps {
 export function RoleSwitcher({ current, users, onSwitch }: RoleSwitcherProps) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-border hover:bg-accent transition-colors">
+      <DropdownMenuTrigger className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-2.5 py-1.5 transition-colors hover:bg-accent">
         <div className="h-7 w-7 rounded-full bg-primary/15 text-primary text-xs font-semibold flex items-center justify-center border border-primary/30">
           {initials(current.fullName)}
         </div>
-        <div className="text-left hidden sm:block">
-          <div className="text-xs font-medium leading-tight">{current.fullName}</div>
+        <div className="min-w-0 text-left hidden lg:block">
+          <div className="max-w-[140px] truncate text-xs font-medium leading-tight">{current.fullName}</div>
           <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
             {current.role === "admin" ? "Admin" : "Project Manager"}
           </div>

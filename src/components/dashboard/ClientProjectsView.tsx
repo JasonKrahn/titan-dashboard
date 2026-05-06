@@ -110,14 +110,19 @@ export function ClientProjectsView({
         </span>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="space-y-3">
         {onCreateProject && (
-          <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={onCreateProject}>
-            <Plus className="mr-1 h-4 w-4" />
-            New project
-          </Button>
+          <div className="sticky top-[6.75rem] z-10 -mx-1 rounded-lg bg-background/95 px-1 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:py-0">
+            <Button
+              className="h-10 w-full bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto"
+              onClick={onCreateProject}
+            >
+              <Plus className="mr-1 h-4 w-4" />
+              New project
+            </Button>
+          </div>
         )}
-        <div className="relative w-full md:w-[360px]">
+        <div className="relative w-full sm:max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
@@ -126,41 +131,43 @@ export function ClientProjectsView({
             className="bg-background/60 pl-9"
           />
         </div>
-        <Select value={filter} onValueChange={onFilterChange}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter" />
-          </SelectTrigger>
-          <SelectContent>
-            {filters.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <div className="inline-flex w-fit gap-1 rounded-md border border-border bg-card p-1 shadow-card">
-          <Button
-            type="button"
-            variant={displayMode === "list" ? "default" : "ghost"}
-            size="sm"
-            className="h-8 px-2"
-            aria-pressed={displayMode === "list"}
-            onClick={() => setDisplayMode("list")}
-          >
-            <List className="h-4 w-4" />
-            List
-          </Button>
-          <Button
-            type="button"
-            variant={displayMode === "cards" ? "default" : "ghost"}
-            size="sm"
-            className="h-8 px-2"
-            aria-pressed={displayMode === "cards"}
-            onClick={() => setDisplayMode("cards")}
-          >
-            <Grid2X2 className="h-4 w-4" />
-            Cards
-          </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={filter} onValueChange={onFilterChange}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="Filter" />
+            </SelectTrigger>
+            <SelectContent>
+              {filters.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="inline-flex w-fit gap-1 rounded-md border border-border bg-card p-1 shadow-card">
+            <Button
+              type="button"
+              variant={displayMode === "list" ? "default" : "ghost"}
+              size="sm"
+              className="h-8 px-2"
+              aria-pressed={displayMode === "list"}
+              onClick={() => setDisplayMode("list")}
+            >
+              <List className="h-4 w-4" />
+              List
+            </Button>
+            <Button
+              type="button"
+              variant={displayMode === "cards" ? "default" : "ghost"}
+              size="sm"
+              className="h-8 px-2"
+              aria-pressed={displayMode === "cards"}
+              onClick={() => setDisplayMode("cards")}
+            >
+              <Grid2X2 className="h-4 w-4" />
+              Cards
+            </Button>
+          </div>
         </div>
       </div>
 

@@ -83,18 +83,21 @@ export function ClientDirectory({
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="space-y-3">
         {isAdmin && onNewClient && (
-          <Button
-            size="sm"
-            className="bg-primary hover:bg-primary/90 text-primary-foreground hidden sm:inline-flex"
-            onClick={onNewClient}
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            New client
-          </Button>
+          <div className="sticky top-[6.75rem] z-10 -mx-1 rounded-lg bg-background/95 px-1 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:py-0">
+            <Button
+              size="sm"
+              className="h-10 w-full bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto"
+              onClick={onNewClient}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New client
+            </Button>
+          </div>
         )}
-        <div className="relative w-full md:w-[360px]">
+
+        <div className="relative w-full sm:max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             ref={searchInputRef}
@@ -104,29 +107,32 @@ export function ClientDirectory({
             className="bg-background/60 pl-9"
           />
         </div>
-        <div className="inline-flex w-fit gap-1 rounded-md border border-border bg-card p-1 shadow-card">
-          <Button
-            type="button"
-            variant={displayMode === "list" ? "default" : "ghost"}
-            size="sm"
-            className="h-8 px-2"
-            aria-pressed={displayMode === "list"}
-            onClick={() => setDisplayMode("list")}
-          >
-            <List className="h-4 w-4" />
-            List
-          </Button>
-          <Button
-            type="button"
-            variant={displayMode === "cards" ? "default" : "ghost"}
-            size="sm"
-            className="h-8 px-2"
-            aria-pressed={displayMode === "cards"}
-            onClick={() => setDisplayMode("cards")}
-          >
-            <Grid2X2 className="h-4 w-4" />
-            Cards
-          </Button>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex w-fit gap-1 rounded-md border border-border bg-card p-1 shadow-card">
+            <Button
+              type="button"
+              variant={displayMode === "list" ? "default" : "ghost"}
+              size="sm"
+              className="h-8 px-2"
+              aria-pressed={displayMode === "list"}
+              onClick={() => setDisplayMode("list")}
+            >
+              <List className="h-4 w-4" />
+              List
+            </Button>
+            <Button
+              type="button"
+              variant={displayMode === "cards" ? "default" : "ghost"}
+              size="sm"
+              className="h-8 px-2"
+              aria-pressed={displayMode === "cards"}
+              onClick={() => setDisplayMode("cards")}
+            >
+              <Grid2X2 className="h-4 w-4" />
+              Cards
+            </Button>
+          </div>
         </div>
       </div>
 
