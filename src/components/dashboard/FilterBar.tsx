@@ -33,7 +33,7 @@ export function FilterBar({ filters, search, onSearchChange, onChange, clients, 
     !!filters.missingAtticEvidence;
 
   return (
-    <div className="bg-card border border-border rounded-lg p-4 space-y-3 sticky top-2 z-10 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+    <div className="bg-card border border-border rounded-lg p-4 space-y-3 sm:sticky sm:top-2 sm:z-10 backdrop-blur supports-[backdrop-filter]:bg-card/80">
       <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
         <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, SlidersHorizontal } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { AppHeader, type DashboardViewTarget } from "@/components/dashboard/AppHeader";
 import { StatsRow } from "@/components/dashboard/StatsRow";
 import { FilterBar } from "@/components/dashboard/FilterBar";
@@ -46,6 +47,7 @@ const DashboardPage = () => {
   const [editProjectId, setEditProjectId] = useState<string | undefined>();
   const [archiveTarget, setArchiveTarget] = useState<{ id: string; name: string } | null>(null);
   const [newProjectClientId, setNewProjectClientId] = useState<string | undefined>();
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 200);
@@ -171,6 +173,13 @@ const DashboardPage = () => {
     projectsQ.isError ||
     allProjectsQ.isError ||
     clientsQ.isError;
+  const activeFilterCount =
+    Number(!!search) +
+    Number(!!filters.clientId) +
+    Number(!!filters.status?.length) +
+    Number(!!filters.assignedProjectManagerId) +
+    Number(!!filters.hasBlockedWork) +
+    Number(!!filters.missingAtticEvidence);
 
   return (
     <div className="min-h-screen bg-background">
@@ -264,15 +273,35 @@ const DashboardPage = () => {
             />
 
             {/* Filters */}
-            <FilterBar
-              filters={filters}
-              search={search}
-              onSearchChange={setSearch}
-              onChange={setFilters}
-              clients={clients}
-              pms={pms}
-              isAdmin={!!isAdmin}
-            />
+            <div className="sm:hidden">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full justify-between bg-card"
+                onClick={() => setMobileFiltersOpen(true)}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <SlidersHorizontal className="h-4 w-4" />
+                  Filters
+                </span>
+                {activeFilterCount > 0 && (
+                  <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </Button>
+            </div>
+            <div className="hidden sm:block">
+              <FilterBar
+                filters={filters}
+                search={search}
+                onSearchChange={setSearch}
+                onChange={setFilters}
+                clients={clients}
+                pms={pms}
+                isAdmin={!!isAdmin}
+              />
+            </div>
 
             {/* Alert panels */}
             {!isLoading && (projects.some(p => p.status === "completed") || visiblePhases.some((p) => p.status === "ready_for_inspection")) && (
@@ -353,6 +382,17 @@ const DashboardPage = () => {
           projectName={archiveTarget.name}
         />
       )}
+      <BottomSheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen} title="Filters">
+        <FilterBar
+          filters={filters}
+          search={search}
+          onSearchChange={setSearch}
+          onChange={setFilters}
+          clients={clients}
+          pms={pms}
+          isAdmin={!!isAdmin}
+        />
+      </BottomSheet>
     </div>
   );
 };

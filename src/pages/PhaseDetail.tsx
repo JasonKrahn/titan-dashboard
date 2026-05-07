@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { AppHeader } from "@/components/dashboard/AppHeader";
 import {
   Breadcrumb,
@@ -104,6 +105,7 @@ export default function PhaseDetailPage() {
   const [highlightedDeficiencyId, setHighlightedDeficiencyId] = useState<string | null>(null);
   const deficiencyRefs = useRef<Record<string, HTMLLIElement | null>>({});
   const [dateValidationError, setDateValidationError] = useState<string | null>(null);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
 
   useEffect(() => {
     if (!highlightedDeficiencyId) return;
@@ -186,14 +188,19 @@ export default function PhaseDetailPage() {
         </Breadcrumb>
 
         {/* Hero */}
-        <section className="rounded-xl border border-border bg-gradient-surface p-6 shadow-card">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <section className="rounded-xl border border-border bg-gradient-surface p-4 sm:p-6 shadow-card">
+          <div className="flex flex-col gap-3 sm:gap-4 md:flex-row md:items-start md:justify-between">
             <div className="flex-1">
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                {project.projectNumber} · Phase
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1">
+                  <div className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    {project.projectNumber} · Phase
+                  </div>
+                  <h1 className="mt-1 text-2xl font-bold sm:text-3xl">{PHASE_LABEL[phase.type]}</h1>
+                  <p className="mt-1 text-xs sm:text-sm text-muted-foreground">{health.reason}</p>
+                </div>
+                <PhaseHealthPill health={health} size="md" />
               </div>
-              <h1 className="mt-1 text-2xl font-bold sm:text-3xl">{PHASE_LABEL[phase.type]}</h1>
-              <p className="mt-1 text-sm text-muted-foreground">{health.reason}</p>
               {dateValidationError && (
                 <Alert variant="destructive" className="mt-4">
                   <AlertCircle className="h-4 w-4" />
@@ -202,7 +209,21 @@ export default function PhaseDetailPage() {
                 </Alert>
               )}
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div>
+                <button
+                  type="button"
+                  className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/20 p-3 text-left disabled:opacity-70 sm:hidden"
+                  onClick={() => setScheduleOpen(true)}
+                  disabled={phase.status === "closed"}
+                >
+                  <span>
+                    <span className="block text-xs text-muted-foreground">Schedule</span>
+                    <span className="mt-0.5 block text-sm font-medium">
+                      {fmt(phase.scheduledStart)} → {fmt(phase.scheduledEnd)}
+                    </span>
+                  </span>
+                  <span className="text-xs font-medium text-primary">{phase.status === "closed" ? "Locked" : "Edit"}</span>
+                </button>
+                <div className="hidden sm:block">
                   <div className="text-xs text-muted-foreground">Scheduled start</div>
                   <DatePicker
                     value={phase.scheduledStart ? new Date(phase.scheduledStart) : undefined}
@@ -218,7 +239,7 @@ export default function PhaseDetailPage() {
                     disabled={updatePhaseMutation.isPending || phase.status === "closed"}
                   />
                 </div>
-                <div>
+                <div className="hidden sm:block">
                   <div className="text-xs text-muted-foreground">Scheduled end</div>
                   <DatePicker
                     value={phase.scheduledEnd ? new Date(phase.scheduledEnd) : undefined}
@@ -249,9 +270,6 @@ export default function PhaseDetailPage() {
                   <div className="mt-1 text-sm font-medium">{relativeTime(phase.updatedAt)}</div>
                 </div>
               </div>
-            </div>
-            <div className="flex flex-col items-start gap-3 md:items-end">
-              <PhaseHealthPill health={health} size="lg" />
             </div>
           </div>
         </section>
@@ -651,6 +669,52 @@ export default function PhaseDetailPage() {
           deficiencies={deficiencies}
         />
       )}
+      <BottomSheet open={scheduleOpen} onOpenChange={setScheduleOpen} title="Schedule">
+        <div className="grid gap-4">
+          {dateValidationError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Date validation error</AlertTitle>
+              <AlertDescription>{dateValidationError}</AlertDescription>
+            </Alert>
+          )}
+          <div className="grid gap-1.5">
+            <div className="text-xs text-muted-foreground">Scheduled start</div>
+            <DatePicker
+              value={phase.scheduledStart ? new Date(phase.scheduledStart) : undefined}
+              onChange={(date) => {
+                if (date) {
+                  updatePhaseMutation.mutate({
+                    phaseId: phase.id,
+                    scheduledStart: date.toISOString(),
+                  });
+                }
+              }}
+              placeholder="Not set"
+              disabled={updatePhaseMutation.isPending || phase.status === "closed"}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <div className="text-xs text-muted-foreground">Scheduled end</div>
+            <DatePicker
+              value={phase.scheduledEnd ? new Date(phase.scheduledEnd) : undefined}
+              onChange={(date) => {
+                if (date) {
+                  updatePhaseMutation.mutate({
+                    phaseId: phase.id,
+                    scheduledEnd: date.toISOString(),
+                  });
+                }
+              }}
+              placeholder="Not set"
+              disabled={updatePhaseMutation.isPending || phase.status === "closed"}
+            />
+          </div>
+          <Button type="button" onClick={() => setScheduleOpen(false)}>
+            Done
+          </Button>
+        </div>
+      </BottomSheet>
     </div>
   );
 }
