@@ -1,106 +1,93 @@
-# Plan — Project Detail redesign + Phase Details + Create modals
+# Mobile Responsiveness Overhaul — Titan PM
 
-## 1. Project Detail page redesign (`src/pages/ProjectDetail.tsx`)
+All changes scoped to mobile (`< sm` / `< md`) using Tailwind responsive prefixes. Desktop markup and styling are preserved verbatim by gating new classes with `sm:`/`md:` resets (e.g. `p-2 sm:p-6`, `border-0 sm:border`, `rounded-none sm:rounded-xl`).
 
-Replace the current flat layout with a focused, scannable layout:
+## 1. Global mobile primitives
 
-**Header band (sticky)**
-- Back button, project number, project status badge
-- Title block: project name (h1), client, address, assigned PM avatar+name, scheduled dates
-- Right side: KPI chips — Open deficiencies, Attic gate status, Last activity
+**`src/index.css`**
+- Add `.scrollbar-hide` utility (cross-browser: `scrollbar-width: none`, `-ms-overflow-style: none`, `&::-webkit-scrollbar { display: none }`). Reuse in nav + thumbnail rows.
+- Add `.mobile-list` helper class: `-mx-4 sm:mx-0` + `divide-y divide-border` + `border-y sm:border` + `rounded-none sm:rounded-lg` + `bg-card`. Use as the base for converted list groups.
+- Reduce `.container` side padding on mobile only: keep current value at `sm:` and up, set `px-3` at base (verify nothing depends on default).
 
-**Three big phase cards (grid: 1 col mobile, 3 col md+)**
-- Each card = one phase (Insulation / Drywall / Finishing)
-- **Single high-level indicator per card** = a colored "phase health" pill that summarizes everything in that phase using priority rules:
-  1. `blocked` (red) — phase blocked OR any failed/blocked gate OR critical/high open deficiency
-  2. `attention` (amber) — ready for inspection OR open deficiencies
-  3. `in progress` (blue) — phase active, no issues
-  4. `not started` (gray)
-  5. `closed` (green)
-- Card body: phase label, the indicator pill with one-line reason ("2 open issues", "Awaiting inspection", "Site check failed"), small meta row (subcontractor / scheduled dates if present)
-- Card is clickable → navigates to `/project/:id/phase/:phaseId`
-- Hover shows "View details →"
+**`src/components/dashboard/AppHeader.tsx`**
+- Mobile nav row already exists (`lg:hidden`). Wrap the inner row in a single horizontal scroll container with `scrollbar-hide`, `flex-nowrap`, `snap-x`, and ensure each pill uses `whitespace-nowrap shrink-0` (already partly in place — confirm + tighten gap/padding to `gap-1.5 px-2.5`).
+- Ensure logo block stays compact: hide the "Operations" eyebrow at `< sm`.
 
-**Project-wide sections below the phases (collapsible / tabbed)**
-- Attic Gate card (kept, cleaner): status, photo evidence indicator, call-in/install dates placeholder
-- Deficiencies summary table (across all phases) with phase column, severity, status
-- Recent activity timeline (current audit list, polished)
+**New shared component `src/components/ui/bottom-sheet.tsx`** (thin wrapper around existing `Sheet` with `side="bottom"`, rounded top, drag handle bar). No new deps — reuse Radix `Sheet` already in `components/ui/sheet.tsx`.
 
-Goal: at a glance, the user sees one indicator per phase and the overall project pulse — drill-in lives on the Phase Details page.
+**New shared `src/components/ui/fab.tsx`**: fixed bottom-right circular button, `sm:hidden`, safe-area aware (`bottom-[max(1rem,env(safe-area-inset-bottom))]`).
 
-## 2. New Phase Details page (`src/pages/PhaseDetail.tsx`)
+**New shared `src/components/ui/empty-inline.tsx`**: single-line italic muted text + optional icon. Replaces bordered/dashed empty boxes on mobile only — desktop continues to use `EmptyState` via `hidden sm:block` wrapping.
 
-Route: `/project/:projectId/phase/:phaseId` (added in `App.tsx`).
+## 2. Project Detail page (`src/pages/ProjectDetail.tsx`)
 
-Layout:
-- Header: breadcrumb (Project › Phase), phase title, the same health indicator pill, current status badge
-- Action row: "Start phase" / "Mark ready for inspection" placeholders (disabled with tooltip — gates required)
-- Tabs (using existing shadcn `tabs.tsx`):
-  - **Overview** — schedule, assigned subcontractor, foreman/QC info placeholder
-  - **Gates** — Site Check + Inspection cards with status, photo evidence count, completed-by
-  - **Deficiencies** — list scoped to this phase, severity, status, before/after photo placeholders
-  - **Photos** — grid of photo evidence for this phase (placeholders if none)
-  - **Activity** — audit events filtered to this phase
+Restructure into three mobile-only zones, keeping all current desktop sections behind `hidden md:block` wrappers and rendering a parallel mobile tree behind `md:hidden`.
 
-API additions in `src/lib/api/adapters/prototype/index.ts`:
-- `getPhase(phaseId): ApiResult<PhaseDetail>` — returns the existing `PhaseDetail` shape (already in `types.ts`), enforces PM permission via parent project.
+### 2a. Compact header
+- Title row: project name + status badge inline, truncate name.
+- Second line: client · PM initials avatar · ellipsis-truncated address.
+- "Info" toggle (chevron button) expands collapsible block with: full address, dates, PM full name, finish level, last update. Default collapsed.
+- Edit/Archive moved into right-aligned ellipsis menu (`DropdownMenu`) on mobile.
 
-## 3. "New Client" modal (`src/components/dashboard/NewClientDialog.tsx`)
+### 2b. Sticky tab bar (mobile only)
+- Replace existing mobile anchor nav with sticky tabs using shadcn `Tabs`: `Overview | Deficiencies | Notes | Photos | Activity`.
+- Container: `sticky top-16 z-10 -mx-3 bg-background/90 backdrop-blur border-b`, scrollable with `scrollbar-hide`.
+- Each tab renders a focused mobile section; desktop ignores tabs entirely.
 
-Triggered from header "New client" button (clients view) and a future empty state CTA.
+### 2c. Tab contents
 
-Fields (react-hook-form + zod):
-- Name * (required)
-- Primary contact name
-- Phone
-- Email (validated)
-- Billing address (textarea)
-- Notes (textarea)
+**Overview**
+- Bottleneck Radar strip at top: horizontal 3-segment timeline (Insulation → Drywall → Finishing). Each segment shows phase tone color + tiny label; the active phase is highlighted; blockers/dependencies render as a red badge overlay on the segment. Below the strip, a one-line caption summarizes the current bottleneck (e.g. "Drywall blocked: waiting on attic gate").
+- Pending approvals list: site checks awaiting sign-off, rendered as `mobile-list` rows (one per row, action button right-aligned).
+- Top unresolved deficiencies (max 5): severity tag + title + assigned subcontractor right-aligned, tap row → opens deficiency drawer.
+- Phase accordions (shadcn `Accordion`, `type="multiple"`): closed phases collapsed by default showing only title + status icon; the phase matching `phaseHealth = in-progress|attention|blocked` expanded. Inside each, current mobile phase content is reused but with reduced padding and inline actions.
+- Attic gate condensed into a single accordion item.
 
-Submit:
-- Calls new `createClient(input)` in prototype adapter — appends to `seedClients`, returns the created record, invalidates `["clients"]`.
-- Toast success, closes modal, navigates to that client's projects.
+**Deficiencies**
+- Full list as `mobile-list` rows. Severity color chip + title (line 1), subcontractor + age (line 2). Right-side chevron.
+- Add deficiency exposed only via FAB (no inline button on mobile).
 
-## 4. "New Project" modal (`src/components/dashboard/NewProjectDialog.tsx`)
+**Notes**
+- `ProjectNotes` rendered edge-to-edge (`-mx-3 sm:mx-0`), reduced padding inside list items, "+ note" exposed via header `+` icon button on mobile (replaces large inline button via prop or wrapper).
 
-Triggered from:
-- Header "New project" (when on dashboard or inside client-projects view)
-- Empty state inside `ClientProjectsView`
+**Photos**
+- Single horizontally scrolling row of square thumbnails (`h-20 w-20 sm:h-auto`), `scrollbar-hide`, snap. Tap → `PhotoViewerDialog`.
+- Empty state → `empty-inline` ("No photos yet").
+- Upload via FAB camera icon.
 
-Fields:
-- Client * (Select; pre-filled & locked when opened from a client context)
-- Project number * (auto-suggest "TPM-XXXX" based on count, editable)
-- Project name *
-- Site address *
-- Assigned Project Manager (Select of PMs; admin only — for PM users defaults to self and is hidden)
-- Scheduled start / end (date inputs)
-- Status (defaults to `draft`)
+**Activity**
+- Dedicated tab housing the existing activity timeline, edge-to-edge, denser row padding (`py-2`), `text-sm`/`text-xs`.
 
-Submit:
-- Calls new `createProject(input)` in prototype adapter:
-  - Appends `Project` to `seedProjects`
-  - Auto-generates the three default `Phase` rows (insulation/drywall/finishing, status `not_started`) per the spec ("Generates default phases")
-  - Auto-generates the standard `Gate` rows (site_check + inspection per phase, attic_check per project)
-  - Writes an `AuditEvent`
-- Invalidates `["projects", …]`, `["phases"]`, `["gates"]`.
-- Toast success, navigates to the new project's detail page.
+### 2d. FAB
+- Single contextual FAB per active tab: Deficiencies → "+ Deficiency", Photos → camera, Notes → "+ Note". Hidden on Overview/Activity. Opens bottom sheet drawers (reusing existing `DeficiencyDialog`, `PhotoUploadDialog`, note form) presented via `bottom-sheet` wrapper at `< sm`.
 
-## 5. Wire-up changes
+## 3. Directory pages
 
-- `src/pages/Index.tsx`: replace the two `toast(...)` placeholders on the New client / New project buttons with the new dialogs (state-controlled `open`).
-- `src/components/dashboard/ClientProjectsView.tsx`: pass through a real `onCreateProject` that opens the project dialog with `clientId` pre-filled.
-- `src/App.tsx`: add `/project/:projectId/phase/:phaseId` route.
+**`src/components/dashboard/ClientDirectory.tsx`** (mobile branch)
+- Replace stacked cards with `mobile-list`. Each row: client name (line 1, truncate) + project count badge right; secondary line: contact or city, muted `text-xs`. Right-aligned ellipsis menu (`DropdownMenu`) for edit / view projects.
+
+**`src/pages/SubcontractorRolodex.tsx`** (mobile branch)
+- Same `mobile-list` treatment. Each row: name (line 1) + right-aligned trade badges (color preserved). Line 2: phone or company, muted. Ellipsis menu for call / email / edit.
+- Filters bar: collapse into a single "Filters" button opening a bottom sheet on mobile.
+
+**`src/components/dashboard/ProjectCard.tsx` / `ProjectResults.tsx`** (mobile branch)
+- Below `sm`, render rows via a new `ProjectRow` mobile component: project name + status pill (line 1), client + PM initials + open-deficiency count (line 2). Edge-to-edge list. Desktop card grid untouched.
+
+## 4. Empty states & misc
+
+- All `EmptyState` usages: wrap existing component with `hidden sm:block`; render `EmptyInline` (`sm:hidden`) alongside with the same copy.
+- Inspection / archive panels on dashboard: tighten padding on mobile (`p-3 sm:p-5`), reduce icon size (`h-4 w-4 sm:h-5 sm:w-5`).
+- `StatsRow`: on mobile show as 3-up tight grid with `text-xs` labels and `text-lg` values; desktop unchanged.
 
 ## Technical notes
 
-- All new colors stay on the existing semantic tokens (`status-*`, `primary`, `muted`, `card`). Add a derived helper `phaseHealth(phase, gates, deficiencies)` in `src/lib/derived.ts` returning `{ tone: StatusTone | "attention", label: string, reason: string }` — this single function powers the phase card indicator on both the dashboard project card (optional follow-up) and project detail.
-- Modals use existing `Dialog`, `Form`, `Input`, `Select`, `Textarea`, `Button` shadcn components. No new deps.
-- Adapter mutations append to in-memory arrays; surviving the session is fine for the prototype, matching how the rest of `seed.ts` is mutated nowhere.
-- No backend / Titan PM Cloud changes — still pure prototype adapter.
+- No new npm packages. Use existing Radix `Sheet`, `Tabs`, `Accordion`, `DropdownMenu`.
+- Every mobile change must be additive via `sm:`/`md:` resets so the desktop class chain remains intact. Where structural changes are required (tab bar vs stacked sections), render both trees gated by `md:hidden` / `hidden md:block`.
+- Reuse all existing dialogs (`DeficiencyDialog`, `PhotoUploadDialog`, `SiteCheckDialog`, etc.); only their trigger surfaces change on mobile (FAB / row tap / drawer).
+- Health tones, status colors, and semantic tokens unchanged — pulled from `derived.ts` and `index.css` as today.
+- No data-model or API changes.
 
 ## Out of scope
-
-- Photo upload UI (placeholders only)
-- Editing existing projects / phases
-- Recycle bin & client deletion
-- Real auth, real audit writes for non-create actions
+- Swipe-to-action gestures (use ellipsis menu instead — noted as future enhancement).
+- Vaul library (not added; existing Radix Sheet is sufficient).
+- Desktop visual changes of any kind.

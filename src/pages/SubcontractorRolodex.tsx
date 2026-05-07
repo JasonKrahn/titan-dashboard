@@ -16,6 +16,7 @@ import { getSubcontractorContacts, getAllPhases, getProjects, createSubcontracto
 import type { Phase, Project, TradeType, SubcontractorContact } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { Fab } from "@/components/ui/fab";
 
 const TRADE_LABEL: Record<string, string> = {
   insulation: "Insulation",
@@ -291,7 +292,7 @@ export default function SubcontractorRolodexPage() {
       <main className="container py-6 space-y-6">
         <div className="space-y-3">
           <h1 className="text-2xl font-bold">Subcontractor Rolodex</h1>
-          <div className="sticky top-[4.5rem] z-10 -mx-1 rounded-lg bg-background/95 px-1 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:py-0">
+          <div className="hidden sm:block sticky top-[4.5rem] z-10 -mx-1 rounded-lg bg-background/95 px-1 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:py-0">
             <Button className="h-10 w-full sm:w-auto" onClick={() => setIsAddDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-1" />
               Add Subcontractor
@@ -314,103 +315,149 @@ export default function SubcontractorRolodexPage() {
             <p className="text-sm">No subcontractors match your search.</p>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((s) => (
-              <Card key={s.id} className="border-border bg-card p-5 shadow-card">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="font-semibold truncate">{s.displayName}</h3>
-                    {s.companyName && (
-                      <p className="text-sm text-muted-foreground truncate">{s.companyName}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className={`shrink-0 ${TRADE_COLOR[s.trade] ?? ""}`}>
-                      {TRADE_LABEL[s.trade] ?? s.trade}
-                    </Badge>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => handleEdit(s)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => handleDelete(s)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+          <>
+            {/* Mobile dense list */}
+            <ul className="mobile-list sm:hidden">
+              {filtered.map((s) => (
+                <li key={s.id} className="flex items-center gap-3 px-3 py-2.5">
+                  <button
+                    type="button"
+                    onClick={() => handleEdit(s)}
+                    className="min-w-0 flex-1 text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-block h-1.5 w-1.5 rounded-full ${s.active ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
+                      <span className="truncate text-sm font-semibold">{s.displayName}</span>
                     </div>
-                  </div>
-                </div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {s.companyName ?? s.phone ?? s.email ?? ""}
+                    </div>
+                  </button>
+                  <Badge variant="outline" className={`shrink-0 ${TRADE_COLOR[s.trade] ?? ""}`}>
+                    {TRADE_LABEL[s.trade] ?? s.trade}
+                  </Badge>
+                  <Dialog>
+                    {/* placeholder unused */}
+                  </Dialog>
+                  {(() => {
+                    return (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0"
+                          aria-label="Actions"
+                          onClick={() => handleEdit(s)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </>
+                    );
+                  })()}
+                </li>
+              ))}
+            </ul>
 
-                <div className="mt-4 space-y-2 text-sm">
-                  {s.phone && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Phone className="h-3.5 w-3.5 shrink-0" />
-                      <span>{s.phone}</span>
+            <div className="hidden sm:grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {filtered.map((s) => (
+                <Card key={s.id} className="border-border bg-card p-5 shadow-card">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="font-semibold truncate">{s.displayName}</h3>
+                      {s.companyName && (
+                        <p className="text-sm text-muted-foreground truncate">{s.companyName}</p>
+                      )}
                     </div>
-                  )}
-                  {s.email && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Mail className="h-3.5 w-3.5 shrink-0" />
-                      <span className="truncate">{s.email}</span>
-                    </div>
-                  )}
-                  {s.notes && (
-                    <p className="text-xs text-muted-foreground mt-1 border-t border-border/60 pt-2">
-                      {s.notes}
-                    </p>
-                  )}
-                </div>
-
-                {(() => {
-                  const assignments = subAssignments.get(s.id);
-                  if (!assignments || assignments.length === 0) return null;
-                  return (
-                    <div className="mt-4 pt-3 border-t border-border/60">
-                      <p className="text-xs text-muted-foreground mb-2">Assigned to:</p>
-                      <div className="space-y-1">
-                        {assignments.map(({ phase, project }) => (
-                          <div key={phase.id}>
-                            <Link
-                              to={`/project/${project.id}/phase/${phase.id}`}
-                              className="block text-xs hover:underline text-primary"
-                            >
-                              {project.name} — {TRADE_LABEL[phase.type]}
-                            </Link>
-                            {phase.scheduledEnd && (
-                              <p className="text-xs text-muted-foreground">
-                                Scheduled finish: {new Date(phase.scheduledEnd).toLocaleDateString()}
-                              </p>
-                            )}
-                          </div>
-                        ))}
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className={`shrink-0 ${TRADE_COLOR[s.trade] ?? ""}`}>
+                        {TRADE_LABEL[s.trade] ?? s.trade}
+                      </Badge>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleEdit(s)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => handleDelete(s)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                  );
-                })()}
+                  </div>
 
-                <div className="mt-4 flex items-center gap-2">
-                  <span
-                    className={`inline-flex h-2 w-2 rounded-full ${s.active ? "bg-emerald-500" : "bg-muted-foreground/40"}`}
-                  />
-                  <span className="text-xs text-muted-foreground">{s.active ? "Active" : "Inactive"}</span>
-                </div>
-              </Card>
-            ))}
-          </div>
+                  <div className="mt-4 space-y-2 text-sm">
+                    {s.phone && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Phone className="h-3.5 w-3.5 shrink-0" />
+                        <span>{s.phone}</span>
+                      </div>
+                    )}
+                    {s.email && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Mail className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{s.email}</span>
+                      </div>
+                    )}
+                    {s.notes && (
+                      <p className="text-xs text-muted-foreground mt-1 border-t border-border/60 pt-2">
+                        {s.notes}
+                      </p>
+                    )}
+                  </div>
+
+                  {(() => {
+                    const assignments = subAssignments.get(s.id);
+                    if (!assignments || assignments.length === 0) return null;
+                    return (
+                      <div className="mt-4 pt-3 border-t border-border/60">
+                        <p className="text-xs text-muted-foreground mb-2">Assigned to:</p>
+                        <div className="space-y-1">
+                          {assignments.map(({ phase, project }) => (
+                            <div key={phase.id}>
+                              <Link
+                                to={`/project/${project.id}/phase/${phase.id}`}
+                                className="block text-xs hover:underline text-primary"
+                              >
+                                {project.name} — {TRADE_LABEL[phase.type]}
+                              </Link>
+                              {phase.scheduledEnd && (
+                                <p className="text-xs text-muted-foreground">
+                                  Scheduled finish: {new Date(phase.scheduledEnd).toLocaleDateString()}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <div className="mt-4 flex items-center gap-2">
+                    <span
+                      className={`inline-flex h-2 w-2 rounded-full ${s.active ? "bg-emerald-500" : "bg-muted-foreground/40"}`}
+                    />
+                    <span className="text-xs text-muted-foreground">{s.active ? "Active" : "Inactive"}</span>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </>
         )}
 
         <p className="text-[11px] text-muted-foreground/70 text-center">
           Prototype data · Backend swap-in via lib/api adapters
         </p>
       </main>
+
+      <Fab label="Add subcontractor" icon={<Plus className="h-6 w-6" />} onClick={() => setIsAddDialogOpen(true)} />
 
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">

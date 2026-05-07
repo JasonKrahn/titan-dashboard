@@ -60,7 +60,7 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch }
             </div>
             <div>
               <div className="font-bold leading-tight tracking-tight">Titan PM</div>
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Operations</div>
+              <div className="hidden text-[10px] uppercase tracking-widest text-muted-foreground sm:block">Operations</div>
             </div>
           </button>
 
@@ -106,7 +106,7 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch }
         </div>
 
         <nav className="border-t border-border/60 py-2 lg:hidden">
-          <div className="-mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1 no-scrollbar">
+          <div className="-mx-3 flex items-center gap-1.5 overflow-x-auto px-3 pb-1 scrollbar-hide snap-x">
             <button
               type="button"
               onClick={() => goToDashboardView("clients")}
@@ -123,7 +123,7 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch }
             </button>
             <Link to="/subs" className={mobileTopNavClass(section === "subs")}>
               <Users className="h-4 w-4" />
-              Subcontractor Rolodex
+              Subs
             </Link>
             <Link to="/activity" className={mobileTopNavClass(section === "activity")}>
               <FileText className="h-4 w-4" />

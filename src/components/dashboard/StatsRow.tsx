@@ -20,14 +20,14 @@ interface StatProps {
 
 function Stat({ label, value, icon, accent, hint }: StatProps) {
   return (
-    <Card className="bg-gradient-surface border-border p-5 shadow-card">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
-          <p className="text-3xl font-bold mt-2 tabular-nums">{value}</p>
-          {hint && <p className="text-xs text-muted-foreground mt-1">{hint}</p>}
+    <Card className="bg-gradient-surface border-border p-3 sm:p-5 shadow-card">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] sm:text-xs uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
+          <p className="text-xl sm:text-3xl font-bold mt-1 sm:mt-2 tabular-nums">{value}</p>
+          {hint && <p className="hidden sm:block text-xs text-muted-foreground mt-1">{hint}</p>}
         </div>
-        <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center", accent)}>
+        <div className={cn("h-7 w-7 sm:h-10 sm:w-10 rounded-lg flex items-center justify-center shrink-0", accent)}>
           {icon}
         </div>
       </div>
@@ -38,15 +38,15 @@ function Stat({ label, value, icon, accent, hint }: StatProps) {
 export function StatsRow({ activeProjects, blockedItems, inspectionsDueThisWeek, loading }: StatsRowProps) {
   if (loading) {
     return (
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+      <div className="grid gap-2 grid-cols-3 sm:gap-4">
         {[0, 1, 2].map((i) => (
-          <Skeleton key={i} className="h-[112px] rounded-lg" />
+          <Skeleton key={i} className="h-[68px] sm:h-[112px] rounded-lg" />
         ))}
       </div>
     );
   }
   return (
-    <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+    <div className="grid gap-2 grid-cols-3 sm:gap-4">
       <Stat
         label="Active projects"
         value={activeProjects}
