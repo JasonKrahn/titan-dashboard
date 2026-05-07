@@ -108,7 +108,7 @@ export function ClientDirectory({
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="hidden sm:flex flex-wrap items-center gap-2">
           <div className="inline-flex w-fit gap-1 rounded-md border border-border bg-card p-1 shadow-card">
             <Button
               type="button"
