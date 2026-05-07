@@ -87,7 +87,7 @@ export function ClientDirectory({
           <div className="sticky top-[6.75rem] z-10 -mx-1 rounded-lg bg-background/95 px-1 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:py-0">
             <Button
               size="sm"
-              className="h-10 w-full bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto"
+              className="h-10 w-full bg-primary text-primary-foreground hover:bg-primary/90 md:w-auto"
               onClick={onNewClient}
             >
               <Plus className="h-4 w-4 mr-1" />
@@ -96,7 +96,7 @@ export function ClientDirectory({
           </div>
         )}
 
-        <div className="relative w-full sm:max-w-md">
+        <div className="relative w-full md:max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             ref={searchInputRef}
@@ -107,7 +107,7 @@ export function ClientDirectory({
           />
         </div>
 
-        <div className="hidden sm:flex flex-wrap items-center gap-2">
+        <div className="hidden md:flex flex-wrap items-center gap-2">
           <div className="inline-flex w-fit gap-1 rounded-md border border-border bg-card p-1 shadow-card">
             <Button
               type="button"
@@ -157,16 +157,16 @@ export function ClientDirectory({
         </Card>
       ) : displayMode === "list" ? (
         <>
-        <Card className="hidden border-border bg-gradient-surface shadow-card sm:block">
+        <Card className="hidden border-border bg-gradient-surface shadow-card md:block">
           <Table className="table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[58%] sm:w-[50%] lg:w-[30%] xl:w-[22%]">Client</TableHead>
-                <TableHead className="hidden sm:table-cell sm:w-[24%] lg:w-[18%] xl:w-[14%]">Contact</TableHead>
+                <TableHead className="w-[58%] md:w-[50%] lg:w-[30%] xl:w-[22%]">Client</TableHead>
+                <TableHead className="hidden md:table-cell md:w-[24%] lg:w-[18%] xl:w-[14%]">Contact</TableHead>
                 <TableHead className="hidden lg:table-cell lg:w-[12%] xl:w-[10%]">Phone</TableHead>
                 <TableHead className="hidden lg:table-cell lg:w-[20%] xl:w-[18%]">Email</TableHead>
-                <TableHead className="w-[21%] text-right sm:w-[13%] lg:w-[10%] xl:w-[7%]">Active</TableHead>
-                <TableHead className="w-[21%] text-right sm:w-[13%] lg:w-[10%] xl:w-[7%]">Total</TableHead>
+                <TableHead className="w-[21%] text-right md:w-[13%] lg:w-[10%] xl:w-[7%]">Active</TableHead>
+                <TableHead className="w-[21%] text-right md:w-[13%] lg:w-[10%] xl:w-[7%]">Total</TableHead>
                 <TableHead className="hidden xl:table-cell xl:w-[22%]">Latest</TableHead>
                 <TableHead className="w-[36px]"></TableHead>
               </TableRow>
@@ -181,12 +181,12 @@ export function ClientDirectory({
                   <TableCell>
                     <div className="min-w-0">
                       <div className="truncate font-semibold text-foreground">{row.client.name}</div>
-                      <div className="truncate text-xs text-muted-foreground sm:hidden">
+                      <div className="truncate text-xs text-muted-foreground md:hidden">
                         {row.client.primaryContactName ?? "No primary contact"}
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="hidden truncate text-muted-foreground sm:table-cell">
+                  <TableCell className="hidden truncate text-muted-foreground md:table-cell">
                     {row.client.primaryContactName ?? "No primary contact"}
                   </TableCell>
                   <TableCell className="hidden truncate text-muted-foreground lg:table-cell">
@@ -221,7 +221,7 @@ export function ClientDirectory({
             </TableBody>
           </Table>
         </Card>
-        <ul className="mobile-list sm:hidden">
+        <ul className="mobile-list md:hidden">
           {rows.map((row) => (
             <li key={row.client.id}>
               <div className="flex items-center gap-2 px-3 py-2.5 active:bg-muted/40">
@@ -261,7 +261,7 @@ export function ClientDirectory({
       ) : (
         <>
           {/* Mobile dense list */}
-          <ul className="mobile-list sm:hidden">
+          <ul className="mobile-list md:hidden">
             {rows.map((row) => (
               <li key={row.client.id}>
                 <div className="flex items-center gap-2 px-3 py-2.5 active:bg-muted/40">
@@ -298,7 +298,7 @@ export function ClientDirectory({
             ))}
           </ul>
 
-          <div className="hidden sm:grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="hidden md:grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {rows.map((row) => {
             return (
               <Card

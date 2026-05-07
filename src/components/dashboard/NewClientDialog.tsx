@@ -79,7 +79,7 @@ export function NewClientDialog({ open, onOpenChange, client, onCreated, onUpdat
         onOpenChange(o);
       }}
     >
-      <DialogContent className="sm:max-w-[520px]">
+      <DialogContent className="md:max-w-[520px]">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit client" : "New client"}</DialogTitle>
           <DialogDescription>{isEdit ? "Update client details." : "Add a customer record to attach projects to."}</DialogDescription>
@@ -114,7 +114,7 @@ export function NewClientDialog({ open, onOpenChange, client, onCreated, onUpdat
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="grid gap-1.5">
               <Label htmlFor="phone">Phone</Label>
               <Input id="phone" value={form.phone ?? ""} onChange={(e) => setField("phone", e.target.value)} placeholder="555-0100" />

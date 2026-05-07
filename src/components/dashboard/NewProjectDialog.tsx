@@ -162,7 +162,7 @@ export function NewProjectDialog({ open, onOpenChange, currentUser, presetClient
         onOpenChange(o);
       }}
     >
-      <DialogContent className="sm:max-w-[560px]">
+      <DialogContent className="md:max-w-[560px]">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit project" : "New project"}</DialogTitle>
           <DialogDescription>
@@ -222,7 +222,7 @@ export function NewProjectDialog({ open, onOpenChange, currentUser, presetClient
             {errors.clientId && <p className="text-xs text-destructive">{errors.clientId}</p>}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-4">
             <div className="grid gap-1.5">
               <Label htmlFor="projectNumber">Project number *</Label>
               <Input

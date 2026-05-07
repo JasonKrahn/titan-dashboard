@@ -62,7 +62,7 @@ export function SiteCheckDialog({ open, onOpenChange, gateId, phaseId, projectId
         onOpenChange(o);
       }}
     >
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="md:max-w-[480px]">
         <DialogHeader>
           <DialogTitle>Site Check — {phaseLabel}</DialogTitle>
           <DialogDescription>Confirm the site has been visited and is ready for this phase to begin.</DialogDescription>

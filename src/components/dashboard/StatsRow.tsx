@@ -25,7 +25,7 @@ function Stat({ label, value, icon, accent, hint }: StatProps) {
         <div className="min-w-0">
           <p className="text-[10px] sm:text-xs uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
           <p className="text-xl sm:text-3xl font-bold mt-1 sm:mt-2 tabular-nums">{value}</p>
-          {hint && <p className="hidden sm:block text-xs text-muted-foreground mt-1">{hint}</p>}
+          {hint && <p className="hidden md:block text-xs text-muted-foreground mt-1">{hint}</p>}
         </div>
         <div className={cn("h-7 w-7 sm:h-10 sm:w-10 rounded-lg flex items-center justify-center shrink-0", accent)}>
           {icon}

@@ -73,7 +73,7 @@ export function SettingsDialog({ open, onOpenChange, user, onUpdated }: Settings
         onOpenChange(o);
       }}
     >
-      <DialogContent className="sm:max-w-[520px]">
+      <DialogContent className="md:max-w-[520px]">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>Edit your profile information and preferences.</DialogDescription>
@@ -98,7 +98,7 @@ export function SettingsDialog({ open, onOpenChange, user, onUpdated }: Settings
             {errors.fullName && <p className="text-xs text-destructive">{errors.fullName}</p>}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="grid gap-1.5">
               <Label htmlFor="phone">Phone</Label>
               <Input id="phone" value={form.phone ?? ""} onChange={(e) => setField("phone", e.target.value)} placeholder="555-0100" />

@@ -60,7 +60,7 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch }
             </div>
             <div>
               <div className="font-bold leading-tight tracking-tight">Titan PM</div>
-              <div className="hidden text-[10px] uppercase tracking-widest text-muted-foreground sm:block">Operations</div>
+              <div className="hidden text-[10px] uppercase tracking-widest text-muted-foreground md:block">Operations</div>
             </div>
           </button>
 

@@ -114,7 +114,7 @@ export function ClientProjectsView({
         {onCreateProject && (
           <div className="sticky top-[6.75rem] z-10 -mx-1 rounded-lg bg-background/95 px-1 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:py-0">
             <Button
-              className="h-10 w-full bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto"
+              className="h-10 w-full bg-primary text-primary-foreground hover:bg-primary/90 md:w-auto"
               onClick={onCreateProject}
             >
               <Plus className="mr-1 h-4 w-4" />
@@ -122,7 +122,7 @@ export function ClientProjectsView({
             </Button>
           </div>
         )}
-        <div className="relative w-full sm:max-w-md">
+        <div className="relative w-full md:max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
@@ -133,7 +133,7 @@ export function ClientProjectsView({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Select value={filter} onValueChange={onFilterChange}>
-            <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectTrigger className="w-full md:w-[180px]">
               <SelectValue placeholder="Filter" />
             </SelectTrigger>
             <SelectContent>

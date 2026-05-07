@@ -273,7 +273,7 @@ const DashboardPage = () => {
             />
 
             {/* Filters */}
-            <div className="sm:hidden">
+            <div className="md:hidden">
               <Button
                 type="button"
                 variant="outline"
@@ -291,7 +291,7 @@ const DashboardPage = () => {
                 )}
               </Button>
             </div>
-            <div className="hidden sm:block">
+            <div className="hidden md:block">
               <FilterBar
                 filters={filters}
                 search={search}

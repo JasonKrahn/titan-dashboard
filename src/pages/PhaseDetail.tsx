@@ -6,17 +6,24 @@ import {
   AlertTriangle,
   ArrowLeft,
   Camera,
+  Calendar,
+  CheckCircle2,
   Clock,
   FileText,
   Image as ImageIcon,
+  Plus,
   ShieldCheck,
+  Upload,
   User as UserIcon,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { Fab } from "@/components/ui/fab";
+import { MobileActionSheet, type MobileActionItem } from "@/components/ui/mobile-action-sheet";
 import { AppHeader } from "@/components/dashboard/AppHeader";
 import {
   Breadcrumb,
@@ -106,6 +113,7 @@ export default function PhaseDetailPage() {
   const deficiencyRefs = useRef<Record<string, HTMLLIElement | null>>({});
   const [dateValidationError, setDateValidationError] = useState<string | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
 
   useEffect(() => {
     if (!highlightedDeficiencyId) return;
@@ -157,6 +165,109 @@ export default function PhaseDetailPage() {
 
   const { phase, project, gates, deficiencies, photoEvidence, auditEvents, subcontractors } = detail;
   const activeDefs = deficiencies.filter((d) => d.status === "open" || d.status === "in_progress");
+  const siteGate = gates.find((g) => g.type === "site_check");
+  const inspectionGate = gates.find((g) => g.type === "inspection");
+  const showReadyButton =
+    !!inspectionGate &&
+    (phase.status === "in_progress" || (phase.status === "blocked" && inspectionGate.status === "failed")) &&
+    activeDefs.length === 0;
+  const showPassedFailed =
+    !!inspectionGate &&
+    phase.status === "ready_for_inspection" &&
+    activeDefs.length === 0;
+  const phaseMobileActions: MobileActionItem[] = [
+    ...(phase.status !== "closed"
+      ? [
+          {
+            label: "Edit schedule",
+            icon: <Calendar className="h-4 w-4" />,
+            helperText: "Update start or end date",
+            onClick: () => setScheduleOpen(true),
+          },
+        ]
+      : []),
+    ...(siteGate?.status === "not_started"
+      ? [
+          {
+            label: "Site checked",
+            icon: <CheckCircle2 className="h-4 w-4" />,
+            helperText: "Mark the site check as passed",
+            onClick: () => setSiteCheckOpen(true),
+          },
+          {
+            label: "Site blocked",
+            icon: <AlertTriangle className="h-4 w-4" />,
+            helperText: "Block this phase with notes and evidence",
+            onClick: () => setSiteBlockOpen(true),
+          },
+        ]
+      : []),
+    ...(siteGate?.status === "blocked"
+      ? [
+          {
+            label: "Site cleared",
+            icon: <ShieldCheck className="h-4 w-4" />,
+            helperText: "Clear the site check block",
+            onClick: () => setSiteUnblockOpen(true),
+          },
+        ]
+      : []),
+    ...(showReadyButton
+      ? [
+          {
+            label: readyMutation.isPending ? "Marking ready..." : "Ready for inspection",
+            icon: <ShieldCheck className="h-4 w-4" />,
+            helperText: "Move this phase into inspection queue",
+            disabled: readyMutation.isPending,
+            onClick: () => readyMutation.mutate({ phaseId: phase.id, projectId: project.id }),
+          },
+        ]
+      : []),
+    ...(showPassedFailed && inspectionGate
+      ? [
+          {
+            label: "Pass inspection",
+            icon: <CheckCircle2 className="h-4 w-4" />,
+            helperText: "Record a passed inspection",
+            onClick: () => {
+              setSelectedGateId(inspectionGate.id);
+              setInspectionResultMode("passed");
+              setInspectionResultOpen(true);
+            },
+          },
+          {
+            label: "Fail inspection",
+            icon: <XCircle className="h-4 w-4" />,
+            helperText: "Record a failed inspection",
+            onClick: () => {
+              setSelectedGateId(inspectionGate.id);
+              setInspectionResultMode("failed");
+              setInspectionResultOpen(true);
+            },
+          },
+        ]
+      : []),
+    {
+      label: "Add deficiency",
+      icon: <Plus className="h-4 w-4" />,
+      helperText: "Log an issue for this phase",
+      onClick: () => {
+        setActiveTab("deficiencies");
+        setDeficiencyDialogMode("create");
+        setSelectedDeficiencyId(null);
+        setDeficiencyDialogOpen(true);
+      },
+    },
+    {
+      label: "Upload photo",
+      icon: <Upload className="h-4 w-4" />,
+      helperText: "Add phase or deficiency evidence",
+      onClick: () => {
+        setActiveTab("photos");
+        setPhotoUploadOpen(true);
+      },
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -174,13 +285,13 @@ export default function PhaseDetailPage() {
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem className="min-w-0">
-              <BreadcrumbLink asChild className="block max-w-[190px] truncate sm:max-w-[320px]">
+              <BreadcrumbLink asChild className="block max-w-[190px] truncate md:max-w-[320px]">
                 <Link to={`/project/${project.id}`}>{project.name}</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem className="min-w-0">
-              <BreadcrumbPage className="block max-w-[150px] truncate sm:max-w-[240px]">
+              <BreadcrumbPage className="block max-w-[150px] truncate md:max-w-[240px]">
                 {PHASE_LABEL[phase.type]}
               </BreadcrumbPage>
             </BreadcrumbItem>
@@ -208,22 +319,14 @@ export default function PhaseDetailPage() {
                   <AlertDescription>{dateValidationError}</AlertDescription>
                 </Alert>
               )}
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/20 p-3 text-left disabled:opacity-70 sm:hidden"
-                  onClick={() => setScheduleOpen(true)}
-                  disabled={phase.status === "closed"}
-                >
-                  <span>
-                    <span className="block text-xs text-muted-foreground">Schedule</span>
-                    <span className="mt-0.5 block text-sm font-medium">
-                      {fmt(phase.scheduledStart)} → {fmt(phase.scheduledEnd)}
-                    </span>
-                  </span>
-                  <span className="text-xs font-medium text-primary">{phase.status === "closed" ? "Locked" : "Edit"}</span>
-                </button>
-                <div className="hidden sm:block">
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div className="rounded-md border border-border bg-muted/20 p-3 md:hidden">
+                  <div className="text-xs text-muted-foreground">Schedule</div>
+                  <div className="mt-0.5 text-sm font-medium">
+                    {fmt(phase.scheduledStart)} → {fmt(phase.scheduledEnd)}
+                  </div>
+                </div>
+                <div className="hidden md:block">
                   <div className="text-xs text-muted-foreground">Scheduled start</div>
                   <DatePicker
                     value={phase.scheduledStart ? new Date(phase.scheduledStart) : undefined}
@@ -239,7 +342,7 @@ export default function PhaseDetailPage() {
                     disabled={updatePhaseMutation.isPending || phase.status === "closed"}
                   />
                 </div>
-                <div className="hidden sm:block">
+                <div className="hidden md:block">
                   <div className="text-xs text-muted-foreground">Scheduled end</div>
                   <DatePicker
                     value={phase.scheduledEnd ? new Date(phase.scheduledEnd) : undefined}
@@ -329,7 +432,7 @@ export default function PhaseDetailPage() {
                       {g.notes && <p className="text-foreground">{g.notes}</p>}
                     </div>
                     {g.type === "site_check" && g.status === "not_started" && (
-                      <div className="mt-3 flex gap-2">
+                      <div className="mt-3 hidden gap-2 md:flex">
                         <Button
                           size="sm"
                           variant="outline"
@@ -352,7 +455,7 @@ export default function PhaseDetailPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="mt-3 w-full"
+                        className="mt-3 hidden w-full md:inline-flex"
                         onClick={() => setSiteUnblockOpen(true)}
                       >
                         Site Cleared
@@ -371,7 +474,7 @@ export default function PhaseDetailPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="mt-3 w-full"
+                              className="mt-3 hidden w-full md:inline-flex"
                               onClick={() => readyMutation.mutate({ phaseId: phase.id, projectId: project.id })}
                               disabled={readyMutation.isPending}
                             >
@@ -379,7 +482,7 @@ export default function PhaseDetailPage() {
                             </Button>
                           )}
                           {showPassedFailed && (
-                            <div className="mt-3 flex gap-2">
+                            <div className="mt-3 hidden gap-2 md:flex">
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -417,7 +520,7 @@ export default function PhaseDetailPage() {
             {/* Personnel */}
             <Card className="border-border bg-card p-5 shadow-card">
               <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Personnel</h4>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
                 <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm">
                   <UserIcon className="h-4 w-4 text-muted-foreground" />
                   <div className="flex-1">
@@ -579,7 +682,7 @@ export default function PhaseDetailPage() {
             {photoEvidence.length === 0 ? (
               <EmptyCard icon={<ImageIcon className="h-5 w-5" />} text="No photos uploaded for this phase yet." />
             ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 {photoEvidence.map((p) => {
                   const linkedDef = p.deficiencyId ? deficiencies.find((d) => d.id === p.deficiencyId) : undefined;
                   return (
@@ -601,6 +704,18 @@ export default function PhaseDetailPage() {
 
         </Tabs>
       </main>
+
+      <Fab
+        label="Phase actions"
+        icon={<Plus className="h-6 w-6" />}
+        onClick={() => setMobileActionsOpen(true)}
+      />
+      <MobileActionSheet
+        open={mobileActionsOpen}
+        onOpenChange={setMobileActionsOpen}
+        title="Phase actions"
+        actions={phaseMobileActions}
+      />
 
       {detail && (() => {
         const siteGate = gates.find((g) => g.type === "site_check");

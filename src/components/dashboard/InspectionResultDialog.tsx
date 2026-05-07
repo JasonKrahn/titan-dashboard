@@ -117,7 +117,7 @@ export function InspectionResultDialog({
         onOpenChange(o);
       }}
     >
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="md:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Inspection Result — {phaseLabel}</DialogTitle>
           <DialogDescription>
