@@ -437,7 +437,7 @@ export default function ProjectDetailPage() {
 
               const cardInner = (
                 <Card
-                  className={`group relative h-full overflow-hidden border-border bg-gradient-surface p-5 shadow-card transition-all ${phase ? "cursor-pointer hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-glow" : "opacity-70"
+                  className={`group relative h-full overflow-hidden border-border bg-gradient-surface p-3 sm:p-5 shadow-card transition-all ${phase ? "cursor-pointer hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-glow" : "opacity-70"
                     }`}
                 >
                   {/* tone accent strip */}
