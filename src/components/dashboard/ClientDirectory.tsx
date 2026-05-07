@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpRight, Building2, Grid2X2, List, Mail, Phone, Pencil, Plus, Search } from "lucide-react";
+import { ArrowUpRight, Building2, Grid2X2, List, Mail, MoreHorizontal, Phone, Pencil, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -39,15 +40,13 @@ export function ClientDirectory({
   isAdmin,
 }: ClientDirectoryProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [mobileActionClientId, setMobileActionClientId] = useState<string | null>(null);
   const [displayMode, setDisplayMode] = useState<"list" | "cards">(() => {
     const saved = localStorage.getItem("clientViewMode");
     return saved === "list" || saved === "cards" ? saved : "cards";
   });
   const rows = useMemo(() => buildClientRows(clients, projects, search), [clients, projects, search]);
-
-  useEffect(() => {
-    searchInputRef.current?.focus();
-  }, []);
+  const mobileActionRow = rows.find((row) => row.client.id === mobileActionClientId);
 
   useEffect(() => {
     localStorage.setItem("clientViewMode", displayMode);
@@ -157,7 +156,8 @@ export function ClientDirectory({
           <p className="mt-1 text-sm text-muted-foreground">Try a different name, contact, phone, or email.</p>
         </Card>
       ) : displayMode === "list" ? (
-        <Card className="border-border bg-gradient-surface shadow-card">
+        <>
+        <Card className="hidden border-border bg-gradient-surface shadow-card sm:block">
           <Table className="table-fixed">
             <TableHeader>
               <TableRow>
@@ -221,16 +221,14 @@ export function ClientDirectory({
             </TableBody>
           </Table>
         </Card>
-      ) : (
-        <>
-          {/* Mobile dense list */}
-          <ul className="mobile-list sm:hidden">
-            {rows.map((row) => (
-              <li key={row.client.id}>
+        <ul className="mobile-list sm:hidden">
+          {rows.map((row) => (
+            <li key={row.client.id}>
+              <div className="flex items-center gap-2 px-3 py-2.5 active:bg-muted/40">
                 <button
                   type="button"
                   onClick={() => onOpenClient?.(row.client.id)}
-                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left active:bg-muted/40"
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
                 >
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
                     <Building2 className="h-4 w-4" />
@@ -241,10 +239,61 @@ export function ClientDirectory({
                       {row.client.primaryContactName ?? row.client.phone ?? "No contact"}
                     </div>
                   </div>
-                  <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums">
-                    {row.activeProjects}
+                  <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums" aria-label={`${row.activeProjects} active projects`}>
+                    {row.activeProjects} active
                   </span>
                 </button>
+                {onEditClient && (
+                  <button
+                    type="button"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground active:bg-muted/60"
+                    aria-label={`Actions for ${row.client.name}`}
+                    onClick={() => setMobileActionClientId(row.client.id)}
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+        </>
+      ) : (
+        <>
+          {/* Mobile dense list */}
+          <ul className="mobile-list sm:hidden">
+            {rows.map((row) => (
+              <li key={row.client.id}>
+                <div className="flex items-center gap-2 px-3 py-2.5 active:bg-muted/40">
+                  <button
+                    type="button"
+                    onClick={() => onOpenClient?.(row.client.id)}
+                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                  >
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
+                      <Building2 className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold">{row.client.name}</div>
+                      <div className="truncate text-xs text-muted-foreground">
+                        {row.client.primaryContactName ?? row.client.phone ?? "No contact"}
+                      </div>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums" aria-label={`${row.activeProjects} active projects`}>
+                      {row.activeProjects} active
+                    </span>
+                  </button>
+                  {onEditClient && (
+                    <button
+                      type="button"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground active:bg-muted/60"
+                      aria-label={`Actions for ${row.client.name}`}
+                      onClick={() => setMobileActionClientId(row.client.id)}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
@@ -320,6 +369,36 @@ export function ClientDirectory({
         </div>
         </>
       )}
+      <BottomSheet open={!!mobileActionRow} onOpenChange={(open) => { if (!open) setMobileActionClientId(null); }} title={mobileActionRow?.client.name}>
+        {mobileActionRow && (
+          <div className="grid gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="justify-start"
+              onClick={() => {
+                setMobileActionClientId(null);
+                onOpenClient?.(mobileActionRow.client.id);
+              }}
+            >
+              Open client
+            </Button>
+            {onEditClient && (
+              <Button
+                type="button"
+                variant="outline"
+                className="justify-start"
+                onClick={() => {
+                  setMobileActionClientId(null);
+                  onEditClient(mobileActionRow.client.id);
+                }}
+              >
+                Edit client
+              </Button>
+            )}
+          </div>
+        )}
+      </BottomSheet>
     </section>
   );
 }
