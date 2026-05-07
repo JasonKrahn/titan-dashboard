@@ -249,7 +249,7 @@ export default function ProjectDetailPage() {
     <div className="min-h-screen bg-background">
       <AppHeader activeSection="dashboard" />
 
-      <main className="container space-y-8 py-6">
+      <main className="container space-y-4 py-3 sm:space-y-8 sm:py-6">
         <Breadcrumb>
           <BreadcrumbList className="flex-nowrap overflow-hidden">
             <BreadcrumbItem className="shrink-0">
