@@ -291,7 +291,7 @@ export default function SubcontractorRolodexPage() {
       <main className="container py-6 space-y-6">
         <div className="space-y-3">
           <h1 className="text-2xl font-bold">Subcontractor Rolodex</h1>
-          <div className="sticky top-[4.5rem] z-10 -mx-1 rounded-lg bg-background/95 px-1 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:py-0">
+          <div className="hidden sm:block sticky top-[4.5rem] z-10 -mx-1 rounded-lg bg-background/95 px-1 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:py-0">
             <Button className="h-10 w-full sm:w-auto" onClick={() => setIsAddDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-1" />
               Add Subcontractor
