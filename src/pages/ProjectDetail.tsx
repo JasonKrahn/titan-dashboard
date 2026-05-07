@@ -274,8 +274,95 @@ export default function ProjectDetailPage() {
           </BreadcrumbList>
         </Breadcrumb>
 
-        {/* Hero / project header */}
-        <section className="rounded-xl border border-border bg-gradient-surface p-6 shadow-card">
+        {/* Compact mobile header */}
+        <section className="md:hidden -mx-3 border-b border-border bg-card px-3 py-3">
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <h1 className="truncate text-base font-semibold">{p.name}</h1>
+                <StatusBadge tone={projectStatusTone(p.status)} label={STATUS_LABEL[p.status]} size="sm" />
+              </div>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                {detail.client.name}
+                {detail.assignedProjectManager ? ` · ${initials(detail.assignedProjectManager.fullName)}` : ""}
+                {p.siteAddress ? ` · ${p.siteAddress}` : ""}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                aria-label="Toggle info"
+                onClick={() => setMobileInfoOpen((v) => !v)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground"
+              >
+                <ChevronDown className={`h-4 w-4 transition-transform ${mobileInfoOpen ? "rotate-180" : ""}`} />
+              </button>
+              {(p.status !== "archived") && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="More"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {p.status !== "completed" && p.status !== "archived" && (
+                      <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                        <Pencil className="mr-2 h-4 w-4" /> Edit project
+                      </DropdownMenuItem>
+                    )}
+                    {p.status === "completed" && (
+                      <DropdownMenuItem onClick={() => setArchiveOpen(true)}>
+                        <Archive className="mr-2 h-4 w-4" /> Archive
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+          </div>
+          {mobileInfoOpen && (
+            <div className="mt-2 space-y-1 border-t border-border pt-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5"><MapPin className="h-3 w-3" />{p.siteAddress}</div>
+              <div className="flex items-center gap-1.5"><Calendar className="h-3 w-3" />{formatDate(p.scheduledStart)} → {formatDate(p.scheduledEnd)}</div>
+              {detail.assignedProjectManager && (
+                <div className="flex items-center gap-1.5"><User className="h-3 w-3" />{detail.assignedProjectManager.fullName}</div>
+              )}
+              <div className="flex items-center gap-1.5"><Clock className="h-3 w-3" />Updated {relativeTime(p.updatedAt)}</div>
+              {p.finishLevel && <div>Finish level: {p.finishLevel}</div>}
+            </div>
+          )}
+        </section>
+
+        {/* Mobile sticky tab bar */}
+        <nav className="md:hidden sticky top-16 z-10 -mx-3 border-b border-border bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <div className="flex gap-1 overflow-x-auto py-1.5 scrollbar-hide">
+            {([
+              { id: "overview", label: "Overview" },
+              { id: "deficiencies", label: "Deficiencies" },
+              { id: "notes", label: "Notes" },
+              { id: "photos", label: "Photos" },
+              { id: "activity", label: "Activity" },
+            ] as const).map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setMobileTab(item.id)}
+                className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  mobileTab === item.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </nav>
+
+        {/* Hero / project header (desktop) */}
+        <section className="hidden md:block rounded-xl border border-border bg-gradient-surface p-6 shadow-card">
           <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
             <div className="min-w-0">
               <h1 className="text-2xl font-bold sm:text-3xl">{p.name}</h1>
@@ -331,30 +418,6 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         </section>
-
-        {/* Mobile anchor nav */}
-        <nav className="md:hidden">
-          <div className="flex gap-1 overflow-x-auto border-b border-border pb-1 no-scrollbar snap-x snap-mandatory">
-            {[
-              { id: "attic-gate", label: "Attic Gate" },
-              { id: "deficiencies", label: "Deficiencies" },
-              { id: "project-notes", label: "Project Notes" },
-              { id: "activity", label: "Activity" },
-            ].map((item) => (
-              <a
-                key={item.id}
-                href={`#${item.id}`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  document.getElementById(item.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-                }}
-                className="shrink-0 rounded-md px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground snap-start"
-              >
-                {item.label}
-              </a>
-            ))}
-          </div>
-        </nav>
 
         {/* Phases */}
         <section>
