@@ -297,7 +297,7 @@ export default function ProjectDetailPage() {
               >
                 <ChevronDown className={`h-4 w-4 transition-transform ${mobileInfoOpen ? "rotate-180" : ""}`} />
               </button>
-              {(p.status !== "archived") && (
+              {((p.status as string) !== "archived") && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
