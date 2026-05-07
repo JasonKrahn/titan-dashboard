@@ -784,26 +784,30 @@ export default function ProjectDetailPage() {
           <section className={mobileTab === "photos" ? "" : "hidden md:block"}>
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Project Photos</h3>
             {detail.photoEvidence.filter(p => p.phaseId).length === 0 ? (
-              <Card className="border-border bg-card p-8 text-center text-sm text-muted-foreground shadow-card">
-                <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-                  <ImageIcon className="h-5 w-5" />
-                </div>
-                No photos in this project yet
-              </Card>
+              <>
+                <EmptyInline text="No photos in this project yet" icon={<ImageIcon className="h-3.5 w-3.5" />} className="sm:hidden" />
+                <Card className="hidden sm:block border-border bg-card p-8 text-center text-sm text-muted-foreground shadow-card">
+                  <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                    <ImageIcon className="h-5 w-5" />
+                  </div>
+                  No photos in this project yet
+                </Card>
+              </>
             ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 scrollbar-hide snap-x sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-3 sm:overflow-visible sm:px-0 md:grid-cols-4">
                 {detail.photoEvidence.filter(p => p.phaseId).map((photo) => (
-                  <ProjectPhotoCard
-                    key={photo.id}
-                    photo={photo}
-                    phases={detail.phases}
-                    gates={detail.gates}
-                    deficiencies={detail.deficiencies}
-                    onOpen={() => {
-                      setSelectedPhoto(photo);
-                      setPhotoViewerOpen(true);
-                    }}
-                  />
+                  <div key={photo.id} className="w-24 shrink-0 snap-start sm:w-auto">
+                    <ProjectPhotoCard
+                      photo={photo}
+                      phases={detail.phases}
+                      gates={detail.gates}
+                      deficiencies={detail.deficiencies}
+                      onOpen={() => {
+                        setSelectedPhoto(photo);
+                        setPhotoViewerOpen(true);
+                      }}
+                    />
+                  </div>
                 ))}
               </div>
             )}
