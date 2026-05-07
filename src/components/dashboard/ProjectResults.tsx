@@ -216,22 +216,51 @@ export function ProjectResults({
       ) : projects.length === 0 ? (
         emptyState
       ) : displayMode === "cards" ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {sortedRows.map((row) => (
-            <ProjectCard
-              key={row.project.id}
-              project={row.project}
-              client={row.client}
-              pm={row.pm}
-              phases={phases}
-              gates={gates}
-              deficiencies={deficiencies}
-              onOpen={onOpenProject}
-              onArchive={onArchiveProject}
-              onEdit={onEditProject}
-            />
-          ))}
-        </div>
+        <>
+          {/* Mobile dense list */}
+          <ul className="mobile-list sm:hidden">
+            {sortedRows.map((row) => (
+              <li key={row.project.id}>
+                <button
+                  type="button"
+                  onClick={() => onOpenProject?.(row.project.id)}
+                  className="flex w-full items-start gap-2 px-3 py-2.5 text-left active:bg-muted/40"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm font-semibold">{row.project.name}</span>
+                      <span className="shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground">
+                        {STATUS_LABEL[row.project.status]}
+                      </span>
+                    </div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {row.clientName}
+                      {row.openIssues > 0 ? ` · ${row.openIssues} open` : ""}
+                      {row.pm ? ` · ${initials(row.pm.fullName)}` : ""}
+                    </div>
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          <div className="hidden sm:grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {sortedRows.map((row) => (
+              <ProjectCard
+                key={row.project.id}
+                project={row.project}
+                client={row.client}
+                pm={row.pm}
+                phases={phases}
+                gates={gates}
+                deficiencies={deficiencies}
+                onOpen={onOpenProject}
+                onArchive={onArchiveProject}
+                onEdit={onEditProject}
+              />
+            ))}
+          </div>
+        </>
       ) : (
         <Card className="border-border bg-gradient-surface shadow-card">
           <Table className="table-fixed">
