@@ -148,6 +148,8 @@ export default function ProjectDetailPage() {
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoEvidence | null>(null);
   const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
   const [deficiencyDialogOpen, setDeficiencyDialogOpen] = useState(false);
+  const [mobileInfoOpen, setMobileInfoOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"overview" | "deficiencies" | "notes" | "photos" | "activity">("overview");
 
   const activeDefs = useMemo(
     () => detail?.deficiencies.filter((d) => d.status === "open" || d.status === "in_progress") ?? [],
