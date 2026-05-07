@@ -721,31 +721,40 @@ export default function ProjectDetailPage() {
             </div>
           </Card>
 
-          <Card id="deficiencies" className="border-border bg-card p-5 shadow-card">
+          <Card id="deficiencies" className="border-border bg-card p-3 shadow-card sm:p-5">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Deficiencies</h3>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">{activeDefs.length} active</span>
-                <Button size="sm" onClick={() => setDeficiencyDialogOpen(true)}>
+                <Button size="sm" className="hidden sm:inline-flex" onClick={() => setDeficiencyDialogOpen(true)}>
                   Add Deficiency
                 </Button>
+                <button
+                  type="button"
+                  aria-label="Add deficiency"
+                  onClick={() => setDeficiencyDialogOpen(true)}
+                  className="sm:hidden inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
               </div>
             </div>
             {activeDefs.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No active deficiencies.</p>
+              <EmptyInline text="No active deficiencies" />
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1.5 sm:space-y-2">
                 {activeDefs.map((d) => {
                   const phase = detail.phases.find((ph) => ph.id === d.phaseId);
                   return (
                     <Link key={d.id} to={`/project/${p.id}/phase/${d.phaseId}?tab=deficiencies`} className="block">
-                      <div className="flex items-start justify-between gap-2 rounded-md border border-border bg-muted/20 p-2.5 cursor-pointer hover:bg-muted/30 transition-colors">
+                      <div className="flex items-start justify-between gap-2 rounded-md border border-border bg-muted/20 p-2 sm:p-2.5 cursor-pointer hover:bg-muted/30 transition-colors">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium">{d.title}</p>
                           <p className="mt-0.5 text-xs text-muted-foreground">
                             {phase ? PHASE_LABEL[phase.type] : "—"} · {d.severity}
                           </p>
                         </div>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                       </div>
                     </Link>
                   );
