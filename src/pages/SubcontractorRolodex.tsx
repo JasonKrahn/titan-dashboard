@@ -16,6 +16,7 @@ import { getSubcontractorContacts, getAllPhases, getProjects, createSubcontracto
 import type { Phase, Project, TradeType, SubcontractorContact } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { Fab } from "@/components/ui/fab";
 
 const TRADE_LABEL: Record<string, string> = {
   insulation: "Insulation",
@@ -455,6 +456,8 @@ export default function SubcontractorRolodexPage() {
           Prototype data · Backend swap-in via lib/api adapters
         </p>
       </main>
+
+      <Fab label="Add subcontractor" icon={<Plus className="h-6 w-6" />} onClick={() => setIsAddDialogOpen(true)} />
 
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
