@@ -38,15 +38,15 @@ function Stat({ label, value, icon, accent, hint }: StatProps) {
 export function StatsRow({ activeProjects, blockedItems, inspectionsDueThisWeek, loading }: StatsRowProps) {
   if (loading) {
     return (
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+      <div className="grid gap-2 grid-cols-3 sm:gap-4">
         {[0, 1, 2].map((i) => (
-          <Skeleton key={i} className="h-[112px] rounded-lg" />
+          <Skeleton key={i} className="h-[68px] sm:h-[112px] rounded-lg" />
         ))}
       </div>
     );
   }
   return (
-    <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+    <div className="grid gap-2 grid-cols-3 sm:gap-4">
       <Stat
         label="Active projects"
         value={activeProjects}
