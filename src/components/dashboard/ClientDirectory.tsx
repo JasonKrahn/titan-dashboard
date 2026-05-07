@@ -318,6 +318,7 @@ export function ClientDirectory({
             );
           })}
         </div>
+        </>
       )}
     </section>
   );
