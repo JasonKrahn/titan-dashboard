@@ -425,7 +425,7 @@ export default function ProjectDetailPage() {
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Phases</h2>
             <span className="text-xs text-muted-foreground">Click a phase for details</span>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-2 sm:gap-4 md:grid-cols-3">
             {PHASE_ORDER.map((type) => {
               const phase = detail.phases.find((ph) => ph.type === type);
               const phaseGates = phase ? detail.gates.filter((g) => g.phaseId === phase.id) : [];
