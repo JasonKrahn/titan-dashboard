@@ -420,7 +420,7 @@ export default function ProjectDetailPage() {
         </section>
 
         {/* Phases */}
-        <section>
+        <section className={mobileTab === "overview" ? "" : "hidden md:block"}>
           <div className="mb-3 flex items-baseline justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Phases</h2>
             <span className="text-xs text-muted-foreground">Click a phase for details</span>
@@ -561,7 +561,7 @@ export default function ProjectDetailPage() {
         </section>
 
         {/* Two-column: Attic & Deficiencies */}
-        <section className="grid gap-6 md:grid-cols-2">
+        <section className={`grid gap-6 md:grid-cols-2 ${mobileTab === "overview" || mobileTab === "deficiencies" ? "" : "hidden md:grid"}`}>
           <Card id="attic-gate" className="border-border bg-card p-5 shadow-card">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Attic Gate</h3>
@@ -768,7 +768,7 @@ export default function ProjectDetailPage() {
 
         {/* Project Notes */}
         {detail && (
-          <div id="project-notes">
+          <div id="project-notes" className={mobileTab === "notes" ? "" : "hidden md:block"}>
             <ProjectNotes
               projectId={detail.project.id}
               notes={detail.project.notes}
@@ -781,7 +781,7 @@ export default function ProjectDetailPage() {
 
         {/* Project Photos */}
         {detail && (
-          <section>
+          <section className={mobileTab === "photos" ? "" : "hidden md:block"}>
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Project Photos</h3>
             {detail.photoEvidence.filter(p => p.phaseId).length === 0 ? (
               <Card className="border-border bg-card p-8 text-center text-sm text-muted-foreground shadow-card">
@@ -812,7 +812,7 @@ export default function ProjectDetailPage() {
 
         {/* Activity */}
         {detail.auditEvents.length > 0 && (
-          <section id="activity">
+          <section id="activity" className={mobileTab === "activity" ? "" : "hidden md:block"}>
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Recent activity</h3>
             <Card className="border-border bg-card shadow-card">
               <CardContent className="p-5">
