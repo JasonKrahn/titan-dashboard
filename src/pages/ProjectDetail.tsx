@@ -868,6 +868,14 @@ export default function ProjectDetailPage() {
         )}
       </main>
 
+      {/* Mobile FAB — context based on active tab */}
+      {(mobileTab === "deficiencies" || mobileTab === "overview") && p.status !== "archived" && p.status !== "completed" && (
+        <Fab
+          label="Add deficiency"
+          icon={<Plus className="h-6 w-6" />}
+          onClick={() => setDeficiencyDialogOpen(true)}
+        />
+      )}
       {siteCheckTarget && detail && (
         <SiteCheckDialog
           open={!!siteCheckTarget}
