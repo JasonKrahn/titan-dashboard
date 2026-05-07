@@ -562,7 +562,7 @@ export default function ProjectDetailPage() {
 
         {/* Two-column: Attic & Deficiencies */}
         <section className={`grid gap-6 md:grid-cols-2 ${mobileTab === "overview" || mobileTab === "deficiencies" ? "" : "hidden md:grid"}`}>
-          <Card id="attic-gate" className="border-border bg-card p-5 shadow-card">
+          <Card id="attic-gate" className="border-border bg-card p-3 shadow-card sm:p-5">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Attic Gate</h3>
             </div>
