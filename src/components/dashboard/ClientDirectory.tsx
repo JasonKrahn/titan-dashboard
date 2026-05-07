@@ -108,7 +108,7 @@ export function ClientDirectory({
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="hidden sm:flex flex-wrap items-center gap-2">
           <div className="inline-flex w-fit gap-1 rounded-md border border-border bg-card p-1 shadow-card">
             <Button
               type="button"
@@ -222,7 +222,34 @@ export function ClientDirectory({
           </Table>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <>
+          {/* Mobile dense list */}
+          <ul className="mobile-list sm:hidden">
+            {rows.map((row) => (
+              <li key={row.client.id}>
+                <button
+                  type="button"
+                  onClick={() => onOpenClient?.(row.client.id)}
+                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left active:bg-muted/40"
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
+                    <Building2 className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold">{row.client.name}</div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {row.client.primaryContactName ?? row.client.phone ?? "No contact"}
+                    </div>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums">
+                    {row.activeProjects}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          <div className="hidden sm:grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {rows.map((row) => {
             return (
               <Card
@@ -291,6 +318,7 @@ export function ClientDirectory({
             );
           })}
         </div>
+        </>
       )}
     </section>
   );

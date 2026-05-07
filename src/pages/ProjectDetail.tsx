@@ -19,7 +19,19 @@ import {
   Archive,
   Pencil,
   Image as ImageIcon,
+  ChevronDown,
+  Plus,
+  MoreVertical,
 } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Fab } from "@/components/ui/fab";
+import { EmptyInline } from "@/components/ui/empty-inline";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -136,6 +148,8 @@ export default function ProjectDetailPage() {
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoEvidence | null>(null);
   const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
   const [deficiencyDialogOpen, setDeficiencyDialogOpen] = useState(false);
+  const [mobileInfoOpen, setMobileInfoOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"overview" | "deficiencies" | "notes" | "photos" | "activity">("overview");
 
   const activeDefs = useMemo(
     () => detail?.deficiencies.filter((d) => d.status === "open" || d.status === "in_progress") ?? [],
@@ -235,7 +249,7 @@ export default function ProjectDetailPage() {
     <div className="min-h-screen bg-background">
       <AppHeader activeSection="dashboard" />
 
-      <main className="container space-y-8 py-6">
+      <main className="container space-y-4 py-3 sm:space-y-8 sm:py-6">
         <Breadcrumb>
           <BreadcrumbList className="flex-nowrap overflow-hidden">
             <BreadcrumbItem className="shrink-0">
@@ -260,8 +274,95 @@ export default function ProjectDetailPage() {
           </BreadcrumbList>
         </Breadcrumb>
 
-        {/* Hero / project header */}
-        <section className="rounded-xl border border-border bg-gradient-surface p-6 shadow-card">
+        {/* Compact mobile header */}
+        <section className="md:hidden -mx-3 border-b border-border bg-card px-3 py-3">
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <h1 className="truncate text-base font-semibold">{p.name}</h1>
+                <StatusBadge tone={projectStatusTone(p.status)} label={STATUS_LABEL[p.status]} size="sm" />
+              </div>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                {detail.client.name}
+                {detail.assignedProjectManager ? ` · ${initials(detail.assignedProjectManager.fullName)}` : ""}
+                {p.siteAddress ? ` · ${p.siteAddress}` : ""}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                aria-label="Toggle info"
+                onClick={() => setMobileInfoOpen((v) => !v)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground"
+              >
+                <ChevronDown className={`h-4 w-4 transition-transform ${mobileInfoOpen ? "rotate-180" : ""}`} />
+              </button>
+              {((p.status as string) !== "archived") && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="More"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {p.status !== "completed" && p.status !== "archived" && (
+                      <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                        <Pencil className="mr-2 h-4 w-4" /> Edit project
+                      </DropdownMenuItem>
+                    )}
+                    {p.status === "completed" && (
+                      <DropdownMenuItem onClick={() => setArchiveOpen(true)}>
+                        <Archive className="mr-2 h-4 w-4" /> Archive
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+          </div>
+          {mobileInfoOpen && (
+            <div className="mt-2 space-y-1 border-t border-border pt-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5"><MapPin className="h-3 w-3" />{p.siteAddress}</div>
+              <div className="flex items-center gap-1.5"><Calendar className="h-3 w-3" />{formatDate(p.scheduledStart)} → {formatDate(p.scheduledEnd)}</div>
+              {detail.assignedProjectManager && (
+                <div className="flex items-center gap-1.5"><User className="h-3 w-3" />{detail.assignedProjectManager.fullName}</div>
+              )}
+              <div className="flex items-center gap-1.5"><Clock className="h-3 w-3" />Updated {relativeTime(p.updatedAt)}</div>
+              {p.finishLevel && <div>Finish level: {p.finishLevel}</div>}
+            </div>
+          )}
+        </section>
+
+        {/* Mobile sticky tab bar */}
+        <nav className="md:hidden sticky top-16 z-10 -mx-3 border-b border-border bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <div className="flex gap-1 overflow-x-auto py-1.5 scrollbar-hide">
+            {([
+              { id: "overview", label: "Overview" },
+              { id: "deficiencies", label: "Deficiencies" },
+              { id: "notes", label: "Notes" },
+              { id: "photos", label: "Photos" },
+              { id: "activity", label: "Activity" },
+            ] as const).map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setMobileTab(item.id)}
+                className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  mobileTab === item.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </nav>
+
+        {/* Hero / project header (desktop) */}
+        <section className="hidden md:block rounded-xl border border-border bg-gradient-surface p-6 shadow-card">
           <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
             <div className="min-w-0">
               <h1 className="text-2xl font-bold sm:text-3xl">{p.name}</h1>
@@ -318,37 +419,13 @@ export default function ProjectDetailPage() {
           </div>
         </section>
 
-        {/* Mobile anchor nav */}
-        <nav className="md:hidden">
-          <div className="flex gap-1 overflow-x-auto border-b border-border pb-1 no-scrollbar snap-x snap-mandatory">
-            {[
-              { id: "attic-gate", label: "Attic Gate" },
-              { id: "deficiencies", label: "Deficiencies" },
-              { id: "project-notes", label: "Project Notes" },
-              { id: "activity", label: "Activity" },
-            ].map((item) => (
-              <a
-                key={item.id}
-                href={`#${item.id}`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  document.getElementById(item.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-                }}
-                className="shrink-0 rounded-md px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground snap-start"
-              >
-                {item.label}
-              </a>
-            ))}
-          </div>
-        </nav>
-
         {/* Phases */}
-        <section>
+        <section className={mobileTab === "overview" ? "" : "hidden md:block"}>
           <div className="mb-3 flex items-baseline justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Phases</h2>
             <span className="text-xs text-muted-foreground">Click a phase for details</span>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-2 sm:gap-4 md:grid-cols-3">
             {PHASE_ORDER.map((type) => {
               const phase = detail.phases.find((ph) => ph.type === type);
               const phaseGates = phase ? detail.gates.filter((g) => g.phaseId === phase.id) : [];
@@ -360,7 +437,7 @@ export default function ProjectDetailPage() {
 
               const cardInner = (
                 <Card
-                  className={`group relative h-full overflow-hidden border-border bg-gradient-surface p-5 shadow-card transition-all ${phase ? "cursor-pointer hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-glow" : "opacity-70"
+                  className={`group relative h-full overflow-hidden border-border bg-gradient-surface p-3 sm:p-5 shadow-card transition-all ${phase ? "cursor-pointer hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-glow" : "opacity-70"
                     }`}
                 >
                   {/* tone accent strip */}
@@ -484,8 +561,8 @@ export default function ProjectDetailPage() {
         </section>
 
         {/* Two-column: Attic & Deficiencies */}
-        <section className="grid gap-6 md:grid-cols-2">
-          <Card id="attic-gate" className="border-border bg-card p-5 shadow-card">
+        <section className={`grid gap-6 md:grid-cols-2 ${mobileTab === "overview" || mobileTab === "deficiencies" ? "" : "hidden md:grid"}`}>
+          <Card id="attic-gate" className="border-border bg-card p-3 shadow-card sm:p-5">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Attic Gate</h3>
             </div>
@@ -644,31 +721,40 @@ export default function ProjectDetailPage() {
             </div>
           </Card>
 
-          <Card id="deficiencies" className="border-border bg-card p-5 shadow-card">
+          <Card id="deficiencies" className="border-border bg-card p-3 shadow-card sm:p-5">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Deficiencies</h3>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">{activeDefs.length} active</span>
-                <Button size="sm" onClick={() => setDeficiencyDialogOpen(true)}>
+                <Button size="sm" className="hidden sm:inline-flex" onClick={() => setDeficiencyDialogOpen(true)}>
                   Add Deficiency
                 </Button>
+                <button
+                  type="button"
+                  aria-label="Add deficiency"
+                  onClick={() => setDeficiencyDialogOpen(true)}
+                  className="sm:hidden inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
               </div>
             </div>
             {activeDefs.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No active deficiencies.</p>
+              <EmptyInline text="No active deficiencies" />
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1.5 sm:space-y-2">
                 {activeDefs.map((d) => {
                   const phase = detail.phases.find((ph) => ph.id === d.phaseId);
                   return (
                     <Link key={d.id} to={`/project/${p.id}/phase/${d.phaseId}?tab=deficiencies`} className="block">
-                      <div className="flex items-start justify-between gap-2 rounded-md border border-border bg-muted/20 p-2.5 cursor-pointer hover:bg-muted/30 transition-colors">
+                      <div className="flex items-start justify-between gap-2 rounded-md border border-border bg-muted/20 p-2 sm:p-2.5 cursor-pointer hover:bg-muted/30 transition-colors">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium">{d.title}</p>
                           <p className="mt-0.5 text-xs text-muted-foreground">
                             {phase ? PHASE_LABEL[phase.type] : "—"} · {d.severity}
                           </p>
                         </div>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                       </div>
                     </Link>
                   );
@@ -691,7 +777,7 @@ export default function ProjectDetailPage() {
 
         {/* Project Notes */}
         {detail && (
-          <div id="project-notes">
+          <div id="project-notes" className={mobileTab === "notes" ? "" : "hidden md:block"}>
             <ProjectNotes
               projectId={detail.project.id}
               notes={detail.project.notes}
@@ -704,29 +790,33 @@ export default function ProjectDetailPage() {
 
         {/* Project Photos */}
         {detail && (
-          <section>
+          <section className={mobileTab === "photos" ? "" : "hidden md:block"}>
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Project Photos</h3>
             {detail.photoEvidence.filter(p => p.phaseId).length === 0 ? (
-              <Card className="border-border bg-card p-8 text-center text-sm text-muted-foreground shadow-card">
-                <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-                  <ImageIcon className="h-5 w-5" />
-                </div>
-                No photos in this project yet
-              </Card>
+              <>
+                <EmptyInline text="No photos in this project yet" icon={<ImageIcon className="h-3.5 w-3.5" />} className="sm:hidden" />
+                <Card className="hidden sm:block border-border bg-card p-8 text-center text-sm text-muted-foreground shadow-card">
+                  <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                    <ImageIcon className="h-5 w-5" />
+                  </div>
+                  No photos in this project yet
+                </Card>
+              </>
             ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 scrollbar-hide snap-x sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-3 sm:overflow-visible sm:px-0 md:grid-cols-4">
                 {detail.photoEvidence.filter(p => p.phaseId).map((photo) => (
-                  <ProjectPhotoCard
-                    key={photo.id}
-                    photo={photo}
-                    phases={detail.phases}
-                    gates={detail.gates}
-                    deficiencies={detail.deficiencies}
-                    onOpen={() => {
-                      setSelectedPhoto(photo);
-                      setPhotoViewerOpen(true);
-                    }}
-                  />
+                  <div key={photo.id} className="w-24 shrink-0 snap-start sm:w-auto">
+                    <ProjectPhotoCard
+                      photo={photo}
+                      phases={detail.phases}
+                      gates={detail.gates}
+                      deficiencies={detail.deficiencies}
+                      onOpen={() => {
+                        setSelectedPhoto(photo);
+                        setPhotoViewerOpen(true);
+                      }}
+                    />
+                  </div>
                 ))}
               </div>
             )}
@@ -735,7 +825,7 @@ export default function ProjectDetailPage() {
 
         {/* Activity */}
         {detail.auditEvents.length > 0 && (
-          <section id="activity">
+          <section id="activity" className={mobileTab === "activity" ? "" : "hidden md:block"}>
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Recent activity</h3>
             <Card className="border-border bg-card shadow-card">
               <CardContent className="p-5">
@@ -778,6 +868,14 @@ export default function ProjectDetailPage() {
         )}
       </main>
 
+      {/* Mobile FAB — context based on active tab */}
+      {(mobileTab === "deficiencies" || mobileTab === "overview") && p.status !== "archived" && p.status !== "completed" && (
+        <Fab
+          label="Add deficiency"
+          icon={<Plus className="h-6 w-6" />}
+          onClick={() => setDeficiencyDialogOpen(true)}
+        />
+      )}
       {siteCheckTarget && detail && (
         <SiteCheckDialog
           open={!!siteCheckTarget}
