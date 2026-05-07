@@ -177,7 +177,7 @@
     scrollbar-width: none;
   }
 
-  /* Edge-to-edge mobile list group. Resets to a normal card from sm: up. */
+  /* Edge-to-edge mobile list group. Resets to a normal card from md: up. */
   .mobile-list {
     margin-left: -0.75rem;
     margin-right: -0.75rem;
@@ -190,7 +190,7 @@
     border-top-width: 1px;
     border-color: hsl(var(--border));
   }
-  @media (min-width: 640px) {
+  @media (min-width: 768px) {
     .mobile-list {
       margin-left: 0;
       margin-right: 0;

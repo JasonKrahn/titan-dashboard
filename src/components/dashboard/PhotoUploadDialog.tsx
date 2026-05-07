@@ -56,6 +56,7 @@ export function PhotoUploadDialog({
     onSuccess: (res) => {
       if (res.ok === true) {
         toast.success("Photo uploaded");
+        qc.invalidateQueries({ queryKey: ["project", projectId] });
         qc.invalidateQueries({ queryKey: ["phase", phaseId] });
         onOpenChange(false);
         return;
@@ -93,7 +94,7 @@ export function PhotoUploadDialog({
         onOpenChange(o);
       }}
     >
-      <DialogContent className="sm:max-w-[440px]">
+      <DialogContent className="md:max-w-[440px]">
         <DialogHeader>
           <DialogTitle>Upload Photo</DialogTitle>
           <DialogDescription>Add a photo to this phase.</DialogDescription>

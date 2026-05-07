@@ -292,13 +292,13 @@ export default function SubcontractorRolodexPage() {
       <main className="container py-6 space-y-6">
         <div className="space-y-3">
           <h1 className="text-2xl font-bold">Subcontractor Rolodex</h1>
-          <div className="hidden sm:block sticky top-[4.5rem] z-10 -mx-1 rounded-lg bg-background/95 px-1 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:py-0">
-            <Button className="h-10 w-full sm:w-auto" onClick={() => setIsAddDialogOpen(true)}>
+          <div className="hidden md:block sticky top-[4.5rem] z-10 -mx-1 rounded-lg bg-background/95 px-1 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:py-0">
+            <Button className="h-10 w-full md:w-auto" onClick={() => setIsAddDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-1" />
               Add Subcontractor
             </Button>
           </div>
-          <div className="relative w-full sm:max-w-sm">
+          <div className="relative w-full md:max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search by name, company, or trade..."
@@ -317,7 +317,7 @@ export default function SubcontractorRolodexPage() {
         ) : (
           <>
             {/* Mobile dense list */}
-            <ul className="mobile-list sm:hidden">
+            <ul className="mobile-list md:hidden">
               {filtered.map((s) => (
                 <li key={s.id} className="flex items-center gap-3 px-3 py-2.5">
                   <button
@@ -358,7 +358,7 @@ export default function SubcontractorRolodexPage() {
               ))}
             </ul>
 
-            <div className="hidden sm:grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="hidden md:grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {filtered.map((s) => (
                 <Card key={s.id} className="border-border bg-card p-5 shadow-card">
                   <div className="flex items-start justify-between gap-3">
@@ -460,7 +460,7 @@ export default function SubcontractorRolodexPage() {
       <Fab label="Add subcontractor" icon={<Plus className="h-6 w-6" />} onClick={() => setIsAddDialogOpen(true)} />
 
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="md:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Add Subcontractor</DialogTitle>
           </DialogHeader>
@@ -547,7 +547,7 @@ export default function SubcontractorRolodexPage() {
       </Dialog>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="md:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Edit Subcontractor</DialogTitle>
           </DialogHeader>
@@ -634,7 +634,7 @@ export default function SubcontractorRolodexPage() {
       </Dialog>
 
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="md:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Delete Subcontractor</DialogTitle>
           </DialogHeader>

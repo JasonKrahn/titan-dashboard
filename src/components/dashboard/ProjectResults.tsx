@@ -218,7 +218,7 @@ export function ProjectResults({
       ) : displayMode === "cards" ? (
         <>
           {/* Mobile dense list */}
-          <ul className="mobile-list sm:hidden">
+          <ul className="mobile-list md:hidden">
             {sortedRows.map((row) => (
               <li key={row.project.id}>
                 <button
@@ -244,7 +244,7 @@ export function ProjectResults({
             ))}
           </ul>
 
-          <div className="hidden sm:grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="hidden md:grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {sortedRows.map((row) => (
               <ProjectCard
                 key={row.project.id}
@@ -289,7 +289,7 @@ export function ProjectResults({
                 <TableHead className="hidden xl:table-cell w-[15%]">
                   Phase summary
                 </TableHead>
-                <TableHead className="hidden sm:table-cell w-[8%]">
+                <TableHead className="hidden md:table-cell w-[8%]">
                   <SortButton sortKey="openIssues" sort={sort} onSort={handleSort}>
                     Issues
                   </SortButton>
@@ -349,7 +349,7 @@ export function ProjectResults({
                   <TableCell className="hidden text-xs text-muted-foreground xl:table-cell">
                     {row.phaseSummary}
                   </TableCell>
-                  <TableCell className="hidden sm:table-cell">
+                  <TableCell className="hidden md:table-cell">
                     {row.openIssues > 0 ? (
                       <span className="inline-flex items-center gap-1.5 text-xs font-medium text-status-blocked">
                         <AlertOctagon className="h-3.5 w-3.5" />

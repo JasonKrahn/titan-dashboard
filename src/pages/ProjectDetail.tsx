@@ -22,9 +22,11 @@ import {
   ChevronDown,
   Plus,
   MoreVertical,
+  ShieldCheck,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Fab } from "@/components/ui/fab";
+import { MobileActionSheet, type MobileActionItem } from "@/components/ui/mobile-action-sheet";
 import { EmptyInline } from "@/components/ui/empty-inline";
 import {
   DropdownMenu,
@@ -58,8 +60,9 @@ import { NewProjectDialog } from "@/components/dashboard/NewProjectDialog";
 import { ProjectNotes } from "@/components/dashboard/ProjectNotes";
 import { PhotoViewerDialog } from "@/components/dashboard/PhotoViewerDialog";
 import { DeficiencyDialog } from "@/components/dashboard/DeficiencyDialog";
+import { PhotoUploadDialog } from "@/components/dashboard/PhotoUploadDialog";
 import { getProject, updateAtticGate, getPhotoViewUrl } from "@/lib/api";
-import type { PhotoEvidence } from "@/lib/types";
+import type { Gate, Phase, PhotoEvidence } from "@/lib/types";
 import {
   PHASE_LABEL,
   PHASE_ORDER,
@@ -148,7 +151,11 @@ export default function ProjectDetailPage() {
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoEvidence | null>(null);
   const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
   const [deficiencyDialogOpen, setDeficiencyDialogOpen] = useState(false);
+  const [phaseDeficiencyTarget, setPhaseDeficiencyTarget] = useState<Phase | null>(null);
+  const [phasePhotoTarget, setPhasePhotoTarget] = useState<Phase | null>(null);
   const [mobileInfoOpen, setMobileInfoOpen] = useState(false);
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
+  const [phaseActionsTarget, setPhaseActionsTarget] = useState<Phase | null>(null);
   const [mobileTab, setMobileTab] = useState<"overview" | "deficiencies" | "notes" | "photos" | "activity">("overview");
 
   const activeDefs = useMemo(
@@ -244,6 +251,70 @@ export default function ProjectDetailPage() {
 
   const p = detail.project;
   const formatDate = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—");
+  const phaseActionGates = phaseActionsTarget
+    ? detail.gates.filter((g) => g.phaseId === phaseActionsTarget.id)
+    : [];
+  const phaseActionSiteGate = phaseActionGates.find((g) => g.type === "site_check");
+  const phaseActions: MobileActionItem[] = phaseActionsTarget
+    ? buildProjectPhaseActions({
+        phase: phaseActionsTarget,
+        siteGate: phaseActionSiteGate,
+        projectId: p.id,
+        navigate,
+        setSiteCheckTarget,
+        setSiteBlockTarget,
+        setSiteUnblockTarget,
+        setPhaseDeficiencyTarget,
+        setDeficiencyDialogOpen,
+        setPhasePhotoTarget,
+      })
+    : [];
+  const projectMobileActions: MobileActionItem[] = [
+    ...(p.status !== "completed" && p.status !== "archived"
+      ? [
+          {
+            label: "Add deficiency",
+            icon: <Plus className="h-4 w-4" />,
+            helperText: "Log an issue against this project",
+            onClick: () => setDeficiencyDialogOpen(true),
+          },
+          {
+            label: "Edit project",
+            icon: <Pencil className="h-4 w-4" />,
+            helperText: "Update project details",
+            onClick: () => setEditOpen(true),
+          },
+        ]
+      : []),
+    ...(p.status === "completed"
+      ? [
+          {
+            label: "Archive project",
+            icon: <Archive className="h-4 w-4" />,
+            helperText: "Move completed work out of active views",
+            onClick: () => setArchiveOpen(true),
+          },
+        ]
+      : []),
+    {
+      label: "Deficiencies",
+      icon: <AlertTriangle className="h-4 w-4" />,
+      helperText: "Jump to active project issues",
+      onClick: () => setMobileTab("deficiencies"),
+    },
+    {
+      label: "Photos",
+      icon: <ImageIcon className="h-4 w-4" />,
+      helperText: "Review project photo evidence",
+      onClick: () => setMobileTab("photos"),
+    },
+    {
+      label: "Activity",
+      icon: <Clock className="h-4 w-4" />,
+      helperText: "Review recent project changes",
+      onClick: () => setMobileTab("activity"),
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -261,7 +332,7 @@ export default function ProjectDetailPage() {
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem className="min-w-0">
-              <BreadcrumbLink asChild className="block max-w-[180px] truncate sm:max-w-[260px]">
+              <BreadcrumbLink asChild className="block max-w-[180px] truncate md:max-w-[260px]">
                 <Link to="/" state={{ clientId: detail.client.id }}>
                   {detail.client.name}
                 </Link>
@@ -269,7 +340,7 @@ export default function ProjectDetailPage() {
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem className="min-w-0">
-              <BreadcrumbPage className="block max-w-[190px] truncate sm:max-w-[320px]">{p.name}</BreadcrumbPage>
+              <BreadcrumbPage className="block max-w-[190px] truncate md:max-w-[320px]">{p.name}</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
@@ -425,7 +496,7 @@ export default function ProjectDetailPage() {
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Phases</h2>
             <span className="text-xs text-muted-foreground">Click a phase for details</span>
           </div>
-          <div className="grid gap-2 sm:gap-4 md:grid-cols-3">
+          <div className="grid gap-2 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
             {PHASE_ORDER.map((type) => {
               const phase = detail.phases.find((ph) => ph.type === type);
               const phaseGates = phase ? detail.gates.filter((g) => g.phaseId === phase.id) : [];
@@ -443,7 +514,7 @@ export default function ProjectDetailPage() {
                   {/* tone accent strip */}
                   <div className={`absolute inset-x-0 top-0 h-1 ${c.dot}`} />
 
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between gap-2">
                     <div>
                       <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                         {PHASE_LABEL[type]}
@@ -452,7 +523,23 @@ export default function ProjectDetailPage() {
                         <div className="mt-1 text-xs font-medium text-primary">Finish level: {p.finishLevel}</div>
                       )}
                     </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                    <div className="flex items-center gap-1">
+                      {phase && (
+                        <button
+                          type="button"
+                          aria-label={`${PHASE_LABEL[type]} actions`}
+                          className="md:hidden inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setPhaseActionsTarget(phase);
+                          }}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      )}
+                      <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                    </div>
                   </div>
 
                   <div className="mt-4">
@@ -581,7 +668,7 @@ export default function ProjectDetailPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                 {/* Call-in date */}
                 {insulationClosed && drywallStarted ? (
                   <Popover open={callInOpen} onOpenChange={setCallInOpen}>
@@ -726,14 +813,14 @@ export default function ProjectDetailPage() {
               <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Deficiencies</h3>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">{activeDefs.length} active</span>
-                <Button size="sm" className="hidden sm:inline-flex" onClick={() => setDeficiencyDialogOpen(true)}>
+                <Button size="sm" className="hidden md:inline-flex" onClick={() => setDeficiencyDialogOpen(true)}>
                   Add Deficiency
                 </Button>
                 <button
                   type="button"
                   aria-label="Add deficiency"
                   onClick={() => setDeficiencyDialogOpen(true)}
-                  className="sm:hidden inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground"
+                  className="md:hidden inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground"
                 >
                   <Plus className="h-4 w-4" />
                 </button>
@@ -794,8 +881,8 @@ export default function ProjectDetailPage() {
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Project Photos</h3>
             {detail.photoEvidence.filter(p => p.phaseId).length === 0 ? (
               <>
-                <EmptyInline text="No photos in this project yet" icon={<ImageIcon className="h-3.5 w-3.5" />} className="sm:hidden" />
-                <Card className="hidden sm:block border-border bg-card p-8 text-center text-sm text-muted-foreground shadow-card">
+                <EmptyInline text="No photos in this project yet" icon={<ImageIcon className="h-3.5 w-3.5" />} className="md:hidden" />
+                <Card className="hidden md:block border-border bg-card p-8 text-center text-sm text-muted-foreground shadow-card">
                   <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
                     <ImageIcon className="h-5 w-5" />
                   </div>
@@ -803,9 +890,9 @@ export default function ProjectDetailPage() {
                 </Card>
               </>
             ) : (
-              <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 scrollbar-hide snap-x sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-3 sm:overflow-visible sm:px-0 md:grid-cols-4">
+              <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 scrollbar-hide snap-x md:mx-0 md:grid md:grid-cols-4 md:gap-3 md:overflow-visible md:px-0">
                 {detail.photoEvidence.filter(p => p.phaseId).map((photo) => (
-                  <div key={photo.id} className="w-24 shrink-0 snap-start sm:w-auto">
+                  <div key={photo.id} className="w-24 shrink-0 snap-start md:w-auto">
                     <ProjectPhotoCard
                       photo={photo}
                       phases={detail.phases}
@@ -868,14 +955,26 @@ export default function ProjectDetailPage() {
         )}
       </main>
 
-      {/* Mobile FAB — context based on active tab */}
-      {(mobileTab === "deficiencies" || mobileTab === "overview") && p.status !== "archived" && p.status !== "completed" && (
+      {/* Mobile actions */}
+      {projectMobileActions.length > 0 && (
         <Fab
-          label="Add deficiency"
+          label="Project actions"
           icon={<Plus className="h-6 w-6" />}
-          onClick={() => setDeficiencyDialogOpen(true)}
+          onClick={() => setMobileActionsOpen(true)}
         />
       )}
+      <MobileActionSheet
+        open={mobileActionsOpen}
+        onOpenChange={setMobileActionsOpen}
+        title="Project actions"
+        actions={projectMobileActions}
+      />
+      <MobileActionSheet
+        open={!!phaseActionsTarget}
+        onOpenChange={(open) => { if (!open) setPhaseActionsTarget(null); }}
+        title={phaseActionsTarget ? `${PHASE_LABEL[phaseActionsTarget.type]} actions` : "Phase actions"}
+        actions={phaseActions}
+      />
       {siteCheckTarget && detail && (
         <SiteCheckDialog
           open={!!siteCheckTarget}
@@ -934,10 +1033,24 @@ export default function ProjectDetailPage() {
       {detail && (
         <DeficiencyDialog
           open={deficiencyDialogOpen}
-          onOpenChange={setDeficiencyDialogOpen}
+          onOpenChange={(open) => {
+            setDeficiencyDialogOpen(open);
+            if (!open) setPhaseDeficiencyTarget(null);
+          }}
           projectId={detail.project.id}
+          phaseId={phaseDeficiencyTarget?.id}
+          phaseLabel={phaseDeficiencyTarget ? PHASE_LABEL[phaseDeficiencyTarget.type] : undefined}
           mode="create"
           phases={detail.phases}
+        />
+      )}
+      {detail && phasePhotoTarget && (
+        <PhotoUploadDialog
+          open={!!phasePhotoTarget}
+          onOpenChange={(open) => { if (!open) setPhasePhotoTarget(null); }}
+          phaseId={phasePhotoTarget.id}
+          projectId={detail.project.id}
+          deficiencies={detail.deficiencies.filter((d) => d.phaseId === phasePhotoTarget.id)}
         />
       )}
     </div>
@@ -965,6 +1078,96 @@ function KpiChip({
       </div>
     </div>
   );
+}
+
+function buildProjectPhaseActions({
+  phase,
+  siteGate,
+  projectId,
+  navigate,
+  setSiteCheckTarget,
+  setSiteBlockTarget,
+  setSiteUnblockTarget,
+  setPhaseDeficiencyTarget,
+  setDeficiencyDialogOpen,
+  setPhasePhotoTarget,
+}: {
+  phase: Phase;
+  siteGate?: Gate;
+  projectId: string;
+  navigate: ReturnType<typeof useNavigate>;
+  setSiteCheckTarget: React.Dispatch<React.SetStateAction<{ gateId: string; phaseId: string; phaseLabel: string } | null>>;
+  setSiteBlockTarget: React.Dispatch<React.SetStateAction<{ gateId: string; phaseId: string; phaseLabel: string } | null>>;
+  setSiteUnblockTarget: React.Dispatch<React.SetStateAction<{ gateId: string; phaseId: string; phaseLabel: string } | null>>;
+  setPhaseDeficiencyTarget: React.Dispatch<React.SetStateAction<Phase | null>>;
+  setDeficiencyDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setPhasePhotoTarget: React.Dispatch<React.SetStateAction<Phase | null>>;
+}): MobileActionItem[] {
+  const phaseLabel = PHASE_LABEL[phase.type];
+  return [
+    {
+      label: "View phase",
+      icon: <ChevronRight className="h-4 w-4" />,
+      helperText: "Open detailed phase workspace",
+      onClick: () => navigate(`/project/${projectId}/phase/${phase.id}`),
+    },
+    ...(siteGate?.status === "not_started"
+      ? [
+          {
+            label: "Site checked",
+            icon: <CheckCircle2 className="h-4 w-4" />,
+            helperText: "Mark the site check as passed",
+            onClick: () =>
+              setSiteCheckTarget({
+                gateId: siteGate.id,
+                phaseId: phase.id,
+                phaseLabel,
+              }),
+          },
+          {
+            label: "Site blocked",
+            icon: <AlertTriangle className="h-4 w-4" />,
+            helperText: "Block this phase with notes and evidence",
+            onClick: () =>
+              setSiteBlockTarget({
+                gateId: siteGate.id,
+                phaseId: phase.id,
+                phaseLabel,
+              }),
+          },
+        ]
+      : []),
+    ...(siteGate?.status === "blocked"
+      ? [
+          {
+            label: "Site cleared",
+            icon: <ShieldCheck className="h-4 w-4" />,
+            helperText: "Clear the site check block",
+            onClick: () =>
+              setSiteUnblockTarget({
+                gateId: siteGate.id,
+                phaseId: phase.id,
+                phaseLabel,
+              }),
+          },
+        ]
+      : []),
+    {
+      label: "Add deficiency",
+      icon: <Plus className="h-4 w-4" />,
+      helperText: `Log an issue for ${phaseLabel}`,
+      onClick: () => {
+        setPhaseDeficiencyTarget(phase);
+        setDeficiencyDialogOpen(true);
+      },
+    },
+    {
+      label: "Upload photo",
+      icon: <Upload className="h-4 w-4" />,
+      helperText: `Add evidence for ${phaseLabel}`,
+      onClick: () => setPhasePhotoTarget(phase),
+    },
+  ];
 }
 
 const PURPOSE_LABEL: Record<string, string> = {

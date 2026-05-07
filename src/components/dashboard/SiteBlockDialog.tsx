@@ -72,7 +72,7 @@ export function SiteBlockDialog({ open, onOpenChange, gateId, phaseId, projectId
         onOpenChange(o);
       }}
     >
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="md:max-w-[480px]">
         <DialogHeader>
           <DialogTitle>Block Site Check — {phaseLabel}</DialogTitle>
           <DialogDescription>Block the site check and explain why work cannot proceed. This will block the phase.</DialogDescription>

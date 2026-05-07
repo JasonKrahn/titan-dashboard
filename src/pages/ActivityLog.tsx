@@ -292,9 +292,9 @@ export default function ActivityLogPage() {
       <AppHeader activeSection="activity" />
 
       <main className="container py-6 space-y-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <h1 className="text-2xl font-bold">Activity Log</h1>
-          <div className="relative w-full sm:max-w-sm">
+          <div className="relative w-full md:max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search events..."
@@ -306,9 +306,9 @@ export default function ActivityLogPage() {
         </div>
 
         {/* Filter dropdowns */}
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
           <Select value={actionFilter} onValueChange={setActionFilter}>
-            <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectTrigger className="w-full md:w-[180px]">
               <SelectValue placeholder="All action types" />
             </SelectTrigger>
             <SelectContent>
@@ -322,7 +322,7 @@ export default function ActivityLogPage() {
           </Select>
 
           <Select value={clientFilter} onValueChange={setClientFilter}>
-            <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectTrigger className="w-full md:w-[180px]">
               <SelectValue placeholder="All clients" />
             </SelectTrigger>
             <SelectContent>
@@ -334,7 +334,7 @@ export default function ActivityLogPage() {
           </Select>
 
           <Select value={pmFilter} onValueChange={setPmFilter}>
-            <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectTrigger className="w-full md:w-[180px]">
               <SelectValue placeholder="All project managers" />
             </SelectTrigger>
             <SelectContent>
@@ -346,7 +346,7 @@ export default function ActivityLogPage() {
           </Select>
 
           <Select value={projectFilter} onValueChange={setProjectFilter}>
-            <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectTrigger className="w-full md:w-[180px]">
               <SelectValue placeholder="All projects" />
             </SelectTrigger>
             <SelectContent>
@@ -387,7 +387,7 @@ export default function ActivityLogPage() {
                         key={a.id}
                         className={`border-border bg-card p-4 shadow-card ${PRIORITY_BORDER[a.action] ?? ""}`}
                       >
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                        <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
                           <div className="flex items-center gap-2">
                             <Badge variant="outline" className={ACTION_COLOR[a.action] ?? ""}>
                               {ACTION_LABEL[a.action] ?? a.action.replace(/_/g, " ")}

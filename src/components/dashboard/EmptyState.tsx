@@ -14,7 +14,7 @@ export function EmptyState({ variant, onClear }: EmptyStateProps) {
   return (
     <>
       {/* Mobile: inline */}
-      <div className="sm:hidden flex flex-col items-start gap-1 px-3 py-2 text-xs italic text-muted-foreground">
+      <div className="md:hidden flex flex-col items-start gap-1 px-3 py-2 text-xs italic text-muted-foreground">
         <span>{title}.</span>
         {variant === "no-matches" && onClear && (
           <Button variant="link" size="sm" className="h-auto px-0 text-xs" onClick={onClear}>
@@ -23,7 +23,7 @@ export function EmptyState({ variant, onClear }: EmptyStateProps) {
         )}
       </div>
       {/* Desktop */}
-      <div className="hidden sm:block border border-dashed border-border rounded-lg p-12 text-center bg-card/40">
+      <div className="hidden md:block border border-dashed border-border rounded-lg p-12 text-center bg-card/40">
         <div className="mx-auto h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
           <Inbox className="h-6 w-6 text-muted-foreground" />
         </div>

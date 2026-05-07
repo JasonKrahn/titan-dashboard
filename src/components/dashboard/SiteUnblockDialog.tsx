@@ -40,7 +40,7 @@ export function SiteUnblockDialog({ open, onOpenChange, gateId, phaseId, project
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px]">
+      <DialogContent className="md:max-w-[400px]">
         <DialogHeader>
           <DialogTitle>Clear Site Check Block — {phaseLabel}</DialogTitle>
           <DialogDescription>

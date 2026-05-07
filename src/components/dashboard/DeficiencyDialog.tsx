@@ -156,7 +156,7 @@ export function DeficiencyDialog({
         onOpenChange(o);
       }}
     >
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="md:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>
             {mode === "create" ? "Add Deficiency" : mode === "resolve" ? "Resolve Deficiency" : "Edit Deficiency"} {phaseLabel ? `— ${phaseLabel}` : ""}

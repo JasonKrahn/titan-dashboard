@@ -7,7 +7,7 @@ interface FabProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 /**
- * Floating action button. Mobile-only (hidden at sm and up).
+ * Floating action button. Mobile-only (hidden at md and up).
  * Pinned to bottom-right with safe-area padding.
  */
 export const Fab = React.forwardRef<HTMLButtonElement, FabProps>(
@@ -17,7 +17,7 @@ export const Fab = React.forwardRef<HTMLButtonElement, FabProps>(
       type="button"
       aria-label={label}
       className={cn(
-        "sm:hidden fixed right-4 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-glow transition active:scale-95",
+        "md:hidden fixed right-4 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-glow transition active:scale-95",
         "bottom-[max(1rem,env(safe-area-inset-bottom))]",
         className,
       )}
