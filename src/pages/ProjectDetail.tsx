@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft,
+  
   ArrowRight,
   Building2,
   MapPin,
