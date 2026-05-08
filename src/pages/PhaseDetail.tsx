@@ -603,48 +603,42 @@ export default function PhaseDetailPage() {
                     </Select>
                   </div>
                 </div>
+                <div className="hidden items-center gap-3 px-4 pb-4 pt-2 text-sm md:flex md:rounded-md md:border md:border-border md:bg-muted/30 md:p-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground md:h-auto md:w-auto md:bg-transparent">
+                    <UserIcon className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-medium text-muted-foreground">Project manager</div>
+                    <div className="mt-0.5 truncate text-sm font-semibold">
+                      {detail.assignedProjectManager?.fullName ?? "Unassigned"}
+                    </div>
+                  </div>
+                </div>
               </div>
             </Card>
 
-            {/* Activity */}
-            <section>
+            {/* Activity (mobile only — desktop has its own tab) */}
+            <section className="md:hidden">
               <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Activity</h3>
               {auditEvents.length === 0 ? (
                 <EmptyCard icon={<FileText className="h-5 w-5" />} text="No activity recorded for this phase yet." />
               ) : (
                 <Card className="border-border bg-card p-5 shadow-card">
-                  <ol className="space-y-3">
-                    {auditEvents.map((a) => {
-                      const entityLabel = a.entityType.replace(/_/g, " ");
-                      const actionLabel = a.action.replace(/_/g, " ");
-                      return (
-                        <li key={a.id} className="flex items-start gap-3 text-sm">
-                          <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                          <div className="flex-1">
-                            <p className="font-medium capitalize">
-                              {entityLabel} {actionLabel}
-                            </p>
-                            <p className="mt-0.5 text-xs text-muted-foreground">
-                              {relativeTime(a.createdAt)}
-                            </p>
-                            {a.metadata && Object.keys(a.metadata).length > 0 && (
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {Object.entries(a.metadata).map(([key, value]) => {
-                                  if (key === "phaseId") return null;
-                                  if (key === "notes" && value) return `Notes: ${value}`;
-                                  if (key === "inspectorName" && value) return `Inspector: ${value}`;
-                                  return null;
-                                }).filter(Boolean).join(" · ")}
-                              </p>
-                            )}
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ol>
+                  <ActivityList events={auditEvents} />
                 </Card>
               )}
             </section>
+          </TabsContent>
+
+          {/* Activity tab (desktop) */}
+          <TabsContent value="activity">
+            {auditEvents.length === 0 ? (
+              <EmptyCard icon={<FileText className="h-5 w-5" />} text="No activity recorded for this phase yet." />
+            ) : (
+              <Card className="border-border bg-card p-5 shadow-card">
+                <ActivityList events={auditEvents} />
+              </Card>
+            )}
           </TabsContent>
 
           {/* Deficiencies */}
