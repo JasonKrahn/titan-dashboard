@@ -22,7 +22,6 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
-import { Fab } from "@/components/ui/fab";
 import { MobileActionSheet, type MobileActionItem } from "@/components/ui/mobile-action-sheet";
 import { AppHeader } from "@/components/dashboard/AppHeader";
 import {
@@ -46,7 +45,8 @@ import { PhotoViewerDialog } from "@/components/dashboard/PhotoViewerDialog";
 import { PhotoUploadDialog } from "@/components/dashboard/PhotoUploadDialog";
 import { DatePicker } from "@/components/ui/date-picker";
 import { assignSubcontractorToPhase, getPhase, getPhotoViewUrl, markPhaseReadyForInspection, updatePhase } from "@/lib/api";
-import type { Deficiency, PhotoEvidence } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import type { Deficiency, Gate, PhaseStatus, PhotoEvidence } from "@/lib/types";
 import {
   GATE_LABEL,
   PHASE_LABEL,
@@ -273,7 +273,7 @@ export default function PhaseDetailPage() {
     <div className="min-h-screen bg-background">
       <AppHeader activeSection="dashboard" />
 
-      <main className="container space-y-6 py-6">
+      <main className="container space-y-5 pb-28 pt-5 md:space-y-6 md:py-6">
         <Breadcrumb>
           <BreadcrumbList className="flex-nowrap overflow-hidden">
             <BreadcrumbItem className="shrink-0">
@@ -299,7 +299,7 @@ export default function PhaseDetailPage() {
         </Breadcrumb>
 
         {/* Hero */}
-        <section className="rounded-xl border border-border bg-gradient-surface p-4 sm:p-6 shadow-card">
+        <section className="rounded-xl border border-border bg-gradient-surface p-4 shadow-card sm:p-6">
           <div className="flex flex-col gap-3 sm:gap-4 md:flex-row md:items-start md:justify-between">
             <div className="flex-1">
               <div className="flex items-start justify-between gap-2">
@@ -307,7 +307,7 @@ export default function PhaseDetailPage() {
                   <div className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                     {project.projectNumber} · Phase
                   </div>
-                  <h1 className="mt-1 text-2xl font-bold sm:text-3xl">{PHASE_LABEL[phase.type]}</h1>
+                  <h1 className="mt-1 text-2xl font-bold leading-tight sm:text-3xl">{PHASE_LABEL[phase.type]}</h1>
                   <p className="mt-1 text-xs sm:text-sm text-muted-foreground">{health.reason}</p>
                 </div>
                 <PhaseHealthPill health={health} size="md" />
@@ -319,10 +319,10 @@ export default function PhaseDetailPage() {
                   <AlertDescription>{dateValidationError}</AlertDescription>
                 </Alert>
               )}
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                <div className="rounded-md border border-border bg-muted/20 p-3 md:hidden">
-                  <div className="text-xs text-muted-foreground">Schedule</div>
-                  <div className="mt-0.5 text-sm font-medium">
+              <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-2">
+                <div className="col-span-2 rounded-lg border border-border bg-muted/20 p-3 md:hidden">
+                  <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Schedule</div>
+                  <div className="mt-1 text-sm font-semibold">
                     {fmt(phase.scheduledStart)} → {fmt(phase.scheduledEnd)}
                   </div>
                 </div>
@@ -364,11 +364,11 @@ export default function PhaseDetailPage() {
                     <div className="mt-1 text-sm font-medium">{project.finishLevel}</div>
                   </div>
                 )}
-                <div>
+                <div className="rounded-lg border border-border/70 bg-muted/10 p-3 md:rounded-none md:border-0 md:bg-transparent md:p-0">
                   <div className="text-xs text-muted-foreground">Closed at</div>
                   <div className="mt-1 text-sm font-medium">{fmt(phase.closedAt)}</div>
                 </div>
-                <div>
+                <div className="rounded-lg border border-border/70 bg-muted/10 p-3 md:rounded-none md:border-0 md:bg-transparent md:p-0">
                   <div className="text-xs text-muted-foreground">Last updated</div>
                   <div className="mt-1 text-sm font-medium">{relativeTime(phase.updatedAt)}</div>
                 </div>
@@ -389,7 +389,75 @@ export default function PhaseDetailPage() {
           {/* Overview (Gates + Schedule/Personnel) */}
           <TabsContent value="overview" className="space-y-4">
             {/* Gates */}
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="md:hidden">
+              {gates.length === 0 ? (
+                <EmptyCard icon={<ShieldCheck className="h-5 w-5" />} text="No gates configured for this phase yet." />
+              ) : (
+                <div className="mobile-list overflow-hidden">
+                  {gates.map((g) => {
+                    const gatePhotos = photoEvidence.filter((p) => p.gateId === g.id);
+                    const hasMobileAction = mobileGateHasAction({
+                      gate: g,
+                      phaseStatus: phase.status,
+                      activeDeficiencyCount: activeDefs.length,
+                    });
+                    const content = (
+                      <>
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                          {g.requiredPhotoEvidence ? <Camera className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-2">
+                            <span className="truncate text-sm font-semibold text-foreground">{GATE_LABEL[g.type]}</span>
+                            <span
+                              className={cn(
+                                "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                                g.requiredPhotoEvidence ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
+                              )}
+                            >
+                              {gatePhotos.length > 0 ? `${gatePhotos.length} photo${gatePhotos.length === 1 ? "" : "s"}` : STATUS_LABEL[g.status]}
+                            </span>
+                          </span>
+                          <span className="mt-1 block text-xs text-muted-foreground">
+                            {gatePhotos.length > 0
+                              ? "Photo evidence attached"
+                              : g.requiredPhotoEvidence
+                                ? "Photo evidence required"
+                                : "No photo required"}
+                          </span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            Updated {relativeTime(g.updatedAt)}
+                          </span>
+                          {g.notes && <span className="mt-1 block text-xs text-foreground">{g.notes}</span>}
+                        </span>
+                        {hasMobileAction && (
+                          <span className="shrink-0 rounded-full border border-border px-2.5 py-1 text-xs font-semibold text-foreground">
+                            Actions
+                          </span>
+                        )}
+                      </>
+                    );
+
+                    return hasMobileAction ? (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => setMobileActionsOpen(true)}
+                        className="flex w-full items-center gap-3 px-3 py-3 text-left active:bg-muted/60"
+                      >
+                        {content}
+                      </button>
+                    ) : (
+                      <div key={g.id} className="flex items-center gap-3 px-3 py-3">
+                        {content}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="hidden gap-4 md:grid md:grid-cols-2">
               {gates.length === 0 ? (
                 <EmptyCard icon={<ShieldCheck className="h-5 w-5" />} text="No gates configured for this phase yet." />
               ) : (
@@ -518,13 +586,17 @@ export default function PhaseDetailPage() {
             </div>
 
             {/* Personnel */}
-            <Card className="border-border bg-card p-5 shadow-card">
-              <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Personnel</h4>
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm">
-                  <UserIcon className="h-4 w-4 text-muted-foreground" />
-                  <div className="flex-1">
-                    <div className="text-xs text-muted-foreground">Subcontractor</div>
+            <Card className="border-border bg-card p-0 shadow-card md:p-5">
+              <div className="p-4 pb-2 md:p-0">
+                <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Personnel</h4>
+              </div>
+              <div className="grid gap-3 md:mt-3 md:grid-cols-2">
+                <div className="flex items-center gap-3 px-4 pb-4 pt-2 text-sm md:rounded-md md:border md:border-border md:bg-muted/30 md:p-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground md:h-auto md:w-auto md:bg-transparent">
+                    <UserIcon className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-medium text-muted-foreground">Subcontractor</div>
                     <Select
                       value={phase.assignedSubcontractorId || "unassigned"}
                       onValueChange={(value) => {
@@ -536,7 +608,7 @@ export default function PhaseDetailPage() {
                         });
                       }}
                     >
-                      <SelectTrigger className="h-7 text-xs">
+                      <SelectTrigger className="mt-0.5 h-auto border-0 bg-transparent p-0 text-sm font-semibold shadow-none ring-offset-0 focus:ring-0 focus:ring-offset-0 md:h-7 md:border md:border-input md:bg-background md:px-3 md:py-2 md:text-xs md:font-normal md:focus:ring-2 md:focus:ring-ring md:focus:ring-offset-2">
                         <SelectValue placeholder="Select subcontractor" />
                       </SelectTrigger>
                       <SelectContent>
@@ -705,11 +777,16 @@ export default function PhaseDetailPage() {
         </Tabs>
       </main>
 
-      <Fab
-        label="Phase actions"
-        icon={<Plus className="h-6 w-6" />}
-        onClick={() => setMobileActionsOpen(true)}
-      />
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur md:hidden">
+        <Button
+          type="button"
+          className="h-12 w-full rounded-full text-sm font-semibold shadow-glow"
+          onClick={() => setMobileActionsOpen(true)}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Phase actions
+        </Button>
+      </div>
       <MobileActionSheet
         open={mobileActionsOpen}
         onOpenChange={setMobileActionsOpen}
@@ -836,6 +913,30 @@ export default function PhaseDetailPage() {
 
 function fmt(iso?: string) {
   return iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
+}
+
+function mobileGateHasAction({
+  gate,
+  phaseStatus,
+  activeDeficiencyCount,
+}: {
+  gate: Gate;
+  phaseStatus: PhaseStatus;
+  activeDeficiencyCount: number;
+}) {
+  if (gate.type === "site_check") {
+    return gate.status === "not_started" || gate.status === "blocked";
+  }
+
+  if (gate.type !== "inspection" || activeDeficiencyCount > 0) {
+    return false;
+  }
+
+  return (
+    phaseStatus === "ready_for_inspection" ||
+    phaseStatus === "in_progress" ||
+    (phaseStatus === "blocked" && gate.status === "failed")
+  );
 }
 
 function Field({ label, value }: { label: string; value: string }) {
