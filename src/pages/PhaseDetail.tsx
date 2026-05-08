@@ -997,9 +997,6 @@ function PhotoCard({
   );
 }
 
-import type { StatusTone } from "@/lib/derived";
-import type { AuditEvent } from "@/lib/types";
-
 function toneChipClasses(tone: StatusTone): string {
   switch (tone) {
     case "blocked":
