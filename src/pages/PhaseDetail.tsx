@@ -1,10 +1,10 @@
 import { useMemo, useState, useEffect, useRef } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   AlertTriangle,
-  ArrowLeft,
+  
   Camera,
   Calendar,
   CheckCircle2,
