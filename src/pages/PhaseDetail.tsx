@@ -280,14 +280,14 @@ export default function PhaseDetailPage() {
 
         {/* Hero */}
         <section className="rounded-xl border border-border bg-gradient-surface p-4 shadow-card sm:p-6">
-          <div className="flex flex-col gap-3 sm:gap-4 md:flex-row md:items-start md:justify-between">
-            <div className="flex-1">
+          <div className="flex flex-col gap-4 md:flex-row md:items-stretch md:gap-6">
+            <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-2">
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   <div className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                     {project.projectNumber} · Phase
                   </div>
-                  <h1 className="mt-1 text-2xl font-bold leading-tight sm:text-3xl">{PHASE_LABEL[phase.type]}</h1>
+                  <h1 className="mt-1 truncate text-2xl font-bold leading-tight sm:text-3xl">{PHASE_LABEL[phase.type]}</h1>
                   <p className="mt-1 text-xs sm:text-sm text-muted-foreground">{health.reason}</p>
                 </div>
                 <PhaseHealthPill health={health} size="md" />
@@ -299,61 +299,139 @@ export default function PhaseDetailPage() {
                   <AlertDescription>{dateValidationError}</AlertDescription>
                 </Alert>
               )}
-              <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-2">
-                <div className="col-span-2 rounded-lg border border-border bg-muted/20 p-3 md:hidden">
-                  <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Schedule</div>
-                  <div className="mt-1 text-sm font-semibold">
-                    {fmt(phase.scheduledStart)} → {fmt(phase.scheduledEnd)}
-                  </div>
+              {/* Mobile schedule summary */}
+              <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3 md:hidden">
+                <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Schedule</div>
+                <div className="mt-1 text-sm font-semibold">
+                  {fmt(phase.scheduledStart)} → {fmt(phase.scheduledEnd)}
                 </div>
-                <div className="hidden md:block">
+              </div>
+              {phase.type === "finishing" && project.finishLevel && (
+                <div className="mt-4 hidden md:block">
+                  <div className="text-xs text-muted-foreground">Finish level</div>
+                  <div className="mt-1 text-sm font-medium">{project.finishLevel}</div>
+                </div>
+              )}
+            </div>
+
+            {/* Desktop: Schedule card on the right */}
+            <aside className="hidden w-72 shrink-0 rounded-lg border border-border bg-card/60 p-4 md:block">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Schedule</div>
+              <div className="mt-3 space-y-3">
+                <div>
                   <div className="text-xs text-muted-foreground">Scheduled start</div>
                   <DatePicker
                     value={phase.scheduledStart ? new Date(phase.scheduledStart) : undefined}
                     onChange={(date) => {
                       if (date) {
-                        updatePhaseMutation.mutate({
-                          phaseId: phase.id,
-                          scheduledStart: date.toISOString(),
-                        });
+                        updatePhaseMutation.mutate({ phaseId: phase.id, scheduledStart: date.toISOString() });
                       }
                     }}
                     placeholder="Not set"
                     disabled={updatePhaseMutation.isPending || phase.status === "closed"}
                   />
                 </div>
-                <div className="hidden md:block">
+                <div>
                   <div className="text-xs text-muted-foreground">Scheduled end</div>
                   <DatePicker
                     value={phase.scheduledEnd ? new Date(phase.scheduledEnd) : undefined}
                     onChange={(date) => {
                       if (date) {
-                        updatePhaseMutation.mutate({
-                          phaseId: phase.id,
-                          scheduledEnd: date.toISOString(),
-                        });
+                        updatePhaseMutation.mutate({ phaseId: phase.id, scheduledEnd: date.toISOString() });
                       }
                     }}
                     placeholder="Not set"
                     disabled={updatePhaseMutation.isPending || phase.status === "closed"}
                   />
                 </div>
-                {phase.type === "finishing" && project.finishLevel && (
-                  <div>
-                    <div className="text-xs text-muted-foreground">Finish level</div>
-                    <div className="mt-1 text-sm font-medium">{project.finishLevel}</div>
-                  </div>
-                )}
-                <div className="rounded-lg border border-border/70 bg-muted/10 p-3 md:rounded-none md:border-0 md:bg-transparent md:p-0">
-                  <div className="text-xs text-muted-foreground">Closed at</div>
-                  <div className="mt-1 text-sm font-medium">{fmt(phase.closedAt)}</div>
-                </div>
-                <div className="rounded-lg border border-border/70 bg-muted/10 p-3 md:rounded-none md:border-0 md:bg-transparent md:p-0">
-                  <div className="text-xs text-muted-foreground">Last updated</div>
-                  <div className="mt-1 text-sm font-medium">{relativeTime(phase.updatedAt)}</div>
-                </div>
               </div>
-            </div>
+              <div className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">
+                <div>Closed: <span className="font-medium text-foreground">{fmt(phase.closedAt)}</span></div>
+                <div className="mt-1">Last update: <span className="font-medium text-foreground">{relativeTime(phase.updatedAt)}</span></div>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        {/* Desktop KPI strip + primary action bar */}
+        <section className="hidden gap-3 md:flex md:flex-wrap md:items-center md:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <KpiChip
+              label="Open deficiencies"
+              value={String(activeDefs.length)}
+              tone={activeDefs.length > 0 ? "blocked" : "closed"}
+            />
+            <KpiChip
+              label="Photos"
+              value={String(photoEvidence.length)}
+              tone={photoEvidence.length > 0 ? "in-progress" : "not-started"}
+            />
+            {siteGate && (
+              <KpiChip
+                label="Site check"
+                value={STATUS_LABEL[siteGate.status]}
+                tone={gateStatusTone(siteGate.status)}
+              />
+            )}
+            {inspectionGate && (
+              <KpiChip
+                label="Inspection"
+                value={STATUS_LABEL[inspectionGate.status]}
+                tone={gateStatusTone(inspectionGate.status)}
+              />
+            )}
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {siteGate?.status === "not_started" && (
+              <>
+                <Button size="sm" variant="outline" onClick={() => setSiteCheckOpen(true)}>
+                  <CheckCircle2 className="mr-1.5 h-4 w-4" /> Site Checked
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setSiteBlockOpen(true)}>
+                  <AlertTriangle className="mr-1.5 h-4 w-4" /> Site Blocked
+                </Button>
+              </>
+            )}
+            {siteGate?.status === "blocked" && (
+              <Button size="sm" variant="outline" onClick={() => setSiteUnblockOpen(true)}>
+                <ShieldCheck className="mr-1.5 h-4 w-4" /> Site Cleared
+              </Button>
+            )}
+            {showReadyButton && (
+              <Button
+                size="sm"
+                onClick={() => readyMutation.mutate({ phaseId: phase.id, projectId: project.id })}
+                disabled={readyMutation.isPending}
+              >
+                <ShieldCheck className="mr-1.5 h-4 w-4" />
+                {readyMutation.isPending ? "Marking ready…" : "Ready for Inspection"}
+              </Button>
+            )}
+            {showPassedFailed && inspectionGate && (
+              <>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setSelectedGateId(inspectionGate.id);
+                    setInspectionResultMode("passed");
+                    setInspectionResultOpen(true);
+                  }}
+                >
+                  <CheckCircle2 className="mr-1.5 h-4 w-4" /> Mark Passed
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedGateId(inspectionGate.id);
+                    setInspectionResultMode("failed");
+                    setInspectionResultOpen(true);
+                  }}
+                >
+                  <XCircle className="mr-1.5 h-4 w-4" /> Mark Failed
+                </Button>
+              </>
+            )}
           </div>
         </section>
 
