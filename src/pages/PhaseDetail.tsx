@@ -995,3 +995,66 @@ function PhotoCard({
     </div>
   );
 }
+
+import type { StatusTone } from "@/lib/derived";
+import type { AuditEvent } from "@/lib/types";
+
+function toneChipClasses(tone: StatusTone): string {
+  switch (tone) {
+    case "blocked":
+      return "border-status-blocked/30 bg-status-blocked/10 text-status-blocked";
+    case "in-progress":
+      return "border-primary/30 bg-primary/10 text-primary";
+    case "ready":
+      return "border-amber-500/30 bg-amber-500/10 text-amber-600";
+    case "closed":
+      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-600";
+    case "not-started":
+    default:
+      return "border-border bg-muted text-muted-foreground";
+  }
+}
+
+function KpiChip({ label, value, tone }: { label: string; value: string; tone: StatusTone }) {
+  return (
+    <div className={cn("inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs", toneChipClasses(tone))}>
+      <span className="font-semibold uppercase tracking-wide opacity-70">{label}</span>
+      <span className="font-semibold">{value}</span>
+    </div>
+  );
+}
+
+function ActivityList({ events }: { events: AuditEvent[] }) {
+  return (
+    <ol className="space-y-3">
+      {events.map((a) => {
+        const entityLabel = a.entityType.replace(/_/g, " ");
+        const actionLabel = a.action.replace(/_/g, " ");
+        return (
+          <li key={a.id} className="flex items-start gap-3 text-sm">
+            <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+            <div className="flex-1">
+              <p className="font-medium capitalize">
+                {entityLabel} {actionLabel}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{relativeTime(a.createdAt)}</p>
+              {a.metadata && Object.keys(a.metadata).length > 0 && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {Object.entries(a.metadata)
+                    .map(([key, value]) => {
+                      if (key === "phaseId") return null;
+                      if (key === "notes" && value) return `Notes: ${value}`;
+                      if (key === "inspectorName" && value) return `Inspector: ${value}`;
+                      return null;
+                    })
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              )}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
