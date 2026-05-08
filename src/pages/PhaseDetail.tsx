@@ -24,14 +24,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { MobileActionSheet, type MobileActionItem } from "@/components/ui/mobile-action-sheet";
 import { AppHeader } from "@/components/dashboard/AppHeader";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+import { PageNav } from "@/components/dashboard/PageNav";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -147,12 +140,14 @@ export default function PhaseDetailPage() {
       <div className="min-h-screen bg-background">
         <AppHeader activeSection="dashboard" />
         <main className="container py-6">
-          <div className="mb-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-              <ArrowLeft className="mr-1 h-4 w-4" />
-              Back
-            </Button>
-          </div>
+          <PageNav
+            backFallback={`/project/${detail?.project.id ?? ""}`}
+            items={[
+              { label: "All Projects", to: "/", state: { view: "dashboard" } },
+              { label: "Phase" },
+            ]}
+            className="mb-4"
+          />
           <Alert variant={error ? "destructive" : "default"}>
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>{error ? "Couldn't load phase" : "Phase not found"}</AlertTitle>
@@ -274,29 +269,14 @@ export default function PhaseDetailPage() {
       <AppHeader activeSection="dashboard" />
 
       <main className="container space-y-5 pb-28 pt-5 md:space-y-6 md:py-6">
-        <Breadcrumb>
-          <BreadcrumbList className="flex-nowrap overflow-hidden">
-            <BreadcrumbItem className="shrink-0">
-              <BreadcrumbLink asChild>
-                <Link to="/" state={{ view: "dashboard" }}>
-                  All Projects
-                </Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem className="min-w-0">
-              <BreadcrumbLink asChild className="block max-w-[190px] truncate md:max-w-[320px]">
-                <Link to={`/project/${project.id}`}>{project.name}</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem className="min-w-0">
-              <BreadcrumbPage className="block max-w-[150px] truncate md:max-w-[240px]">
-                {PHASE_LABEL[phase.type]}
-              </BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+        <PageNav
+          backFallback={`/project/${project.id}`}
+          items={[
+            { label: "All Projects", to: "/", state: { view: "dashboard" } },
+            { label: project.name, to: `/project/${project.id}` },
+            { label: PHASE_LABEL[phase.type] },
+          ]}
+        />
 
         {/* Hero */}
         <section className="rounded-xl border border-border bg-gradient-surface p-4 shadow-card sm:p-6">
