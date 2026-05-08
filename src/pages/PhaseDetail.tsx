@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -52,7 +52,7 @@ import {
 
 export default function PhaseDetailPage() {
   const { projectId, phaseId } = useParams<{ projectId: string; phaseId: string }>();
-  const navigate = useNavigate();
+  
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") ?? "overview";
 
