@@ -519,127 +519,47 @@ export default function PhaseDetailPage() {
               {gates.length === 0 ? (
                 <EmptyCard icon={<ShieldCheck className="h-5 w-5" />} text="No gates configured for this phase yet." />
               ) : (
-                gates.map((g) => (
-                  <Card key={g.id} className="border-border bg-card p-5 shadow-card">
-                    <div className="mb-2 flex items-center justify-between">
-                      <h3 className="font-semibold">{GATE_LABEL[g.type]}</h3>
-                    </div>
-                    <div className="space-y-1.5 text-xs text-muted-foreground">
-                      {(() => {
-                        const gatePhotos = photoEvidence.filter((p) => p.gateId === g.id);
-                        if (gatePhotos.length > 0) {
-                          return (
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <Camera className="h-3.5 w-3.5" />
-                              {gatePhotos.map((p) => (
-                                <button
-                                  key={p.id}
-                                  onClick={() => { setSelectedPhoto(p); setPhotoViewerOpen(true); }}
-                                  className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/30 px-2 py-0.5 text-xs hover:bg-muted/50"
-                                >
-                                  <ImageIcon className="h-3 w-3" />
-                                  {PURPOSE_LABEL[p.purpose] ?? p.purpose}
-                                </button>
-                              ))}
-                            </div>
-                          );
-                        }
-                        return (
+                gates.map((g) => {
+                  const gatePhotos = photoEvidence.filter((p) => p.gateId === g.id);
+                  const tone = gateStatusTone(g.status);
+                  return (
+                    <Card key={g.id} className="border-border bg-card p-5 shadow-card">
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <h3 className="font-semibold">{GATE_LABEL[g.type]}</h3>
+                        <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide", toneChipClasses(tone))}>
+                          {STATUS_LABEL[g.status]}
+                        </span>
+                      </div>
+                      <div className="space-y-2 text-xs text-muted-foreground">
+                        {gatePhotos.length > 0 ? (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Camera className="h-3.5 w-3.5" />
+                            {gatePhotos.map((p) => (
+                              <button
+                                key={p.id}
+                                onClick={() => { setSelectedPhoto(p); setPhotoViewerOpen(true); }}
+                                className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/30 px-2 py-0.5 text-xs hover:bg-muted/50"
+                              >
+                                <ImageIcon className="h-3 w-3" />
+                                {PURPOSE_LABEL[p.purpose] ?? p.purpose}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
                           <div className="flex items-center gap-1.5">
                             <Camera className="h-3.5 w-3.5" />
                             {g.requiredPhotoEvidence ? "Photo evidence required" : "No photo required"}
                           </div>
-                        );
-                      })()}
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="h-3.5 w-3.5" />
-                        Updated {relativeTime(g.updatedAt)}
+                        )}
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="h-3.5 w-3.5" />
+                          Updated {relativeTime(g.updatedAt)}
+                        </div>
+                        {g.notes && <p className="text-foreground">{g.notes}</p>}
                       </div>
-                      {g.notes && <p className="text-foreground">{g.notes}</p>}
-                    </div>
-                    {g.type === "site_check" && g.status === "not_started" && (
-                      <div className="mt-3 hidden gap-2 md:flex">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="flex-1"
-                          onClick={() => setSiteCheckOpen(true)}
-                        >
-                          Site Checked
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="flex-1"
-                          onClick={() => setSiteBlockOpen(true)}
-                        >
-                          Site Blocked
-                        </Button>
-                      </div>
-                    )}
-                    {g.type === "site_check" && g.status === "blocked" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="mt-3 hidden w-full md:inline-flex"
-                        onClick={() => setSiteUnblockOpen(true)}
-                      >
-                        Site Cleared
-                      </Button>
-                    )}
-                    {g.type === "inspection" && (() => {
-                      const unresolvedDefs = deficiencies.filter(
-                        (d) => d.phaseId === phase.id && (d.status === "open" || d.status === "in_progress")
-                      );
-                      const showReadyButton = (phase.status === "in_progress" || (phase.status === "blocked" && g.status === "failed")) && unresolvedDefs.length === 0;
-                      const showPassedFailed = phase.status === "ready_for_inspection" && unresolvedDefs.length === 0;
-                      if (!showReadyButton && !showPassedFailed) return null;
-                      return (
-                        <>
-                          {showReadyButton && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="mt-3 hidden w-full md:inline-flex"
-                              onClick={() => readyMutation.mutate({ phaseId: phase.id, projectId: project.id })}
-                              disabled={readyMutation.isPending}
-                            >
-                              {readyMutation.isPending ? "Marking ready…" : "Ready for Inspection"}
-                            </Button>
-                          )}
-                          {showPassedFailed && (
-                            <div className="mt-3 hidden gap-2 md:flex">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="flex-1"
-                                onClick={() => {
-                                  setSelectedGateId(g.id);
-                                  setInspectionResultMode("passed");
-                                  setInspectionResultOpen(true);
-                                }}
-                              >
-                                Passed
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="flex-1"
-                                onClick={() => {
-                                  setSelectedGateId(g.id);
-                                  setInspectionResultMode("failed");
-                                  setInspectionResultOpen(true);
-                                }}
-                              >
-                                Failed
-                              </Button>
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </Card>
-                ))
+                    </Card>
+                  );
+                })
               )}
             </div>
 
