@@ -39,7 +39,7 @@ import { PhotoUploadDialog } from "@/components/dashboard/PhotoUploadDialog";
 import { DatePicker } from "@/components/ui/date-picker";
 import { assignSubcontractorToPhase, getPhase, getPhotoViewUrl, markPhaseReadyForInspection, updatePhase } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import type { Deficiency, Gate, PhaseStatus, PhotoEvidence } from "@/lib/types";
+import type { AuditEvent, Deficiency, Gate, PhaseStatus, PhotoEvidence } from "@/lib/types";
 import {
   GATE_LABEL,
   PHASE_LABEL,
