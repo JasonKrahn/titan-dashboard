@@ -39,14 +39,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AppHeader } from "@/components/dashboard/AppHeader";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+import { PageNav } from "@/components/dashboard/PageNav";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -233,12 +226,7 @@ export default function ProjectDetailPage() {
       <div className="min-h-screen bg-background">
         <AppHeader activeSection="dashboard" />
         <main className="container py-6">
-          <div className="mb-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-              <ArrowLeft className="mr-1 h-4 w-4" />
-              Back
-            </Button>
-          </div>
+          <PageNav backFallback="/" items={[{ label: "All Projects", to: "/", state: { view: "dashboard" } }, { label: "Project" }]} className="mb-4" />
           <Alert variant={error ? "destructive" : "default"}>
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>{error ? "Couldn't load project" : "Project not found"}</AlertTitle>
@@ -321,29 +309,15 @@ export default function ProjectDetailPage() {
       <AppHeader activeSection="dashboard" />
 
       <main className="container space-y-4 py-3 sm:space-y-8 sm:py-6">
-        <Breadcrumb>
-          <BreadcrumbList className="flex-nowrap overflow-hidden">
-            <BreadcrumbItem className="shrink-0">
-              <BreadcrumbLink asChild>
-                <Link to="/" state={{ view: "dashboard" }}>
-                  All Projects
-                </Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem className="min-w-0">
-              <BreadcrumbLink asChild className="block max-w-[180px] truncate md:max-w-[260px]">
-                <Link to="/" state={{ clientId: detail.client.id }}>
-                  {detail.client.name}
-                </Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem className="min-w-0">
-              <BreadcrumbPage className="block max-w-[190px] truncate md:max-w-[320px]">{p.name}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+        <PageNav
+          backFallback="/"
+          items={[
+            { label: "All Projects", to: "/", state: { view: "dashboard" } },
+            { label: detail.client.name, to: "/", state: { clientId: detail.client.id } },
+            { label: p.name },
+          ]}
+        />
+
 
         {/* Compact mobile header */}
         <section className="md:hidden -mx-3 border-b border-border bg-card px-3 py-3">
