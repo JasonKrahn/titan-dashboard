@@ -23,7 +23,14 @@ export function BottomSheet({ open, onOpenChange, title, children, className }: 
           className,
         )}
       >
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-muted-foreground/30" />
+        <button
+          type="button"
+          aria-label="Close bottom sheet"
+          onClick={() => onOpenChange(false)}
+          className="mx-auto mb-3 flex h-6 w-16 items-center justify-center rounded-full text-muted-foreground/70 transition hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <span className="h-1 w-10 rounded-full bg-current" />
+        </button>
         {title && (
           <SheetHeader className="mb-3">
             <SheetTitle>{title}</SheetTitle>
