@@ -442,6 +442,7 @@ export default function PhaseDetailPage() {
               Deficiencies {activeDefs.length > 0 && <span className="ml-1 text-status-blocked">({activeDefs.length})</span>}
             </TabsTrigger>
             <TabsTrigger value="photos" className="font-semibold data-[state=active]:bg-background data-[state=active]:shadow-sm hover:bg-muted/50">Photos</TabsTrigger>
+            <TabsTrigger value="activity" className="hidden font-semibold data-[state=active]:bg-background data-[state=active]:shadow-sm hover:bg-muted/50 md:inline-flex">Activity</TabsTrigger>
           </TabsList>
 
           {/* Overview (Gates + Schedule/Personnel) */}
