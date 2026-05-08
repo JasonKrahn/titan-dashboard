@@ -76,18 +76,18 @@ export function ProjectCard({
     <Card
       onClick={() => onOpen?.(project.id)}
       className={cn(
-        "group bg-gradient-surface border-border p-5 cursor-pointer shadow-card",
+        "group bg-gradient-surface border-border cursor-pointer p-4 shadow-card sm:p-5",
         "transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-glow",
         "animate-fade-in",
       )}
     >
       {/* Header */}
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div className="min-w-0">
+      <div className="mb-3 flex items-start justify-between gap-3 sm:mb-4">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground font-mono mb-1">
             {project.projectNumber}
           </div>
-          <h3 className="font-semibold text-base leading-tight truncate group-hover:text-primary transition-colors">
+          <h3 className="text-base font-semibold leading-tight transition-colors group-hover:text-primary md:truncate">
             {project.name}
           </h3>
           <p className="text-sm text-muted-foreground truncate mt-0.5">
@@ -98,29 +98,29 @@ export function ProjectCard({
             <span className="truncate">{project.siteAddress}</span>
           </p>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex shrink-0 items-center gap-1.5">
           <StatusBadge tone={projectStatusTone(project.status)} label={STATUS_LABEL[project.status]} size="sm" />
           {project.status !== "completed" && project.status !== "archived" && onEdit && (
             <button
               type="button"
               title="Edit project"
-              className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground opacity-0 group-hover:opacity-100"
+              className="rounded-md p-1 text-muted-foreground opacity-100 transition-colors hover:bg-muted hover:text-foreground md:opacity-0 md:group-hover:opacity-100"
               onClick={(e) => { e.stopPropagation(); onEdit(project.id); }}
             >
               <Pencil className="h-3.5 w-3.5" />
             </button>
           )}
-          <ArrowUpRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+          <ArrowUpRight className="hidden h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 md:block" />
         </div>
       </div>
 
       {/* Phase progress */}
-      <div className="mb-4">
+      <div className="mb-3 sm:mb-4">
         <PhaseProgress phasesByType={phasesByType} gates={projectGates} deficiencies={deficiencies} />
       </div>
 
       {/* Gates row */}
-      <div className="flex flex-wrap gap-1.5 mb-4">
+      <div className="mb-3 flex flex-wrap gap-1.5 sm:mb-4">
         {gateSummary.filter((g) => g.type !== "site_check" && g.type !== "inspection").map((g) => (
           <StatusBadge
             key={g.type}
@@ -132,7 +132,7 @@ export function ProjectCard({
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between pt-3 border-t border-border/60">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3">
         <div className="flex items-center gap-3">
           {openDefs > 0 ? (
             <div className="flex items-center gap-1.5 text-status-blocked text-xs font-medium">
