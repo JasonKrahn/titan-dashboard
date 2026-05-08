@@ -71,7 +71,7 @@ export function ClientProjectsView({
     });
 
   return (
-    <section className="space-y-5">
+    <section className="space-y-5 pb-20 md:pb-0">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <Button variant="ghost" size="sm" className="-ml-3 mb-2 text-muted-foreground" onClick={onBack}>
@@ -112,9 +112,9 @@ export function ClientProjectsView({
 
       <div className="space-y-3">
         {onCreateProject && (
-          <div className="sticky top-[6.75rem] z-10 -mx-1 rounded-lg bg-background/95 px-1 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:py-0">
+          <div className="hidden md:block">
             <Button
-              className="h-10 w-full bg-primary text-primary-foreground hover:bg-primary/90 md:w-auto"
+              className="h-10 bg-primary text-primary-foreground hover:bg-primary/90"
               onClick={onCreateProject}
             >
               <Plus className="mr-1 h-4 w-4" />
@@ -193,6 +193,17 @@ export function ClientProjectsView({
         onDisplayModeChange={setDisplayMode}
         showTitle={false}
       />
+      {onCreateProject && (
+        <Button
+          type="button"
+          size="icon"
+          aria-label="New project"
+          className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-30 h-14 w-14 rounded-full shadow-glow md:hidden"
+          onClick={onCreateProject}
+        >
+          <Plus className="h-6 w-6" />
+        </Button>
+      )}
     </section>
   );
 }

@@ -160,54 +160,69 @@ export function ProjectResults({
     );
   };
 
+  const viewToggle = !externalDisplayMode ? (
+    <div className="inline-flex w-fit rounded-md border border-border bg-card p-1 shadow-card">
+      <Button
+        type="button"
+        variant={displayMode === "list" ? "default" : "ghost"}
+        size="sm"
+        className="h-9 px-3"
+        aria-pressed={displayMode === "list"}
+        onClick={() => setDisplayMode("list")}
+      >
+        <List className="h-4 w-4" />
+        List
+      </Button>
+      <Button
+        type="button"
+        variant={displayMode === "cards" ? "default" : "ghost"}
+        size="sm"
+        className="h-9 px-3"
+        aria-pressed={displayMode === "cards"}
+        onClick={() => setDisplayMode("cards")}
+      >
+        <Grid2X2 className="h-4 w-4" />
+        Cards
+      </Button>
+    </div>
+  ) : null;
+
   return (
-    <section className="space-y-3">
-      {showTitle && (
-        <div className="flex items-baseline gap-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{title}</h2>
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {loading ? "-" : `${projects.length} shown`}
-          </span>
-        </div>
-      )}
-      {!externalDisplayMode && (
-        <div className="flex justify-end">
-          <div className="inline-flex w-fit rounded-md border border-border bg-card p-1 shadow-card">
-            <Button
-              type="button"
-              variant={displayMode === "list" ? "default" : "ghost"}
-              size="sm"
-              className="h-8 px-2"
-              aria-pressed={displayMode === "list"}
-              onClick={() => setDisplayMode("list")}
-            >
-              <List className="h-4 w-4" />
-              List
-            </Button>
-            <Button
-              type="button"
-              variant={displayMode === "cards" ? "default" : "ghost"}
-              size="sm"
-              className="h-8 px-2"
-              aria-pressed={displayMode === "cards"}
-              onClick={() => setDisplayMode("cards")}
-            >
-              <Grid2X2 className="h-4 w-4" />
-              Cards
-            </Button>
-          </div>
+    <section className="space-y-4">
+      {(showTitle || viewToggle) && (
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          {showTitle && (
+            <div className="flex items-baseline gap-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{title}</h2>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {loading ? "-" : `${projects.length} shown`}
+              </span>
+            </div>
+          )}
+          {viewToggle && (
+            <div className={cn("flex", showTitle ? "justify-start md:justify-end" : "justify-end")}>
+              {viewToggle}
+            </div>
+          )}
         </div>
       )}
 
       {loading ? (
         displayMode === "list" ? (
-          <Card className="border-border bg-gradient-surface p-3">
-            {[0, 1, 2, 3, 4].map((item) => (
-              <Skeleton key={item} className="mb-2 h-12 last:mb-0" />
-            ))}
-          </Card>
+          <>
+            <div className="mobile-list md:hidden">
+              {[0, 1, 2, 3, 4].map((item) => (
+                <Skeleton key={item} className="mx-3 my-2 h-12" />
+              ))}
+            </div>
+            <Card className="hidden border-border bg-gradient-surface p-3 md:block">
+              {[0, 1, 2, 3, 4].map((item) => (
+                <Skeleton key={item} className="mb-2 h-12 last:mb-0" />
+              ))}
+            </Card>
+          </>
         ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-3">
             {[0, 1, 2, 3, 4, 5].map((item) => (
               <Skeleton key={item} className="h-[260px] rounded-lg" />
             ))}
@@ -216,8 +231,24 @@ export function ProjectResults({
       ) : projects.length === 0 ? (
         emptyState
       ) : displayMode === "cards" ? (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-3">
+          {sortedRows.map((row) => (
+            <ProjectCard
+              key={row.project.id}
+              project={row.project}
+              client={row.client}
+              pm={row.pm}
+              phases={phases}
+              gates={gates}
+              deficiencies={deficiencies}
+              onOpen={onOpenProject}
+              onArchive={onArchiveProject}
+              onEdit={onEditProject}
+            />
+          ))}
+        </div>
+      ) : (
         <>
-          {/* Mobile dense list */}
           <ul className="mobile-list md:hidden">
             {sortedRows.map((row) => (
               <li key={row.project.id}>
@@ -244,152 +275,135 @@ export function ProjectResults({
             ))}
           </ul>
 
-          <div className="hidden md:grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {sortedRows.map((row) => (
-              <ProjectCard
-                key={row.project.id}
-                project={row.project}
-                client={row.client}
-                pm={row.pm}
-                phases={phases}
-                gates={gates}
-                deficiencies={deficiencies}
-                onOpen={onOpenProject}
-                onArchive={onArchiveProject}
-                onEdit={onEditProject}
-              />
-            ))}
-          </div>
-        </>
-      ) : (
-        <Card className="border-border bg-gradient-surface shadow-card">
-          <Table className="table-fixed">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[25%]">
-                  <SortButton sortKey="project" sort={sort} onSort={handleSort}>
-                    Project
-                  </SortButton>
-                </TableHead>
-                {includeClientColumn && (
-                  <TableHead className="hidden md:table-cell w-[15%]">
-                    <SortButton sortKey="client" sort={sort} onSort={handleSort}>
-                      Client
+          <Card className="hidden border-border bg-gradient-surface shadow-card md:block">
+            <Table className="table-fixed">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[25%]">
+                    <SortButton sortKey="project" sort={sort} onSort={handleSort}>
+                      Project
                     </SortButton>
                   </TableHead>
-                )}
-                <TableHead className="hidden lg:table-cell w-[15%]">
-                  Address
-                </TableHead>
-                <TableHead className="w-[10%]">
-                  <SortButton sortKey="status" sort={sort} onSort={handleSort}>
-                    Status
-                  </SortButton>
-                </TableHead>
-                <TableHead className="hidden xl:table-cell w-[15%]">
-                  Phase summary
-                </TableHead>
-                <TableHead className="hidden md:table-cell w-[8%]">
-                  <SortButton sortKey="openIssues" sort={sort} onSort={handleSort}>
-                    Issues
-                  </SortButton>
-                </TableHead>
-                <TableHead className="w-[8%]">
-                  <SortButton sortKey="updated" sort={sort} onSort={handleSort}>
-                    Updated
-                  </SortButton>
-                </TableHead>
-                <TableHead className="hidden xl:table-cell w-[4%]">
-                  <SortButton sortKey="pm" sort={sort} onSort={handleSort}>
-                    PM
-                  </SortButton>
-                </TableHead>
-                {onArchiveProject && <TableHead className="w-[3%]" />}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedRows.map((row) => (
-                <TableRow key={row.project.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="group block w-full min-w-0 text-left"
-                        onClick={() => onOpenProject?.(row.project.id)}
-                      >
-                        <div className="truncate font-mono text-xs text-muted-foreground">{row.project.projectNumber}</div>
-                        <div className="truncate font-semibold leading-tight text-foreground group-hover:text-primary">
-                          {row.project.name}
-                        </div>
-                      </button>
-                      {row.project.status !== "completed" && row.project.status !== "archived" && onEditProject && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 shrink-0"
-                          onClick={() => onEditProject(row.project.id)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
                   {includeClientColumn && (
-                    <TableCell className="hidden truncate text-muted-foreground md:table-cell">
-                      {row.clientName}
-                    </TableCell>
+                    <TableHead className="hidden md:table-cell w-[15%]">
+                      <SortButton sortKey="client" sort={sort} onSort={handleSort}>
+                        Client
+                      </SortButton>
+                    </TableHead>
                   )}
-                  <TableCell className="hidden truncate text-muted-foreground lg:table-cell">
-                    {row.project.siteAddress}
-                  </TableCell>
-                  <TableCell>
-                    {STATUS_LABEL[row.project.status]}
-                  </TableCell>
-                  <TableCell className="hidden text-xs text-muted-foreground xl:table-cell">
-                    {row.phaseSummary}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    {row.openIssues > 0 ? (
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-status-blocked">
-                        <AlertOctagon className="h-3.5 w-3.5" />
-                        {row.openIssues} open
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">No issues</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {relativeTime(row.project.updatedAt)}
-                  </TableCell>
-                  <TableCell className="hidden xl:table-cell">
-                    {row.pm ? (
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-[11px] font-semibold text-primary" title={row.pmName}>
-                        {initials(row.pm.fullName)}
-                      </span>
-                    ) : (
-                      <UserCircle className="h-5 w-5 text-muted-foreground" />
-                    )}
-                  </TableCell>
-                  {onArchiveProject && (
+                  <TableHead className="hidden lg:table-cell w-[15%]">
+                    Address
+                  </TableHead>
+                  <TableHead className="w-[10%]">
+                    <SortButton sortKey="status" sort={sort} onSort={handleSort}>
+                      Status
+                    </SortButton>
+                  </TableHead>
+                  <TableHead className="hidden xl:table-cell w-[15%]">
+                    Phase summary
+                  </TableHead>
+                  <TableHead className="hidden md:table-cell w-[8%]">
+                    <SortButton sortKey="openIssues" sort={sort} onSort={handleSort}>
+                      Issues
+                    </SortButton>
+                  </TableHead>
+                  <TableHead className="w-[8%]">
+                    <SortButton sortKey="updated" sort={sort} onSort={handleSort}>
+                      Updated
+                    </SortButton>
+                  </TableHead>
+                  <TableHead className="hidden xl:table-cell w-[4%]">
+                    <SortButton sortKey="pm" sort={sort} onSort={handleSort}>
+                      PM
+                    </SortButton>
+                  </TableHead>
+                  {onArchiveProject && <TableHead className="w-[3%]" />}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedRows.map((row) => (
+                  <TableRow key={row.project.id}>
                     <TableCell>
-                      {row.project.status === "completed" && (
+                      <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          title="Archive project"
-                          className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                          onClick={() => onArchiveProject(row.project.id, row.project.name)}
+                          className="group block w-full min-w-0 text-left"
+                          onClick={() => onOpenProject?.(row.project.id)}
                         >
-                          <Archive className="h-3.5 w-3.5" />
+                          <div className="truncate font-mono text-xs text-muted-foreground">{row.project.projectNumber}</div>
+                          <div className="truncate font-semibold leading-tight text-foreground group-hover:text-primary">
+                            {row.project.name}
+                          </div>
                         </button>
+                        {row.project.status !== "completed" && row.project.status !== "archived" && onEditProject && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0"
+                            onClick={() => onEditProject(row.project.id)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                    {includeClientColumn && (
+                      <TableCell className="hidden truncate text-muted-foreground md:table-cell">
+                        {row.clientName}
+                      </TableCell>
+                    )}
+                    <TableCell className="hidden truncate text-muted-foreground lg:table-cell">
+                      {row.project.siteAddress}
+                    </TableCell>
+                    <TableCell>
+                      {STATUS_LABEL[row.project.status]}
+                    </TableCell>
+                    <TableCell className="hidden text-xs text-muted-foreground xl:table-cell">
+                      {row.phaseSummary}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {row.openIssues > 0 ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-status-blocked">
+                          <AlertOctagon className="h-3.5 w-3.5" />
+                          {row.openIssues} open
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">No issues</span>
                       )}
                     </TableCell>
-                  )}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {relativeTime(row.project.updatedAt)}
+                    </TableCell>
+                    <TableCell className="hidden xl:table-cell">
+                      {row.pm ? (
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-[11px] font-semibold text-primary" title={row.pmName}>
+                          {initials(row.pm.fullName)}
+                        </span>
+                      ) : (
+                        <UserCircle className="h-5 w-5 text-muted-foreground" />
+                      )}
+                    </TableCell>
+                    {onArchiveProject && (
+                      <TableCell>
+                        {row.project.status === "completed" && (
+                          <button
+                            type="button"
+                            title="Archive project"
+                            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            onClick={() => onArchiveProject(row.project.id, row.project.name)}
+                          >
+                            <Archive className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        </>
       )}
     </section>
   );
