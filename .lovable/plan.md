@@ -1,93 +1,118 @@
-# Mobile Responsiveness Overhaul — Titan PM
+# Navigation fix + Phase desktop refinement
 
-All changes scoped to mobile (`< sm` / `< md`) using Tailwind responsive prefixes. Desktop markup and styling are preserved verbatim by gating new classes with `sm:`/`md:` resets (e.g. `p-2 sm:p-6`, `border-0 sm:border`, `rounded-none sm:rounded-xl`).
+Two scoped passes. No data-model or API changes. All work in `src/pages/PhaseDetail.tsx`, `src/pages/ProjectDetail.tsx`, plus a small shared nav component.
 
-## 1. Global mobile primitives
+---
 
-**`src/index.css`**
-- Add `.scrollbar-hide` utility (cross-browser: `scrollbar-width: none`, `-ms-overflow-style: none`, `&::-webkit-scrollbar { display: none }`). Reuse in nav + thumbnail rows.
-- Add `.mobile-list` helper class: `-mx-4 sm:mx-0` + `divide-y divide-border` + `border-y sm:border` + `rounded-none sm:rounded-lg` + `bg-card`. Use as the base for converted list groups.
-- Reduce `.container` side padding on mobile only: keep current value at `sm:` and up, set `px-3` at base (verify nothing depends on default).
+## 1. Breadcrumbs + Back button (both pages, both breakpoints)
 
-**`src/components/dashboard/AppHeader.tsx`**
-- Mobile nav row already exists (`lg:hidden`). Wrap the inner row in a single horizontal scroll container with `scrollbar-hide`, `flex-nowrap`, `snap-x`, and ensure each pill uses `whitespace-nowrap shrink-0` (already partly in place — confirm + tighten gap/padding to `gap-1.5 px-2.5`).
-- Ensure logo block stays compact: hide the "Operations" eyebrow at `< sm`.
+### Problems today
+- Both detail pages render a breadcrumb but have **no visible Back button** in the normal state (only in the error state).
+- `PhaseDetail` breadcrumb is `All Projects → Project → Phase` and skips the client level, inconsistent with `ProjectDetail` which uses `All Projects → Client → Project`.
+- On mobile the breadcrumb truncates aggressively, leaving no obvious way to step back one level (the link is small and crowded).
+- Breadcrumb links rely on `Link to="/" state={{view:"dashboard"}}` / `state={{clientId}}` — that part already works (verified in `Index.tsx` lines 108-119) and stays as-is.
 
-**New shared component `src/components/ui/bottom-sheet.tsx`** (thin wrapper around existing `Sheet` with `side="bottom"`, rounded top, drag handle bar). No new deps — reuse Radix `Sheet` already in `components/ui/sheet.tsx`.
+### Changes
 
-**New shared `src/components/ui/fab.tsx`**: fixed bottom-right circular button, `sm:hidden`, safe-area aware (`bottom-[max(1rem,env(safe-area-inset-bottom))]`).
+**New shared component `src/components/dashboard/PageNav.tsx`**
+- Renders a single horizontal row that contains:
+  - A compact `Back` button (`variant="ghost" size="sm"`) on the left with `ArrowLeft` icon. Behavior: `navigate(-1)` if `window.history.length > 1`, otherwise `navigate(fallbackTo)`.
+  - The breadcrumb to the right of it, separated by a thin divider on `sm+`.
+- Props:
+  ```ts
+  { backFallback: string; items: Array<{ label: string; to?: string; state?: unknown }> }
+  ```
+  Last item with no `to` renders as `BreadcrumbPage`.
+- Mobile: stacks back button on top row (full-width-ish) with breadcrumb underneath in a horizontally scrollable strip (`scrollbar-hide`, `whitespace-nowrap`). Desktop: single row, breadcrumb truncates with max-width per item.
+- Replaces the inline `Breadcrumb` JSX currently in both detail pages.
 
-**New shared `src/components/ui/empty-inline.tsx`**: single-line italic muted text + optional icon. Replaces bordered/dashed empty boxes on mobile only — desktop continues to use `EmptyState` via `hidden sm:block` wrapping.
+**`ProjectDetail.tsx`**
+- Replace lines 324-346 (current `<Breadcrumb>...`) with:
+  ```tsx
+  <PageNav
+    backFallback="/"
+    items={[
+      { label: "All Projects", to: "/", state: { view: "dashboard" } },
+      { label: detail.client.name, to: "/", state: { clientId: detail.client.id } },
+      { label: p.name },
+    ]}
+  />
+  ```
+- Remove the duplicated Back button in the error branch (lines 236-241) — now handled by `PageNav` via the same call in error state.
 
-## 2. Project Detail page (`src/pages/ProjectDetail.tsx`)
+**`PhaseDetail.tsx`**
+- Replace lines 277-299 with:
+  ```tsx
+  <PageNav
+    backFallback={`/project/${project.id}`}
+    items={[
+      { label: "All Projects", to: "/", state: { view: "dashboard" } },
+      { label: project.clientName ?? "Client", to: "/", state: { clientId: project.clientId } },
+      { label: project.name, to: `/project/${project.id}` },
+      { label: PHASE_LABEL[phase.type] },
+    ]}
+  />
+  ```
+  (If `project.clientName` / `project.clientId` aren't already on the phase detail payload, pull them from `detail.project` — verify shape in `getPhase` adapter; if missing, drop the client crumb on the phase page rather than adding fields.)
+- Remove the duplicated Back button in the error branch (lines 150-155).
 
-Restructure into three mobile-only zones, keeping all current desktop sections behind `hidden md:block` wrappers and rendering a parallel mobile tree behind `md:hidden`.
+**Verification**
+- Click each crumb on desktop and mobile from `/project/:id` and `/project/:id/phase/:phaseId`.
+- Refresh on a phase URL (no history) → Back falls back to the parent project, not to a 404 or blank.
+- AppHeader links continue to work; no overlap with sticky header (`PageNav` sits inside `<main>`).
 
-### 2a. Compact header
-- Title row: project name + status badge inline, truncate name.
-- Second line: client · PM initials avatar · ellipsis-truncated address.
-- "Info" toggle (chevron button) expands collapsible block with: full address, dates, PM full name, finish level, last update. Default collapsed.
-- Edit/Archive moved into right-aligned ellipsis menu (`DropdownMenu`) on mobile.
+---
 
-### 2b. Sticky tab bar (mobile only)
-- Replace existing mobile anchor nav with sticky tabs using shadcn `Tabs`: `Overview | Deficiencies | Notes | Photos | Activity`.
-- Container: `sticky top-16 z-10 -mx-3 bg-background/90 backdrop-blur border-b`, scrollable with `scrollbar-hide`.
-- Each tab renders a focused mobile section; desktop ignores tabs entirely.
+## 2. Phase Detail desktop refinement (`md:` and up only)
 
-### 2c. Tab contents
+Mobile tree (the `md:hidden` branches with tabs/sheet) stays untouched.
 
-**Overview**
-- Bottleneck Radar strip at top: horizontal 3-segment timeline (Insulation → Drywall → Finishing). Each segment shows phase tone color + tiny label; the active phase is highlighted; blockers/dependencies render as a red badge overlay on the segment. Below the strip, a one-line caption summarizes the current bottleneck (e.g. "Drywall blocked: waiting on attic gate").
-- Pending approvals list: site checks awaiting sign-off, rendered as `mobile-list` rows (one per row, action button right-aligned).
-- Top unresolved deficiencies (max 5): severity tag + title + assigned subcontractor right-aligned, tap row → opens deficiency drawer.
-- Phase accordions (shadcn `Accordion`, `type="multiple"`): closed phases collapsed by default showing only title + status icon; the phase matching `phaseHealth = in-progress|attention|blocked` expanded. Inside each, current mobile phase content is reused but with reduced padding and inline actions.
-- Attic gate condensed into a single accordion item.
+### Problems today
+- Only 3 tabs (`Overview | Deficiencies | Photos`). Activity is jammed inside Overview, Personnel is a tiny isolated card.
+- Hero KPIs mix `DatePicker` controls with read-only "Closed at"/"Last updated" tiles in the same grid — visually inconsistent.
+- Gate cards (lines 460-586) are 2-col blocks with mostly whitespace; primary inspection actions ("Ready for Inspection", "Passed/Failed") are buried per-gate.
+- No at-a-glance summary of open deficiencies / required photos / blocking gate at the top.
 
-**Deficiencies**
-- Full list as `mobile-list` rows. Severity color chip + title (line 1), subcontractor + age (line 2). Right-side chevron.
-- Add deficiency exposed only via FAB (no inline button on mobile).
+### Changes
 
-**Notes**
-- `ProjectNotes` rendered edge-to-edge (`-mx-3 sm:mx-0`), reduced padding inside list items, "+ note" exposed via header `+` icon button on mobile (replaces large inline button via prop or wrapper).
+**Hero section (`md:` branch, lines ~302-378)**
+- Split the hero into two zones with a vertical divider:
+  - Left (flex-1): eyebrow, phase title, `health.reason`, `PhaseHealthPill size="lg"`.
+  - Right (w-80): a "Schedule" card containing the two `DatePicker`s stacked, plus a small footer line `Last updated {relativeTime}` and `Closed {fmt(closedAt)}`. Removes the awkward inline grid mixing inputs and read-only tiles.
+- Add a KPI strip below the hero (desktop only): 4 chips in a row — `Open deficiencies (n)`, `Photos required (n/total)`, `Site check status`, `Inspection status`. Each chip uses the existing tone tokens (`gateStatusTone`, `phaseStatusTone`).
 
-**Photos**
-- Single horizontally scrolling row of square thumbnails (`h-20 w-20 sm:h-auto`), `scrollbar-hide`, snap. Tap → `PhotoViewerDialog`.
-- Empty state → `empty-inline` ("No photos yet").
-- Upload via FAB camera icon.
+**Primary action bar (new, `md:` only)**
+- Right-aligned sticky-ish row directly under the KPI strip, containing the contextual primary actions currently buried in gate cards:
+  - When `showReadyButton`: `Mark Ready for Inspection` (primary).
+  - When `showPassedFailed`: `Mark Passed` (primary) + `Mark Failed` (outline).
+  - When `siteGate.status === "not_started"`: `Site Checked` + `Site Blocked` (outline pair).
+  - When `siteGate.status === "blocked"`: `Site Cleared` (outline).
+- The same handlers wire up; gate cards lose their inline buttons (they remain informational on desktop).
 
-**Activity**
-- Dedicated tab housing the existing activity timeline, edge-to-edge, denser row padding (`py-2`), `text-sm`/`text-xs`.
+**Tabs (`md:` branch, lines ~380-387)**
+- Expand to 4 tabs: `Overview | Gates | Deficiencies | Photos`. Move Activity into a dedicated `Activity` tab → 5 tabs total.
+- `Overview`: KPI summary recap + Personnel (PM + Subcontractor selector side-by-side) + a compact "Recent activity" preview (last 5 items with a "View all" link to the Activity tab).
+- `Gates`: the existing 2-col gate cards, but stripped of action buttons (now in the action bar). Gate cards get tightened: status chip in header, photo thumbnails inline, notes block at bottom.
+- `Deficiencies`: existing list, no changes beyond visual tightening (already adequate).
+- `Photos`: existing grid.
+- `Activity`: existing audit list, full width.
 
-### 2d. FAB
-- Single contextual FAB per active tab: Deficiencies → "+ Deficiency", Photos → camera, Notes → "+ Note". Hidden on Overview/Activity. Opens bottom sheet drawers (reusing existing `DeficiencyDialog`, `PhotoUploadDialog`, note form) presented via `bottom-sheet` wrapper at `< sm`.
+**Personnel card refinement**
+- Currently only shows Subcontractor select. Add PM (read-only, from `project.assignedProjectManager`) as a sibling cell. Keep current select wiring.
 
-## 3. Directory pages
+**Empty/loading states**
+- Replace bespoke `EmptyCard` calls with the existing `EmptyState` component for desktop consistency.
 
-**`src/components/dashboard/ClientDirectory.tsx`** (mobile branch)
-- Replace stacked cards with `mobile-list`. Each row: client name (line 1, truncate) + project count badge right; secondary line: contact or city, muted `text-xs`. Right-aligned ellipsis menu (`DropdownMenu`) for edit / view projects.
+### Out of scope for this pass
+- Mobile phase page (already covered by previous mobile pass).
+- New backend fields, new dialogs, role logic, or attic-gate logic on the phase page.
+- Animations beyond what the existing design system provides.
 
-**`src/pages/SubcontractorRolodex.tsx`** (mobile branch)
-- Same `mobile-list` treatment. Each row: name (line 1) + right-aligned trade badges (color preserved). Line 2: phone or company, muted. Ellipsis menu for call / email / edit.
-- Filters bar: collapse into a single "Filters" button opening a bottom sheet on mobile.
+---
 
-**`src/components/dashboard/ProjectCard.tsx` / `ProjectResults.tsx`** (mobile branch)
-- Below `sm`, render rows via a new `ProjectRow` mobile component: project name + status pill (line 1), client + PM initials + open-deficiency count (line 2). Edge-to-edge list. Desktop card grid untouched.
-
-## 4. Empty states & misc
-
-- All `EmptyState` usages: wrap existing component with `hidden sm:block`; render `EmptyInline` (`sm:hidden`) alongside with the same copy.
-- Inspection / archive panels on dashboard: tighten padding on mobile (`p-3 sm:p-5`), reduce icon size (`h-4 w-4 sm:h-5 sm:w-5`).
-- `StatsRow`: on mobile show as 3-up tight grid with `text-xs` labels and `text-lg` values; desktop unchanged.
-
-## Technical notes
-
-- No new npm packages. Use existing Radix `Sheet`, `Tabs`, `Accordion`, `DropdownMenu`.
-- Every mobile change must be additive via `sm:`/`md:` resets so the desktop class chain remains intact. Where structural changes are required (tab bar vs stacked sections), render both trees gated by `md:hidden` / `hidden md:block`.
-- Reuse all existing dialogs (`DeficiencyDialog`, `PhotoUploadDialog`, `SiteCheckDialog`, etc.); only their trigger surfaces change on mobile (FAB / row tap / drawer).
-- Health tones, status colors, and semantic tokens unchanged — pulled from `derived.ts` and `index.css` as today.
-- No data-model or API changes.
-
-## Out of scope
-- Swipe-to-action gestures (use ellipsis menu instead — noted as future enhancement).
-- Vaul library (not added; existing Radix Sheet is sufficient).
-- Desktop visual changes of any kind.
+## Verification checklist
+- Desktop `/project/:id` and `/project/:id/phase/:phaseId`: breadcrumb + back button both visible, both navigate correctly, refresh-then-back falls back to parent.
+- Mobile: back button visible above breadcrumb strip, breadcrumb scrolls horizontally, no overflow into the sticky header.
+- Desktop phase page: 5 tabs render, primary action bar shows the correct contextual buttons per phase status, gate cards no longer duplicate those buttons, KPI strip reflects current data.
+- No desktop visual changes on `ProjectDetail` aside from the new `PageNav` row.
+- No regressions in mobile project/phase trees.

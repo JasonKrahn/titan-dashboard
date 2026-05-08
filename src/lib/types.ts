@@ -207,6 +207,7 @@ export interface ProjectDetail {
 export interface PhaseDetail {
   phase: Phase;
   project: Project;
+  assignedProjectManager?: User;
   gates: Gate[];
   deficiencies: Deficiency[];
   photoEvidence: PhotoEvidence[];
