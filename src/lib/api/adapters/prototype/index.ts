@@ -260,6 +260,7 @@ export async function getPhase(phaseId: string): Promise<ApiResult<PhaseDetail>>
   const detail: PhaseDetail = {
     phase,
     project,
+    assignedProjectManager: seedUsers.find((u) => u.id === project.assignedProjectManagerId),
     gates: seedGates.filter((g) => g.phaseId === phaseId),
     deficiencies: seedDeficiencies.filter((d) => d.phaseId === phaseId),
     photoEvidence: seedPhotos.filter((ph) => ph.phaseId === phaseId),
