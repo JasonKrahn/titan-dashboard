@@ -1,10 +1,10 @@
 import { useMemo, useState, useEffect, useRef } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   AlertTriangle,
-  ArrowLeft,
+  
   Camera,
   Calendar,
   CheckCircle2,
@@ -24,14 +24,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { MobileActionSheet, type MobileActionItem } from "@/components/ui/mobile-action-sheet";
 import { AppHeader } from "@/components/dashboard/AppHeader";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+import { PageNav } from "@/components/dashboard/PageNav";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -46,11 +39,12 @@ import { PhotoUploadDialog } from "@/components/dashboard/PhotoUploadDialog";
 import { DatePicker } from "@/components/ui/date-picker";
 import { assignSubcontractorToPhase, getPhase, getPhotoViewUrl, markPhaseReadyForInspection, updatePhase } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import type { Deficiency, Gate, PhaseStatus, PhotoEvidence } from "@/lib/types";
+import type { AuditEvent, Deficiency, Gate, PhaseStatus, PhotoEvidence } from "@/lib/types";
 import {
   GATE_LABEL,
   PHASE_LABEL,
   STATUS_LABEL,
+  type StatusTone,
   computePhaseHealth,
   gateStatusTone,
   phaseStatusTone,
@@ -59,7 +53,7 @@ import {
 
 export default function PhaseDetailPage() {
   const { projectId, phaseId } = useParams<{ projectId: string; phaseId: string }>();
-  const navigate = useNavigate();
+  
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") ?? "overview";
 
@@ -147,12 +141,14 @@ export default function PhaseDetailPage() {
       <div className="min-h-screen bg-background">
         <AppHeader activeSection="dashboard" />
         <main className="container py-6">
-          <div className="mb-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-              <ArrowLeft className="mr-1 h-4 w-4" />
-              Back
-            </Button>
-          </div>
+          <PageNav
+            backFallback={`/project/${detail?.project.id ?? ""}`}
+            items={[
+              { label: "All Projects", to: "/", state: { view: "dashboard" } },
+              { label: "Phase" },
+            ]}
+            className="mb-4"
+          />
           <Alert variant={error ? "destructive" : "default"}>
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>{error ? "Couldn't load phase" : "Phase not found"}</AlertTitle>
@@ -274,40 +270,25 @@ export default function PhaseDetailPage() {
       <AppHeader activeSection="dashboard" />
 
       <main className="container space-y-5 pb-28 pt-5 md:space-y-6 md:py-6">
-        <Breadcrumb>
-          <BreadcrumbList className="flex-nowrap overflow-hidden">
-            <BreadcrumbItem className="shrink-0">
-              <BreadcrumbLink asChild>
-                <Link to="/" state={{ view: "dashboard" }}>
-                  All Projects
-                </Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem className="min-w-0">
-              <BreadcrumbLink asChild className="block max-w-[190px] truncate md:max-w-[320px]">
-                <Link to={`/project/${project.id}`}>{project.name}</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem className="min-w-0">
-              <BreadcrumbPage className="block max-w-[150px] truncate md:max-w-[240px]">
-                {PHASE_LABEL[phase.type]}
-              </BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+        <PageNav
+          backFallback={`/project/${project.id}`}
+          items={[
+            { label: "All Projects", to: "/", state: { view: "dashboard" } },
+            { label: project.name, to: `/project/${project.id}` },
+            { label: PHASE_LABEL[phase.type] },
+          ]}
+        />
 
         {/* Hero */}
         <section className="rounded-xl border border-border bg-gradient-surface p-4 shadow-card sm:p-6">
-          <div className="flex flex-col gap-3 sm:gap-4 md:flex-row md:items-start md:justify-between">
-            <div className="flex-1">
+          <div className="flex flex-col gap-4 md:flex-row md:items-stretch md:gap-6">
+            <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-2">
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   <div className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                     {project.projectNumber} · Phase
                   </div>
-                  <h1 className="mt-1 text-2xl font-bold leading-tight sm:text-3xl">{PHASE_LABEL[phase.type]}</h1>
+                  <h1 className="mt-1 truncate text-2xl font-bold leading-tight sm:text-3xl">{PHASE_LABEL[phase.type]}</h1>
                   <p className="mt-1 text-xs sm:text-sm text-muted-foreground">{health.reason}</p>
                 </div>
                 <PhaseHealthPill health={health} size="md" />
@@ -319,61 +300,139 @@ export default function PhaseDetailPage() {
                   <AlertDescription>{dateValidationError}</AlertDescription>
                 </Alert>
               )}
-              <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-2">
-                <div className="col-span-2 rounded-lg border border-border bg-muted/20 p-3 md:hidden">
-                  <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Schedule</div>
-                  <div className="mt-1 text-sm font-semibold">
-                    {fmt(phase.scheduledStart)} → {fmt(phase.scheduledEnd)}
-                  </div>
+              {/* Mobile schedule summary */}
+              <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3 md:hidden">
+                <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Schedule</div>
+                <div className="mt-1 text-sm font-semibold">
+                  {fmt(phase.scheduledStart)} → {fmt(phase.scheduledEnd)}
                 </div>
-                <div className="hidden md:block">
+              </div>
+              {phase.type === "finishing" && project.finishLevel && (
+                <div className="mt-4 hidden md:block">
+                  <div className="text-xs text-muted-foreground">Finish level</div>
+                  <div className="mt-1 text-sm font-medium">{project.finishLevel}</div>
+                </div>
+              )}
+            </div>
+
+            {/* Desktop: Schedule card on the right */}
+            <aside className="hidden w-72 shrink-0 rounded-lg border border-border bg-card/60 p-4 md:block">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Schedule</div>
+              <div className="mt-3 space-y-3">
+                <div>
                   <div className="text-xs text-muted-foreground">Scheduled start</div>
                   <DatePicker
                     value={phase.scheduledStart ? new Date(phase.scheduledStart) : undefined}
                     onChange={(date) => {
                       if (date) {
-                        updatePhaseMutation.mutate({
-                          phaseId: phase.id,
-                          scheduledStart: date.toISOString(),
-                        });
+                        updatePhaseMutation.mutate({ phaseId: phase.id, scheduledStart: date.toISOString() });
                       }
                     }}
                     placeholder="Not set"
                     disabled={updatePhaseMutation.isPending || phase.status === "closed"}
                   />
                 </div>
-                <div className="hidden md:block">
+                <div>
                   <div className="text-xs text-muted-foreground">Scheduled end</div>
                   <DatePicker
                     value={phase.scheduledEnd ? new Date(phase.scheduledEnd) : undefined}
                     onChange={(date) => {
                       if (date) {
-                        updatePhaseMutation.mutate({
-                          phaseId: phase.id,
-                          scheduledEnd: date.toISOString(),
-                        });
+                        updatePhaseMutation.mutate({ phaseId: phase.id, scheduledEnd: date.toISOString() });
                       }
                     }}
                     placeholder="Not set"
                     disabled={updatePhaseMutation.isPending || phase.status === "closed"}
                   />
                 </div>
-                {phase.type === "finishing" && project.finishLevel && (
-                  <div>
-                    <div className="text-xs text-muted-foreground">Finish level</div>
-                    <div className="mt-1 text-sm font-medium">{project.finishLevel}</div>
-                  </div>
-                )}
-                <div className="rounded-lg border border-border/70 bg-muted/10 p-3 md:rounded-none md:border-0 md:bg-transparent md:p-0">
-                  <div className="text-xs text-muted-foreground">Closed at</div>
-                  <div className="mt-1 text-sm font-medium">{fmt(phase.closedAt)}</div>
-                </div>
-                <div className="rounded-lg border border-border/70 bg-muted/10 p-3 md:rounded-none md:border-0 md:bg-transparent md:p-0">
-                  <div className="text-xs text-muted-foreground">Last updated</div>
-                  <div className="mt-1 text-sm font-medium">{relativeTime(phase.updatedAt)}</div>
-                </div>
               </div>
-            </div>
+              <div className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">
+                <div>Closed: <span className="font-medium text-foreground">{fmt(phase.closedAt)}</span></div>
+                <div className="mt-1">Last update: <span className="font-medium text-foreground">{relativeTime(phase.updatedAt)}</span></div>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        {/* Desktop KPI strip + primary action bar */}
+        <section className="hidden gap-3 md:flex md:flex-wrap md:items-center md:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <KpiChip
+              label="Open deficiencies"
+              value={String(activeDefs.length)}
+              tone={activeDefs.length > 0 ? "blocked" : "closed"}
+            />
+            <KpiChip
+              label="Photos"
+              value={String(photoEvidence.length)}
+              tone={photoEvidence.length > 0 ? "in-progress" : "not-started"}
+            />
+            {siteGate && (
+              <KpiChip
+                label="Site check"
+                value={STATUS_LABEL[siteGate.status]}
+                tone={gateStatusTone(siteGate.status)}
+              />
+            )}
+            {inspectionGate && (
+              <KpiChip
+                label="Inspection"
+                value={STATUS_LABEL[inspectionGate.status]}
+                tone={gateStatusTone(inspectionGate.status)}
+              />
+            )}
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {siteGate?.status === "not_started" && (
+              <>
+                <Button size="sm" variant="outline" onClick={() => setSiteCheckOpen(true)}>
+                  <CheckCircle2 className="mr-1.5 h-4 w-4" /> Site Checked
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setSiteBlockOpen(true)}>
+                  <AlertTriangle className="mr-1.5 h-4 w-4" /> Site Blocked
+                </Button>
+              </>
+            )}
+            {siteGate?.status === "blocked" && (
+              <Button size="sm" variant="outline" onClick={() => setSiteUnblockOpen(true)}>
+                <ShieldCheck className="mr-1.5 h-4 w-4" /> Site Cleared
+              </Button>
+            )}
+            {showReadyButton && (
+              <Button
+                size="sm"
+                onClick={() => readyMutation.mutate({ phaseId: phase.id, projectId: project.id })}
+                disabled={readyMutation.isPending}
+              >
+                <ShieldCheck className="mr-1.5 h-4 w-4" />
+                {readyMutation.isPending ? "Marking ready…" : "Ready for Inspection"}
+              </Button>
+            )}
+            {showPassedFailed && inspectionGate && (
+              <>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setSelectedGateId(inspectionGate.id);
+                    setInspectionResultMode("passed");
+                    setInspectionResultOpen(true);
+                  }}
+                >
+                  <CheckCircle2 className="mr-1.5 h-4 w-4" /> Mark Passed
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedGateId(inspectionGate.id);
+                    setInspectionResultMode("failed");
+                    setInspectionResultOpen(true);
+                  }}
+                >
+                  <XCircle className="mr-1.5 h-4 w-4" /> Mark Failed
+                </Button>
+              </>
+            )}
           </div>
         </section>
 
@@ -384,6 +443,7 @@ export default function PhaseDetailPage() {
               Deficiencies {activeDefs.length > 0 && <span className="ml-1 text-status-blocked">({activeDefs.length})</span>}
             </TabsTrigger>
             <TabsTrigger value="photos" className="font-semibold data-[state=active]:bg-background data-[state=active]:shadow-sm hover:bg-muted/50">Photos</TabsTrigger>
+            <TabsTrigger value="activity" className="hidden font-semibold data-[state=active]:bg-background data-[state=active]:shadow-sm hover:bg-muted/50 md:inline-flex">Activity</TabsTrigger>
           </TabsList>
 
           {/* Overview (Gates + Schedule/Personnel) */}
@@ -461,127 +521,47 @@ export default function PhaseDetailPage() {
               {gates.length === 0 ? (
                 <EmptyCard icon={<ShieldCheck className="h-5 w-5" />} text="No gates configured for this phase yet." />
               ) : (
-                gates.map((g) => (
-                  <Card key={g.id} className="border-border bg-card p-5 shadow-card">
-                    <div className="mb-2 flex items-center justify-between">
-                      <h3 className="font-semibold">{GATE_LABEL[g.type]}</h3>
-                    </div>
-                    <div className="space-y-1.5 text-xs text-muted-foreground">
-                      {(() => {
-                        const gatePhotos = photoEvidence.filter((p) => p.gateId === g.id);
-                        if (gatePhotos.length > 0) {
-                          return (
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <Camera className="h-3.5 w-3.5" />
-                              {gatePhotos.map((p) => (
-                                <button
-                                  key={p.id}
-                                  onClick={() => { setSelectedPhoto(p); setPhotoViewerOpen(true); }}
-                                  className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/30 px-2 py-0.5 text-xs hover:bg-muted/50"
-                                >
-                                  <ImageIcon className="h-3 w-3" />
-                                  {PURPOSE_LABEL[p.purpose] ?? p.purpose}
-                                </button>
-                              ))}
-                            </div>
-                          );
-                        }
-                        return (
+                gates.map((g) => {
+                  const gatePhotos = photoEvidence.filter((p) => p.gateId === g.id);
+                  const tone = gateStatusTone(g.status);
+                  return (
+                    <Card key={g.id} className="border-border bg-card p-5 shadow-card">
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <h3 className="font-semibold">{GATE_LABEL[g.type]}</h3>
+                        <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide", toneChipClasses(tone))}>
+                          {STATUS_LABEL[g.status]}
+                        </span>
+                      </div>
+                      <div className="space-y-2 text-xs text-muted-foreground">
+                        {gatePhotos.length > 0 ? (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Camera className="h-3.5 w-3.5" />
+                            {gatePhotos.map((p) => (
+                              <button
+                                key={p.id}
+                                onClick={() => { setSelectedPhoto(p); setPhotoViewerOpen(true); }}
+                                className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/30 px-2 py-0.5 text-xs hover:bg-muted/50"
+                              >
+                                <ImageIcon className="h-3 w-3" />
+                                {PURPOSE_LABEL[p.purpose] ?? p.purpose}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
                           <div className="flex items-center gap-1.5">
                             <Camera className="h-3.5 w-3.5" />
                             {g.requiredPhotoEvidence ? "Photo evidence required" : "No photo required"}
                           </div>
-                        );
-                      })()}
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="h-3.5 w-3.5" />
-                        Updated {relativeTime(g.updatedAt)}
+                        )}
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="h-3.5 w-3.5" />
+                          Updated {relativeTime(g.updatedAt)}
+                        </div>
+                        {g.notes && <p className="text-foreground">{g.notes}</p>}
                       </div>
-                      {g.notes && <p className="text-foreground">{g.notes}</p>}
-                    </div>
-                    {g.type === "site_check" && g.status === "not_started" && (
-                      <div className="mt-3 hidden gap-2 md:flex">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="flex-1"
-                          onClick={() => setSiteCheckOpen(true)}
-                        >
-                          Site Checked
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="flex-1"
-                          onClick={() => setSiteBlockOpen(true)}
-                        >
-                          Site Blocked
-                        </Button>
-                      </div>
-                    )}
-                    {g.type === "site_check" && g.status === "blocked" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="mt-3 hidden w-full md:inline-flex"
-                        onClick={() => setSiteUnblockOpen(true)}
-                      >
-                        Site Cleared
-                      </Button>
-                    )}
-                    {g.type === "inspection" && (() => {
-                      const unresolvedDefs = deficiencies.filter(
-                        (d) => d.phaseId === phase.id && (d.status === "open" || d.status === "in_progress")
-                      );
-                      const showReadyButton = (phase.status === "in_progress" || (phase.status === "blocked" && g.status === "failed")) && unresolvedDefs.length === 0;
-                      const showPassedFailed = phase.status === "ready_for_inspection" && unresolvedDefs.length === 0;
-                      if (!showReadyButton && !showPassedFailed) return null;
-                      return (
-                        <>
-                          {showReadyButton && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="mt-3 hidden w-full md:inline-flex"
-                              onClick={() => readyMutation.mutate({ phaseId: phase.id, projectId: project.id })}
-                              disabled={readyMutation.isPending}
-                            >
-                              {readyMutation.isPending ? "Marking ready…" : "Ready for Inspection"}
-                            </Button>
-                          )}
-                          {showPassedFailed && (
-                            <div className="mt-3 hidden gap-2 md:flex">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="flex-1"
-                                onClick={() => {
-                                  setSelectedGateId(g.id);
-                                  setInspectionResultMode("passed");
-                                  setInspectionResultOpen(true);
-                                }}
-                              >
-                                Passed
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="flex-1"
-                                onClick={() => {
-                                  setSelectedGateId(g.id);
-                                  setInspectionResultMode("failed");
-                                  setInspectionResultOpen(true);
-                                }}
-                              >
-                                Failed
-                              </Button>
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </Card>
-                ))
+                    </Card>
+                  );
+                })
               )}
             </div>
 
@@ -624,48 +604,42 @@ export default function PhaseDetailPage() {
                     </Select>
                   </div>
                 </div>
+                <div className="hidden items-center gap-3 px-4 pb-4 pt-2 text-sm md:flex md:rounded-md md:border md:border-border md:bg-muted/30 md:p-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground md:h-auto md:w-auto md:bg-transparent">
+                    <UserIcon className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-medium text-muted-foreground">Project manager</div>
+                    <div className="mt-0.5 truncate text-sm font-semibold">
+                      {detail.assignedProjectManager?.fullName ?? "Unassigned"}
+                    </div>
+                  </div>
+                </div>
               </div>
             </Card>
 
-            {/* Activity */}
-            <section>
+            {/* Activity (mobile only — desktop has its own tab) */}
+            <section className="md:hidden">
               <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Activity</h3>
               {auditEvents.length === 0 ? (
                 <EmptyCard icon={<FileText className="h-5 w-5" />} text="No activity recorded for this phase yet." />
               ) : (
                 <Card className="border-border bg-card p-5 shadow-card">
-                  <ol className="space-y-3">
-                    {auditEvents.map((a) => {
-                      const entityLabel = a.entityType.replace(/_/g, " ");
-                      const actionLabel = a.action.replace(/_/g, " ");
-                      return (
-                        <li key={a.id} className="flex items-start gap-3 text-sm">
-                          <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                          <div className="flex-1">
-                            <p className="font-medium capitalize">
-                              {entityLabel} {actionLabel}
-                            </p>
-                            <p className="mt-0.5 text-xs text-muted-foreground">
-                              {relativeTime(a.createdAt)}
-                            </p>
-                            {a.metadata && Object.keys(a.metadata).length > 0 && (
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {Object.entries(a.metadata).map(([key, value]) => {
-                                  if (key === "phaseId") return null;
-                                  if (key === "notes" && value) return `Notes: ${value}`;
-                                  if (key === "inspectorName" && value) return `Inspector: ${value}`;
-                                  return null;
-                                }).filter(Boolean).join(" · ")}
-                              </p>
-                            )}
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ol>
+                  <ActivityList events={auditEvents} />
                 </Card>
               )}
             </section>
+          </TabsContent>
+
+          {/* Activity tab (desktop) */}
+          <TabsContent value="activity">
+            {auditEvents.length === 0 ? (
+              <EmptyCard icon={<FileText className="h-5 w-5" />} text="No activity recorded for this phase yet." />
+            ) : (
+              <Card className="border-border bg-card p-5 shadow-card">
+                <ActivityList events={auditEvents} />
+              </Card>
+            )}
           </TabsContent>
 
           {/* Deficiencies */}
@@ -1020,5 +994,65 @@ function PhotoCard({
         )}
       </div>
     </div>
+  );
+}
+
+function toneChipClasses(tone: StatusTone): string {
+  switch (tone) {
+    case "blocked":
+      return "border-status-blocked/30 bg-status-blocked/10 text-status-blocked";
+    case "in-progress":
+      return "border-primary/30 bg-primary/10 text-primary";
+    case "ready":
+      return "border-amber-500/30 bg-amber-500/10 text-amber-600";
+    case "closed":
+      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-600";
+    case "not-started":
+    default:
+      return "border-border bg-muted text-muted-foreground";
+  }
+}
+
+function KpiChip({ label, value, tone }: { label: string; value: string; tone: StatusTone }) {
+  return (
+    <div className={cn("inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs", toneChipClasses(tone))}>
+      <span className="font-semibold uppercase tracking-wide opacity-70">{label}</span>
+      <span className="font-semibold">{value}</span>
+    </div>
+  );
+}
+
+function ActivityList({ events }: { events: AuditEvent[] }) {
+  return (
+    <ol className="space-y-3">
+      {events.map((a) => {
+        const entityLabel = a.entityType.replace(/_/g, " ");
+        const actionLabel = a.action.replace(/_/g, " ");
+        return (
+          <li key={a.id} className="flex items-start gap-3 text-sm">
+            <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+            <div className="flex-1">
+              <p className="font-medium capitalize">
+                {entityLabel} {actionLabel}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{relativeTime(a.createdAt)}</p>
+              {a.metadata && Object.keys(a.metadata).length > 0 && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {Object.entries(a.metadata)
+                    .map(([key, value]) => {
+                      if (key === "phaseId") return null;
+                      if (key === "notes" && value) return `Notes: ${value}`;
+                      if (key === "inspectorName" && value) return `Inspector: ${value}`;
+                      return null;
+                    })
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              )}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
