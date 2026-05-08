@@ -44,6 +44,7 @@ import {
   GATE_LABEL,
   PHASE_LABEL,
   STATUS_LABEL,
+  type StatusTone,
   computePhaseHealth,
   gateStatusTone,
   phaseStatusTone,
