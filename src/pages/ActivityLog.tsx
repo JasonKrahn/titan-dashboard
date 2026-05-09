@@ -164,7 +164,7 @@ export default function ActivityLogPage() {
   const grouped = useMemo(() => {
     const groups: Partial<Record<DateGroup, typeof filtered>> = {};
     for (const e of filtered) {
-      const g = dateGroup(e.createdAt);
+      const g = dateGroup(e.event.createdAt);
       if (!groups[g]) groups[g] = [];
       groups[g]!.push(e);
     }
