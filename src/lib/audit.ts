@@ -7,6 +7,8 @@ import type {
   User,
 } from "@/lib/types";
 import { GATE_LABEL, initials, PHASE_LABEL, relativeTime, STATUS_LABEL } from "@/lib/derived";
+import type { BadgeTone } from "@/components/ui/badge";
+
 
 export const AUDIT_ACTION_LABEL: Record<string, string> = {
   activate_project: "Project activated",
@@ -37,40 +39,47 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   uploaded: "Uploaded",
 };
 
-export const AUDIT_ACTION_COLOR: Record<string, string> = {
-  activate_project: "bg-blue-100 text-blue-700 border-blue-200",
-  archive_project: "bg-slate-100 text-slate-600 border-slate-200",
-  attic_gate_updated: "bg-blue-100 text-blue-700 border-blue-200",
-  complete_project: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  create_client: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  create_deficiency: "bg-amber-100 text-amber-700 border-amber-200",
-  create_project: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  create_subcontractor: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  deleted: "bg-slate-100 text-slate-600 border-slate-200",
-  deficiency_opened: "bg-amber-100 text-amber-700 border-amber-200",
-  fail_gate: "bg-red-100 text-red-700 border-red-200",
-  inspection_completed: "bg-teal-100 text-teal-700 border-teal-200",
-  pass_gate: "bg-teal-100 text-teal-700 border-teal-200",
-  phase_ready_for_inspection: "bg-blue-100 text-blue-700 border-blue-200",
-  photo_uploaded: "bg-purple-100 text-purple-700 border-purple-200",
-  project_notes_updated: "bg-blue-100 text-blue-700 border-blue-200",
-  resolve_deficiency: "bg-teal-100 text-teal-700 border-teal-200",
-  site_check_blocked: "bg-red-100 text-red-700 border-red-200",
-  site_check_cleared: "bg-teal-100 text-teal-700 border-teal-200",
-  site_check_completed: "bg-teal-100 text-teal-700 border-teal-200",
-  status_changed: "bg-blue-100 text-blue-700 border-blue-200",
-  subcontractor_assigned: "bg-blue-100 text-blue-700 border-blue-200",
-  update_deficiency: "bg-blue-100 text-blue-700 border-blue-200",
-  updated: "bg-blue-100 text-blue-700 border-blue-200",
-  upload_photo: "bg-purple-100 text-purple-700 border-purple-200",
-  uploaded: "bg-purple-100 text-purple-700 border-purple-200",
+/**
+ * Single source of truth for audit action → semantic tone.
+ * Used by ActionBadge and the activity row priority accent.
+ */
+export const AUDIT_ACTION_TONE: Record<string, BadgeTone> = {
+  activate_project: "info",
+  archive_project: "neutral",
+  attic_gate_updated: "info",
+  complete_project: "success",
+  create_client: "success",
+  create_deficiency: "warning",
+  create_phase: "success",
+  create_project: "success",
+  create_subcontractor: "success",
+  created: "success",
+  deficiency_opened: "warning",
+  deleted: "neutral",
+  fail_gate: "danger",
+  inspection_completed: "success",
+  pass_gate: "success",
+  phase_ready_for_inspection: "ready",
+  photo_uploaded: "accent",
+  project_notes_updated: "info",
+  resolve_deficiency: "success",
+  site_check_blocked: "danger",
+  site_check_cleared: "success",
+  site_check_completed: "success",
+  status_changed: "info",
+  subcontractor_assigned: "info",
+  update_deficiency: "info",
+  updated: "info",
+  upload_photo: "accent",
+  uploaded: "accent",
 };
 
-export const AUDIT_PRIORITY_BORDER: Record<string, string> = {
-  create_deficiency: "border-l-4 border-l-amber-400",
-  deficiency_opened: "border-l-4 border-l-amber-400",
-  fail_gate: "border-l-4 border-l-red-400",
-  site_check_blocked: "border-l-4 border-l-red-400",
+/** Actions that warrant a left-border accent on the activity row. */
+export const AUDIT_ACTION_PRIORITY: Record<string, "danger" | "warning" | undefined> = {
+  create_deficiency: "warning",
+  deficiency_opened: "warning",
+  fail_gate: "danger",
+  site_check_blocked: "danger",
 };
 
 export const AUDIT_ENTITY_LABEL: Record<string, string> = {
@@ -96,7 +105,8 @@ export interface AuditEventDisplay {
   actionLabel: string;
   actorInitials?: string;
   actorName?: string;
-  colorClass: string;
+  tone: BadgeTone;
+  priority?: "danger" | "warning";
   context: string;
   entityLabel: string;
   metadataText?: string;
@@ -217,15 +227,22 @@ export function formatAuditEvent(event: AuditEvent, lookups: AuditLookups): Audi
   const metadataText = formatMetadataText(event.metadata);
   const statusText = formatStatusText(event);
 
+  const priority = AUDIT_ACTION_PRIORITY[event.action];
   return {
     actionLabel,
     actorInitials: actor ? initials(actor.fullName) : undefined,
     actorName: actor?.fullName,
-    colorClass: AUDIT_ACTION_COLOR[event.action] ?? "",
+    tone: AUDIT_ACTION_TONE[event.action] ?? "info",
+    priority,
     context,
     entityLabel,
     metadataText,
-    priorityBorderClass: AUDIT_PRIORITY_BORDER[event.action],
+    priorityBorderClass:
+      priority === "danger"
+        ? "border-l-4 border-l-status-blocked"
+        : priority === "warning"
+          ? "border-l-4 border-l-status-attention"
+          : undefined,
     relativeTime: relativeTime(event.createdAt),
     searchText: [actionLabel, entityLabel, context, metadataText, statusText].filter(Boolean).join(" ").toLowerCase(),
     statusText,

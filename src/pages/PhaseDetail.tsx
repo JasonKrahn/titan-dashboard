@@ -28,7 +28,10 @@ import { ActivityList } from "@/components/dashboard/ActivityList";
 import { PageNav } from "@/components/dashboard/PageNav";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/dashboard/StatusBadge";
+import { SeverityBadge } from "@/components/ui/severity-badge";
+import { KpiChip } from "@/components/ui/kpi-chip";
+import { statusToTone } from "@/components/dashboard/StatusBadge";
 import { PhaseHealthPill } from "@/components/dashboard/PhaseHealthPill";
 import { SiteCheckDialog } from "@/components/dashboard/SiteCheckDialog";
 import { SiteBlockDialog } from "@/components/dashboard/SiteBlockDialog";
@@ -361,25 +364,25 @@ export default function PhaseDetailPage() {
             <KpiChip
               label="Open deficiencies"
               value={String(activeDefs.length)}
-              tone={activeDefs.length > 0 ? "blocked" : "closed"}
+              tone={activeDefs.length > 0 ? "danger" : "success"}
             />
             <KpiChip
               label="Photos"
               value={String(photoEvidence.length)}
-              tone={photoEvidence.length > 0 ? "in-progress" : "not-started"}
+              tone={photoEvidence.length > 0 ? "accent" : "neutral"}
             />
             {siteGate && (
               <KpiChip
                 label="Site check"
                 value={STATUS_LABEL[siteGate.status]}
-                tone={gateStatusTone(siteGate.status)}
+                tone={statusToTone(gateStatusTone(siteGate.status))}
               />
             )}
             {inspectionGate && (
               <KpiChip
                 label="Inspection"
                 value={STATUS_LABEL[inspectionGate.status]}
-                tone={gateStatusTone(inspectionGate.status)}
+                tone={statusToTone(gateStatusTone(inspectionGate.status))}
               />
             )}
           </div>
@@ -529,9 +532,7 @@ export default function PhaseDetailPage() {
                     <Card key={g.id} className="border-border bg-card p-5 shadow-card">
                       <div className="mb-3 flex items-center justify-between gap-2">
                         <h3 className="font-semibold">{GATE_LABEL[g.type]}</h3>
-                        <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide", toneChipClasses(tone))}>
-                          {STATUS_LABEL[g.status]}
-                        </span>
+                        <StatusBadge tone={tone} label={STATUS_LABEL[g.status]} size="sm" />
                       </div>
                       <div className="space-y-2 text-xs text-muted-foreground">
                         {gatePhotos.length > 0 ? (
@@ -685,7 +686,7 @@ export default function PhaseDetailPage() {
                         <div className="min-w-0 flex-1">
                           <p className="font-medium">{d.title}</p>
                           {d.description && <p className="mt-0.5 text-xs text-muted-foreground">{d.description}</p>}
-                          <p className="mt-1 text-xs text-muted-foreground">Severity: {d.severity}</p>
+                          <div className="mt-1.5"><SeverityBadge severity={d.severity} size="xs" /></div>
                           {deficiencyPhotos.length > 0 && (
                             <div className="mt-2 flex gap-2">
                               {deficiencyPhotos.map((p) => (
@@ -723,7 +724,7 @@ export default function PhaseDetailPage() {
                             </div>
                           )}
                           {d.status === "resolved" && (
-                            <Badge variant="default">Resolved</Badge>
+                            <StatusBadge tone="closed" label="Resolved" size="sm" />
                           )}
                         </div>
                       </li>
@@ -1014,27 +1015,3 @@ function PhotoCard({
   );
 }
 
-function toneChipClasses(tone: StatusTone): string {
-  switch (tone) {
-    case "blocked":
-      return "border-status-blocked/30 bg-status-blocked/10 text-status-blocked";
-    case "in-progress":
-      return "border-primary/30 bg-primary/10 text-primary";
-    case "ready":
-      return "border-amber-500/30 bg-amber-500/10 text-amber-600";
-    case "closed":
-      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-600";
-    case "not-started":
-    default:
-      return "border-border bg-muted text-muted-foreground";
-  }
-}
-
-function KpiChip({ label, value, tone }: { label: string; value: string; tone: StatusTone }) {
-  return (
-    <div className={cn("inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs", toneChipClasses(tone))}>
-      <span className="font-semibold uppercase tracking-wide opacity-70">{label}</span>
-      <span className="font-semibold">{value}</span>
-    </div>
-  );
-}

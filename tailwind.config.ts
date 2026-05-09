@@ -75,6 +75,10 @@ export default {
             DEFAULT: "hsl(var(--status-attention))",
             foreground: "hsl(var(--status-attention-fg))",
           },
+          accent: {
+            DEFAULT: "hsl(var(--status-accent))",
+            foreground: "hsl(var(--status-accent-fg))",
+          },
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
