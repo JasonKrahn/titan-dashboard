@@ -105,7 +105,8 @@ export interface AuditEventDisplay {
   actionLabel: string;
   actorInitials?: string;
   actorName?: string;
-  colorClass: string;
+  tone: BadgeTone;
+  priority?: "danger" | "warning";
   context: string;
   entityLabel: string;
   metadataText?: string;
@@ -226,15 +227,22 @@ export function formatAuditEvent(event: AuditEvent, lookups: AuditLookups): Audi
   const metadataText = formatMetadataText(event.metadata);
   const statusText = formatStatusText(event);
 
+  const priority = AUDIT_ACTION_PRIORITY[event.action];
   return {
     actionLabel,
     actorInitials: actor ? initials(actor.fullName) : undefined,
     actorName: actor?.fullName,
-    colorClass: AUDIT_ACTION_COLOR[event.action] ?? "",
+    tone: AUDIT_ACTION_TONE[event.action] ?? "info",
+    priority,
     context,
     entityLabel,
     metadataText,
-    priorityBorderClass: AUDIT_PRIORITY_BORDER[event.action],
+    priorityBorderClass:
+      priority === "danger"
+        ? "border-l-4 border-l-status-blocked"
+        : priority === "warning"
+          ? "border-l-4 border-l-status-attention"
+          : undefined,
     relativeTime: relativeTime(event.createdAt),
     searchText: [actionLabel, entityLabel, context, metadataText, statusText].filter(Boolean).join(" ").toLowerCase(),
     statusText,
