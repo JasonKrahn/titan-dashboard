@@ -216,17 +216,20 @@ export function DeficiencyDialog({
           {mode !== "resolve" && (
             <div className="grid gap-1.5">
               <Label htmlFor="def-severity">Severity *</Label>
-              <Select value={severity} onValueChange={(v: any) => setSeverity(v)}>
-                <SelectTrigger id="def-severity">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="critical">Critical</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <Select value={severity} onValueChange={(v: any) => setSeverity(v)}>
+                  <SelectTrigger id="def-severity" className="flex-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                  </SelectContent>
+                </Select>
+                <SeverityBadge severity={severity} size="sm" />
+              </div>
             </div>
           )}
 
