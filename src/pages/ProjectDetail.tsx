@@ -68,7 +68,9 @@ import {
   projectStatusTone,
   relativeTime,
 } from "@/lib/derived";
-import { Badge } from "@/components/ui/badge";
+import { ActionBadge } from "@/components/ui/action-badge";
+import { SeverityBadge } from "@/components/ui/severity-badge";
+import { KpiChip } from "@/components/ui/kpi-chip";
 
 const ENTITY_LABEL: Record<string, string> = {
   project: "Project",
@@ -81,24 +83,6 @@ const ENTITY_LABEL: Record<string, string> = {
   user: "User",
 };
 
-const ACTION_COLOR: Record<string, string> = {
-  status_changed: "bg-blue-100 text-blue-700 border-blue-200",
-  created: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  photo_uploaded: "bg-purple-100 text-purple-700 border-purple-200",
-  deficiency_opened: "bg-amber-100 text-amber-700 border-amber-200",
-  inspection_completed: "bg-teal-100 text-teal-700 border-teal-200",
-  create_project: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  create_phase: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  create_client: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  create_deficiency: "bg-amber-100 text-amber-700 border-amber-200",
-  pass_gate: "bg-teal-100 text-teal-700 border-teal-200",
-  fail_gate: "bg-red-100 text-red-700 border-red-200",
-  resolve_deficiency: "bg-teal-100 text-teal-700 border-teal-200",
-  upload_photo: "bg-purple-100 text-purple-700 border-purple-200",
-  activate_project: "bg-blue-100 text-blue-700 border-blue-200",
-  complete_project: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  archive_project: "bg-slate-100 text-slate-600 border-slate-200",
-};
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -457,7 +441,8 @@ export default function ProjectDetailPage() {
               <KpiChip
                 label="Last update"
                 value={relativeTime(p.updatedAt)}
-                tone="not-started"
+                tone="neutral"
+                variant="card"
                 icon={<Clock className="h-4 w-4" />}
               />
             </div>
@@ -811,9 +796,10 @@ export default function ProjectDetailPage() {
                       <div className="flex items-start justify-between gap-2 rounded-md border border-border bg-muted/20 p-2 sm:p-2.5 cursor-pointer hover:bg-muted/30 transition-colors">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium">{d.title}</p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {phase ? PHASE_LABEL[phase.type] : "—"} · {d.severity}
-                          </p>
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <span className="text-xs text-muted-foreground">{phase ? PHASE_LABEL[phase.type] : "—"}</span>
+                            <SeverityBadge severity={d.severity} size="xs" />
+                          </div>
                         </div>
                         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                       </div>
@@ -899,9 +885,7 @@ export default function ProjectDetailPage() {
                       <li key={a.id} className="flex items-start gap-3 text-sm">
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
-                            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${ACTION_COLOR[a.action] ?? ""}`}>
-                              {a.action.replace(/_/g, " ")}
-                            </Badge>
+                            <ActionBadge action={a.action} size="xs" />
                             {phase && <span className="text-xs text-muted-foreground">{PHASE_LABEL[phase.type] ?? phase.type}</span>}
                             {gate && <span className="text-xs text-muted-foreground">{GATE_LABEL[gate.type] ?? gate.type}</span>}
                             {deficiency && <span className="text-xs text-muted-foreground">{deficiency.title}</span>}
@@ -1031,28 +1015,6 @@ export default function ProjectDetailPage() {
   );
 }
 
-function KpiChip({
-  label,
-  value,
-  tone,
-  icon,
-}: {
-  label: string;
-  value: string;
-  tone: "blocked" | "closed" | "not-started" | "in-progress" | "ready";
-  icon: React.ReactNode;
-}) {
-  const c = phaseHealthClasses(tone);
-  return (
-    <div className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${c.bg} ${c.border}`}>
-      <span className={c.text}>{icon}</span>
-      <div className="leading-tight">
-        <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</div>
-        <div className={`text-sm font-semibold ${c.text}`}>{value}</div>
-      </div>
-    </div>
-  );
-}
 
 function buildProjectPhaseActions({
   phase,

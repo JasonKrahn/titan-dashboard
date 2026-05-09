@@ -39,6 +39,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { getSubcontractorContacts, getAllPhases, getProjects, createSubcontractorContact, updateSubcontractorContact, deleteSubcontractorContact } from "@/lib/api";
 import type { Phase, Project, TradeType, SubcontractorContact } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
+import { TradeBadge } from "@/components/ui/trade-badge";
 import { useToast } from "@/hooks/use-toast";
 import { Fab } from "@/components/ui/fab";
 import {
@@ -57,11 +58,6 @@ const TRADE_LABEL: Record<string, string> = {
   finishing: "Finishing",
 };
 
-const TRADE_COLOR: Record<string, string> = {
-  insulation: "bg-blue-100 text-blue-700 border-blue-200",
-  drywall: "bg-amber-100 text-amber-700 border-amber-200",
-  finishing: "bg-emerald-100 text-emerald-700 border-emerald-200",
-};
 
 type ViewMode = "cards" | "list";
 type SortOption = "name" | "company" | "trade" | "active" | "assigned" | "next";
@@ -479,7 +475,7 @@ export default function SubcontractorRolodexPage() {
       <div className="rounded-md border border-border/70 bg-muted/30 px-3 py-2">
         <div className="flex items-center justify-between gap-3">
           <p className="truncate text-xs font-medium text-foreground">{primaryAssignment.project.name}</p>
-          <Badge variant="outline" className="shrink-0 text-[10px]">
+          <Badge tone="neutral" appearance="outline" size="xs" className="shrink-0">
             {assignments.length} phase{assignments.length === 1 ? "" : "s"}
           </Badge>
         </div>
@@ -718,12 +714,10 @@ export default function SubcontractorRolodexPage() {
                           <p className="mt-1 truncate text-sm text-muted-foreground">{s.companyName ?? "No company"}</p>
                         </div>
                         <div className="flex shrink-0 flex-col items-end gap-2">
-                          <Badge variant="outline" className={TRADE_COLOR[s.trade] ?? ""}>
-                            {TRADE_LABEL[s.trade] ?? s.trade}
-                          </Badge>
-                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${s.active ? "bg-emerald-500/15 text-emerald-500" : "bg-muted text-muted-foreground"}`}>
+                          <TradeBadge trade={s.trade} size="sm" />
+                          <Badge tone={s.active ? "success" : "neutral"} appearance="soft" size="xs" dot>
                             {s.active ? "Active" : "Inactive"}
-                          </span>
+                          </Badge>
                         </div>
                       </div>
 
@@ -802,9 +796,7 @@ export default function SubcontractorRolodexPage() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className={TRADE_COLOR[s.trade] ?? ""}>
-                              {TRADE_LABEL[s.trade] ?? s.trade}
-                            </Badge>
+                            <TradeBadge trade={s.trade} size="sm" />
                           </TableCell>
                           <TableCell>
                             <div className="min-w-0 text-xs text-muted-foreground">
