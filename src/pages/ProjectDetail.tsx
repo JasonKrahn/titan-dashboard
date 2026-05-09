@@ -794,9 +794,10 @@ export default function ProjectDetailPage() {
                       <div className="flex items-start justify-between gap-2 rounded-md border border-border bg-muted/20 p-2 sm:p-2.5 cursor-pointer hover:bg-muted/30 transition-colors">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium">{d.title}</p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {phase ? PHASE_LABEL[phase.type] : "—"} · {d.severity}
-                          </p>
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <span className="text-xs text-muted-foreground">{phase ? PHASE_LABEL[phase.type] : "—"}</span>
+                            <SeverityBadge severity={d.severity} size="xs" />
+                          </div>
                         </div>
                         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                       </div>
