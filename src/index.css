@@ -43,14 +43,16 @@
     --status-not-started-fg: 210 20% 96%;
     --status-in-progress: 212 92% 58%;
     --status-in-progress-fg: 210 20% 98%;
-    --status-ready: 230 95% 56%;
-    --status-ready-fg: 30 40% 10%;
+    --status-ready: 262 80% 62%;
+    --status-ready-fg: 210 20% 98%;
     --status-blocked: 0 75% 58%;
     --status-blocked-fg: 210 20% 98%;
     --status-closed: 142 65% 45%;
     --status-closed-fg: 210 20% 98%;
     --status-attention: 30 90% 55%;
     --status-attention-fg: 210 20% 98%;
+    --status-accent: 280 70% 60%;
+    --status-accent-fg: 210 20% 98%;
 
     /* Effects */
     --gradient-primary: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary-glow)) 100%);
@@ -111,8 +113,12 @@
     --sidebar-border: 220 13% 87%;
     --sidebar-ring: 220 95% 53%;
 
-    --status-attention: 30 90% 50%;
-    --status-attention-fg: 222 22% 12%;
+    --status-ready: 262 70% 52%;
+    --status-ready-fg: 0 0% 100%;
+    --status-attention: 30 90% 45%;
+    --status-attention-fg: 0 0% 100%;
+    --status-accent: 280 65% 50%;
+    --status-accent-fg: 0 0% 100%;
   }
 
   /* Accent color overrides — blue is default (no attribute) */
