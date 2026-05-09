@@ -882,9 +882,7 @@ export default function ProjectDetailPage() {
                       <li key={a.id} className="flex items-start gap-3 text-sm">
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
-                            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${ACTION_COLOR[a.action] ?? ""}`}>
-                              {a.action.replace(/_/g, " ")}
-                            </Badge>
+                            <ActionBadge action={a.action} size="xs" />
                             {phase && <span className="text-xs text-muted-foreground">{PHASE_LABEL[phase.type] ?? phase.type}</span>}
                             {gate && <span className="text-xs text-muted-foreground">{GATE_LABEL[gate.type] ?? gate.type}</span>}
                             {deficiency && <span className="text-xs text-muted-foreground">{deficiency.title}</span>}
