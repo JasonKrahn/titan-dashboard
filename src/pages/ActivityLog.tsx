@@ -8,64 +8,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { getAuditEvents, getProjects, getAllPhases, getUsers, getAllGates, getAllDeficiencies, getClients } from "@/lib/api";
+import { formatAuditEvent, getAuditActionLabel, resolveProjectId } from "@/lib/audit";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { AuditEvent } from "@/lib/types";
-import { relativeTime, PHASE_LABEL, GATE_LABEL, initials } from "@/lib/derived";
-
-const ACTION_LABEL: Record<string, string> = {
-  status_changed: "Status changed",
-  created: "Created",
-  photo_uploaded: "Photo uploaded",
-  deficiency_opened: "Deficiency opened",
-  inspection_completed: "Inspection completed",
-  create_project: "Project created",
-  create_phase: "Phase created",
-  create_client: "Client created",
-  create_deficiency: "Deficiency opened",
-  pass_gate: "Gate passed",
-  fail_gate: "Gate failed",
-  resolve_deficiency: "Deficiency resolved",
-  upload_photo: "Photo uploaded",
-  activate_project: "Project activated",
-  complete_project: "Project completed",
-  archive_project: "Project archived",
-};
-
-const ACTION_COLOR: Record<string, string> = {
-  status_changed: "bg-blue-100 text-blue-700 border-blue-200",
-  created: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  photo_uploaded: "bg-purple-100 text-purple-700 border-purple-200",
-  deficiency_opened: "bg-amber-100 text-amber-700 border-amber-200",
-  inspection_completed: "bg-teal-100 text-teal-700 border-teal-200",
-  create_project: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  create_phase: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  create_client: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  create_deficiency: "bg-amber-100 text-amber-700 border-amber-200",
-  pass_gate: "bg-teal-100 text-teal-700 border-teal-200",
-  fail_gate: "bg-red-100 text-red-700 border-red-200",
-  resolve_deficiency: "bg-teal-100 text-teal-700 border-teal-200",
-  upload_photo: "bg-purple-100 text-purple-700 border-purple-200",
-  activate_project: "bg-blue-100 text-blue-700 border-blue-200",
-  complete_project: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  archive_project: "bg-slate-100 text-slate-600 border-slate-200",
-};
-
-const PRIORITY_BORDER: Record<string, string> = {
-  fail_gate: "border-l-4 border-l-red-400",
-  create_deficiency: "border-l-4 border-l-amber-400",
-  deficiency_opened: "border-l-4 border-l-amber-400",
-};
-
-const ENTITY_LABEL: Record<string, string> = {
-  project: "Project",
-  phase: "Phase",
-  gate: "Gate",
-  deficiency: "Deficiency",
-  photo_evidence: "Photo",
-  client_record: "Client",
-  subcontractor_contact: "Subcontractor",
-  user: "User",
-};
 
 const GROUP_ORDER = ["Today", "Yesterday", "This Week", "Earlier"] as const;
 type DateGroup = (typeof GROUP_ORDER)[number];
@@ -83,25 +28,6 @@ function dateGroup(iso: string): DateGroup {
   if (eventDay.getTime() === yesterday.getTime()) return "Yesterday";
   if (eventDay.getTime() >= weekAgo.getTime()) return "This Week";
   return "Earlier";
-}
-
-function resolveProjectId(
-  e: AuditEvent,
-  phases: { id: string; projectId: string }[],
-  gates: { id: string; projectId: string }[],
-  deficiencies: { id: string; projectId: string }[],
-): string | undefined {
-  if (e.entityType === "project") return e.entityId;
-  if (e.entityType === "phase") return phases.find((ph) => ph.id === e.entityId)?.projectId;
-  if (e.entityType === "gate") return gates.find((g) => g.id === e.entityId)?.projectId;
-  if (e.entityType === "deficiency") return deficiencies.find((d) => d.id === e.entityId)?.projectId;
-  return undefined;
-}
-
-function eventTitle(a: AuditEvent) {
-  const action = ACTION_LABEL[a.action] ?? a.action.replace(/_/g, " ");
-  const entity = ENTITY_LABEL[a.entityType] ?? a.entityType;
-  return `${action} · ${entity}`;
 }
 
 export default function ActivityLogPage() {
@@ -184,14 +110,29 @@ export default function ActivityLogPage() {
     return counts;
   }, [nonArchivedEvents]);
 
+  const displayRows = useMemo(
+    () =>
+      nonArchivedEvents.map((event) => ({
+        event,
+        display: formatAuditEvent(event, {
+          projects,
+          phases,
+          gates,
+          deficiencies,
+          users,
+        }),
+      })),
+    [deficiencies, gates, nonArchivedEvents, phases, projects, users],
+  );
+
   const filtered = useMemo(() => {
-    let result = nonArchivedEvents;
+    let result = displayRows;
     if (actionFilter !== "all") {
-      result = result.filter((e) => e.action === actionFilter);
+      result = result.filter(({ event }) => event.action === actionFilter);
     }
     if (projectFilter !== "all") {
-      result = result.filter((e) => {
-        const pid = resolveProjectId(e, phases, gates, deficiencies);
+      result = result.filter(({ event }) => {
+        const pid = resolveProjectId(event, phases, gates, deficiencies);
         return pid === undefined || pid === projectFilter;
       });
     }
@@ -199,8 +140,8 @@ export default function ActivityLogPage() {
       const clientProjectIds = new Set(
         projects.filter((p) => p.clientId === clientFilter).map((p) => p.id),
       );
-      result = result.filter((e) => {
-        const pid = resolveProjectId(e, phases, gates, deficiencies);
+      result = result.filter(({ event }) => {
+        const pid = resolveProjectId(event, phases, gates, deficiencies);
         return pid === undefined || clientProjectIds.has(pid);
       });
     }
@@ -208,22 +149,17 @@ export default function ActivityLogPage() {
       const pmProjectIds = new Set(
         projects.filter((p) => p.assignedProjectManagerId === pmFilter).map((p) => p.id),
       );
-      result = result.filter((e) => {
-        const pid = resolveProjectId(e, phases, gates, deficiencies);
+      result = result.filter(({ event }) => {
+        const pid = resolveProjectId(event, phases, gates, deficiencies);
         return pid === undefined || pmProjectIds.has(pid);
       });
     }
     const q = search.trim().toLowerCase();
     if (q) {
-      result = result.filter((e) => {
-        const project = projects.find((p) => p.id === e.entityId);
-        const phase = phases.find((ph) => ph.id === e.entityId);
-        const text = `${e.action} ${e.entityType} ${project?.name ?? ""} ${phase?.type ?? ""}`.toLowerCase();
-        return text.includes(q);
-      });
+      result = result.filter(({ display }) => display.searchText.includes(q));
     }
     return result;
-  }, [nonArchivedEvents, actionFilter, projectFilter, clientFilter, pmFilter, search, projects, phases, gates, deficiencies]);
+  }, [actionFilter, clientFilter, deficiencies, displayRows, gates, phases, pmFilter, projectFilter, projects, search]);
 
   const grouped = useMemo(() => {
     const groups: Partial<Record<DateGroup, typeof filtered>> = {};
@@ -315,7 +251,7 @@ export default function ActivityLogPage() {
               <SelectItem value="all">All action types</SelectItem>
               {allActions.map((a) => (
                 <SelectItem key={a} value={a}>
-                  {ACTION_LABEL[a] ?? a.replace(/_/g, " ")} ({actionCounts[a] ?? 0})
+                  {getAuditActionLabel(a)} ({actionCounts[a] ?? 0})
                 </SelectItem>
               ))}
             </SelectContent>
@@ -371,65 +307,41 @@ export default function ActivityLogPage() {
                   {group}
                 </h2>
                 <div className="space-y-2">
-                  {grouped[group]!.map((a) => {
-                    const project = projects.find((p) => p.id === a.entityId);
-                    const phase = phases.find((ph) => ph.id === a.entityId);
-                    const gate = gates.find((g) => g.id === a.entityId);
-                    const deficiency = deficiencies.find((d) => d.id === a.entityId);
-                    const actor = users.find((u) => u.id === a.actorUserId);
-                    const contextProject =
-                      project ??
-                      (phase ? projects.find((p) => p.id === phase.projectId) : undefined) ??
-                      (gate ? projects.find((p) => p.id === gate.projectId) : undefined) ??
-                      (deficiency ? projects.find((p) => p.id === deficiency.projectId) : undefined);
+                  {grouped[group]!.map(({ event, display }) => {
                     return (
                       <Card
-                        key={a.id}
-                        className={`border-border bg-card p-4 shadow-card ${PRIORITY_BORDER[a.action] ?? ""}`}
+                        key={event.id}
+                        className={`border-border bg-card p-4 shadow-card ${display.priorityBorderClass ?? ""}`}
                       >
                         <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline" className={ACTION_COLOR[a.action] ?? ""}>
-                              {ACTION_LABEL[a.action] ?? a.action.replace(/_/g, " ")}
+                            <Badge variant="outline" className={display.colorClass}>
+                              {display.actionLabel}
                             </Badge>
                           </div>
                           <div className="flex items-center gap-3 ml-auto text-xs text-muted-foreground">
-                            {actor && (
-                              <div className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-[10px] font-semibold text-primary" title={actor.fullName}>
-                                {initials(actor.fullName)}
+                            {display.actorInitials && display.actorName && (
+                              <div className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-[10px] font-semibold text-primary" title={display.actorName}>
+                                {display.actorInitials}
                               </div>
                             )}
                             <span className="flex items-center gap-1">
                               <Clock className="h-3.5 w-3.5" />
-                              {relativeTime(a.createdAt)}
+                              {display.relativeTime}
                             </span>
                           </div>
                         </div>
                         <div className="mt-2 text-sm">
-                          {contextProject && (
-                            <span className="font-medium">{contextProject.name}</span>
-                          )}
-                          {phase && (
-                            <span className="text-muted-foreground">{" · "}{PHASE_LABEL[phase.type] ?? phase.type}</span>
-                          )}
-                          {gate && (
-                            <span className="text-muted-foreground">{" · "}{GATE_LABEL[gate.type] ?? gate.type}</span>
-                          )}
-                          {deficiency && (
-                            <span className="text-muted-foreground">{" · "}{deficiency.title}</span>
-                          )}
-                          {!contextProject && (
-                            <span className="font-mono text-xs text-muted-foreground">{a.entityId}</span>
-                          )}
+                          <span className="font-medium">{display.context}</span>
                         </div>
-                        {typeof a.previousValue === "string" && typeof a.nextValue === "string" && (
+                        {display.statusText && (
                           <div className="mt-1 text-xs text-muted-foreground">
-                            <span className="font-medium">{a.nextValue.replace(/_/g, " ")}</span>
+                            <span className="font-medium">{display.statusText}</span>
                           </div>
                         )}
-                        {typeof a.metadata?.notes === "string" && (
-                          <div className="mt-1 text-xs text-muted-foreground italic">
-                            &ldquo;{a.metadata.notes}&rdquo;
+                        {display.metadataText && (
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {display.metadataText}
                           </div>
                         )}
                       </Card>

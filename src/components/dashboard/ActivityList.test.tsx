@@ -1,0 +1,79 @@
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import { ActivityList } from "./ActivityList";
+import type { AuditEvent, Deficiency, Gate, Phase, Project } from "@/lib/types";
+
+const project: Project = {
+  id: "project-1",
+  clientId: "client-1",
+  projectNumber: "TP-2026-001",
+  name: "Acme Cedar Point Villas",
+  siteAddress: "100 Main St",
+  status: "active",
+  atticCheckStatus: "not_started",
+  createdAt: "2026-05-01T10:00:00.000Z",
+  updatedAt: "2026-05-01T10:00:00.000Z",
+};
+
+const phase: Phase = {
+  id: "phase-1",
+  projectId: "project-1",
+  type: "insulation",
+  status: "in_progress",
+  createdAt: "2026-05-01T10:00:00.000Z",
+  updatedAt: "2026-05-01T10:00:00.000Z",
+};
+
+const gate: Gate = {
+  id: "gate-1",
+  projectId: "project-1",
+  phaseId: "phase-1",
+  type: "inspection",
+  status: "passed",
+  requiredPhotoEvidence: false,
+  createdAt: "2026-05-01T10:00:00.000Z",
+  updatedAt: "2026-05-01T10:00:00.000Z",
+};
+
+const deficiency: Deficiency = {
+  id: "def-1",
+  projectId: "project-1",
+  phaseId: "phase-1",
+  title: "Missing vapor barrier",
+  severity: "medium",
+  status: "open",
+  createdAt: "2026-05-01T10:00:00.000Z",
+  updatedAt: "2026-05-01T10:00:00.000Z",
+};
+
+describe("ActivityList", () => {
+  it("renders normalized title, context, and metadata for phase activity", () => {
+    const event: AuditEvent = {
+      id: "audit-1",
+      entityType: "deficiency",
+      entityId: "def-1",
+      action: "create_deficiency",
+      actorUserId: "user-1",
+      createdAt: new Date().toISOString(),
+      metadata: {
+        notes: "Missing vapor barrier at east wall",
+      },
+    };
+
+    render(
+      <ActivityList
+        events={[event]}
+        lookups={{
+          projects: [project],
+          phases: [phase],
+          gates: [gate],
+          deficiencies: [deficiency],
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Deficiency opened")).toBeInTheDocument();
+    expect(screen.getByText("Acme Cedar Point Villas · Insulation · Missing vapor barrier")).toBeInTheDocument();
+    expect(screen.getByText("Notes: Missing vapor barrier at east wall")).toBeInTheDocument();
+  });
+});
