@@ -70,6 +70,7 @@ import {
 } from "@/lib/derived";
 import { ActionBadge } from "@/components/ui/action-badge";
 import { SeverityBadge } from "@/components/ui/severity-badge";
+import { KpiChip } from "@/components/ui/kpi-chip";
 
 const ENTITY_LABEL: Record<string, string> = {
   project: "Project",
