@@ -24,12 +24,20 @@ const ICONS: Record<PhaseHealthTone, LucideIcon> = {
 interface PhaseHealthPillProps {
   health: PhaseHealth;
   className?: string;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
 }
 
 export function PhaseHealthPill({ health, className, size = "md" }: PhaseHealthPillProps) {
+  // Pill caps at "md"; "lg" reuses md sizing with a slight font bump for legacy headers.
+  const badgeSize = size === "lg" ? "md" : size;
   return (
-    <Badge tone={TONE[health.tone]} appearance="soft" size={size} icon={ICONS[health.tone]} className={className}>
+    <Badge
+      tone={TONE[health.tone]}
+      appearance="soft"
+      size={badgeSize}
+      icon={ICONS[health.tone]}
+      className={size === "lg" ? `text-sm px-3 py-1.5 ${className ?? ""}` : className}
+    >
       {health.label}
     </Badge>
   );
