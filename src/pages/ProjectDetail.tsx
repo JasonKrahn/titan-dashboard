@@ -68,7 +68,8 @@ import {
   projectStatusTone,
   relativeTime,
 } from "@/lib/derived";
-import { Badge } from "@/components/ui/badge";
+import { ActionBadge } from "@/components/ui/action-badge";
+import { SeverityBadge } from "@/components/ui/severity-badge";
 
 const ENTITY_LABEL: Record<string, string> = {
   project: "Project",
@@ -81,24 +82,6 @@ const ENTITY_LABEL: Record<string, string> = {
   user: "User",
 };
 
-const ACTION_COLOR: Record<string, string> = {
-  status_changed: "bg-blue-100 text-blue-700 border-blue-200",
-  created: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  photo_uploaded: "bg-purple-100 text-purple-700 border-purple-200",
-  deficiency_opened: "bg-amber-100 text-amber-700 border-amber-200",
-  inspection_completed: "bg-teal-100 text-teal-700 border-teal-200",
-  create_project: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  create_phase: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  create_client: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  create_deficiency: "bg-amber-100 text-amber-700 border-amber-200",
-  pass_gate: "bg-teal-100 text-teal-700 border-teal-200",
-  fail_gate: "bg-red-100 text-red-700 border-red-200",
-  resolve_deficiency: "bg-teal-100 text-teal-700 border-teal-200",
-  upload_photo: "bg-purple-100 text-purple-700 border-purple-200",
-  activate_project: "bg-blue-100 text-blue-700 border-blue-200",
-  complete_project: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  archive_project: "bg-slate-100 text-slate-600 border-slate-200",
-};
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
