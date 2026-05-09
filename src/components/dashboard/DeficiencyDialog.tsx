@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SeverityBadge } from "@/components/ui/severity-badge";
 import { createDeficiency, updateDeficiency, type CreateDeficiencyInput, type UpdateDeficiencyInput } from "@/lib/api";
 import type { Deficiency, Phase } from "@/lib/types";
 import { PHASE_LABEL } from "@/lib/derived";
