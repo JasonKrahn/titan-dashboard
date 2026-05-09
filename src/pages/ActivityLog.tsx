@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { ActionBadge } from "@/components/ui/action-badge";
 import { getAuditEvents, getProjects, getAllPhases, getUsers, getAllGates, getAllDeficiencies, getClients } from "@/lib/api";
 import { formatAuditEvent, getAuditActionLabel, resolveProjectId } from "@/lib/audit";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -315,9 +315,7 @@ export default function ActivityLogPage() {
                       >
                         <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline" className={display.colorClass}>
-                              {display.actionLabel}
-                            </Badge>
+                            <ActionBadge action={event.action} size="sm" />
                           </div>
                           <div className="flex items-center gap-3 ml-auto text-xs text-muted-foreground">
                             {display.actorInitials && display.actorName && (
