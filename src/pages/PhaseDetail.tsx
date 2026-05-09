@@ -24,6 +24,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { MobileActionSheet, type MobileActionItem } from "@/components/ui/mobile-action-sheet";
 import { AppHeader } from "@/components/dashboard/AppHeader";
+import { ActivityList } from "@/components/dashboard/ActivityList";
 import { PageNav } from "@/components/dashboard/PageNav";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -39,7 +40,7 @@ import { PhotoUploadDialog } from "@/components/dashboard/PhotoUploadDialog";
 import { DatePicker } from "@/components/ui/date-picker";
 import { assignSubcontractorToPhase, getPhase, getPhotoViewUrl, markPhaseReadyForInspection, updatePhase } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import type { AuditEvent, Deficiency, Gate, PhaseStatus, PhotoEvidence } from "@/lib/types";
+import type { Deficiency, Gate, PhaseStatus, PhotoEvidence } from "@/lib/types";
 import {
   GATE_LABEL,
   PHASE_LABEL,
@@ -625,7 +626,15 @@ export default function PhaseDetailPage() {
                 <EmptyCard icon={<FileText className="h-5 w-5" />} text="No activity recorded for this phase yet." />
               ) : (
                 <Card className="border-border bg-card p-5 shadow-card">
-                  <ActivityList events={auditEvents} />
+                  <ActivityList
+                    events={auditEvents}
+                    lookups={{
+                      projects: [project],
+                      phases: [phase],
+                      gates,
+                      deficiencies,
+                    }}
+                  />
                 </Card>
               )}
             </section>
@@ -637,7 +646,15 @@ export default function PhaseDetailPage() {
               <EmptyCard icon={<FileText className="h-5 w-5" />} text="No activity recorded for this phase yet." />
             ) : (
               <Card className="border-border bg-card p-5 shadow-card">
-                <ActivityList events={auditEvents} />
+                <ActivityList
+                  events={auditEvents}
+                  lookups={{
+                    projects: [project],
+                    phases: [phase],
+                    gates,
+                    deficiencies,
+                  }}
+                />
               </Card>
             )}
           </TabsContent>
@@ -1019,40 +1036,5 @@ function KpiChip({ label, value, tone }: { label: string; value: string; tone: S
       <span className="font-semibold uppercase tracking-wide opacity-70">{label}</span>
       <span className="font-semibold">{value}</span>
     </div>
-  );
-}
-
-function ActivityList({ events }: { events: AuditEvent[] }) {
-  return (
-    <ol className="space-y-3">
-      {events.map((a) => {
-        const entityLabel = a.entityType.replace(/_/g, " ");
-        const actionLabel = a.action.replace(/_/g, " ");
-        return (
-          <li key={a.id} className="flex items-start gap-3 text-sm">
-            <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-            <div className="flex-1">
-              <p className="font-medium capitalize">
-                {entityLabel} {actionLabel}
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">{relativeTime(a.createdAt)}</p>
-              {a.metadata && Object.keys(a.metadata).length > 0 && (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {Object.entries(a.metadata)
-                    .map(([key, value]) => {
-                      if (key === "phaseId") return null;
-                      if (key === "notes" && value) return `Notes: ${value}`;
-                      if (key === "inspectorName" && value) return `Inspector: ${value}`;
-                      return null;
-                    })
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              )}
-            </div>
-          </li>
-        );
-      })}
-    </ol>
   );
 }
