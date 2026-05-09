@@ -685,7 +685,7 @@ export default function PhaseDetailPage() {
                         <div className="min-w-0 flex-1">
                           <p className="font-medium">{d.title}</p>
                           {d.description && <p className="mt-0.5 text-xs text-muted-foreground">{d.description}</p>}
-                          <p className="mt-1 text-xs text-muted-foreground">Severity: {d.severity}</p>
+                          <div className="mt-1.5"><SeverityBadge severity={d.severity} size="xs" /></div>
                           {deficiencyPhotos.length > 0 && (
                             <div className="mt-2 flex gap-2">
                               {deficiencyPhotos.map((p) => (
