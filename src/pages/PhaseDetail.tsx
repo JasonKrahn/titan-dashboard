@@ -28,7 +28,10 @@ import { ActivityList } from "@/components/dashboard/ActivityList";
 import { PageNav } from "@/components/dashboard/PageNav";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/dashboard/StatusBadge";
+import { SeverityBadge } from "@/components/ui/severity-badge";
+import { KpiChip } from "@/components/ui/kpi-chip";
+import { statusToTone } from "@/components/dashboard/StatusBadge";
 import { PhaseHealthPill } from "@/components/dashboard/PhaseHealthPill";
 import { SiteCheckDialog } from "@/components/dashboard/SiteCheckDialog";
 import { SiteBlockDialog } from "@/components/dashboard/SiteBlockDialog";
@@ -723,7 +726,7 @@ export default function PhaseDetailPage() {
                             </div>
                           )}
                           {d.status === "resolved" && (
-                            <Badge variant="default">Resolved</Badge>
+                            <StatusBadge tone="closed" label="Resolved" size="sm" />
                           )}
                         </div>
                       </li>
