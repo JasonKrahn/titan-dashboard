@@ -440,7 +440,8 @@ export default function ProjectDetailPage() {
               <KpiChip
                 label="Last update"
                 value={relativeTime(p.updatedAt)}
-                tone="not-started"
+                tone="neutral"
+                variant="card"
                 icon={<Clock className="h-4 w-4" />}
               />
             </div>
@@ -1013,28 +1014,6 @@ export default function ProjectDetailPage() {
   );
 }
 
-function KpiChip({
-  label,
-  value,
-  tone,
-  icon,
-}: {
-  label: string;
-  value: string;
-  tone: "blocked" | "closed" | "not-started" | "in-progress" | "ready";
-  icon: React.ReactNode;
-}) {
-  const c = phaseHealthClasses(tone);
-  return (
-    <div className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${c.bg} ${c.border}`}>
-      <span className={c.text}>{icon}</span>
-      <div className="leading-tight">
-        <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</div>
-        <div className={`text-sm font-semibold ${c.text}`}>{value}</div>
-      </div>
-    </div>
-  );
-}
 
 function buildProjectPhaseActions({
   phase,
