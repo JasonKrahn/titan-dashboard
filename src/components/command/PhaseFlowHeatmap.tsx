@@ -43,7 +43,7 @@ export function PhaseFlowHeatmap({ matrix }: Props) {
         <p className="text-[11px] text-muted-foreground">Counts by phase × status. Darker = more.</p>
       </header>
       <div className="overflow-x-auto">
-        <div className="min-w-[560px] p-3">
+        <div className="p-3">
           <div
             className="grid gap-1"
             style={{ gridTemplateColumns: `120px repeat(${matrix.cols.length}, minmax(0, 1fr))` }}

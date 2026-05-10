@@ -99,7 +99,6 @@ export function NewClientDialog({ open, onOpenChange, client, onCreated, onUpdat
               value={form.name}
               onChange={(e) => setField("name", e.target.value)}
               placeholder="e.g. Northbridge Developments"
-              autoFocus
             />
             {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
           </div>

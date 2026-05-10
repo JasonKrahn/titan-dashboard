@@ -32,7 +32,10 @@ export function ProjectNotes({ projectId, notes, notesLastEditedBy, notesLastEdi
   useEffect(() => {
     if (isEditing && editorRef.current) {
       editorRef.current.innerHTML = draftNotes;
-      editorRef.current.focus();
+      const shouldFocus = typeof window !== 'undefined' && window.innerWidth >= 768;
+      if (shouldFocus) {
+        editorRef.current.focus();
+      }
     }
   }, [isEditing, draftNotes]);
 

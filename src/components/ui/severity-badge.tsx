@@ -1,8 +1,9 @@
 import { AlertOctagon, AlertTriangle, MinusCircle } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import type { Deficiency } from "@/lib/types";
 
-const MAP: Record<Deficiency["severity"], { tone: BadgeTone; icon: any; label: string; appearance: "soft" | "solid" }> = {
+const MAP: Record<Deficiency["severity"], { tone: BadgeTone; icon: LucideIcon; label: string; appearance: "soft" | "solid" }> = {
   low:      { tone: "neutral", icon: MinusCircle,    label: "Low",      appearance: "soft" },
   medium:   { tone: "warning", icon: AlertTriangle,  label: "Medium",   appearance: "soft" },
   high:     { tone: "danger",  icon: AlertTriangle,  label: "High",     appearance: "soft" },

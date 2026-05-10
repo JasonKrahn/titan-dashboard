@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { completeInspection, type CompleteInspectionInput } from "@/lib/api";
+import type { Deficiency } from "@/lib/types";
 
 interface InspectionResultDialogProps {
   open: boolean;
@@ -223,7 +224,7 @@ export function InspectionResultDialog({
 
               <div className="grid gap-1.5">
                 <Label htmlFor="deficiency-severity">Severity *</Label>
-                <Select value={deficiencySeverity} onValueChange={(v: any) => setDeficiencySeverity(v)}>
+                <Select value={deficiencySeverity} onValueChange={(v: Deficiency["severity"]) => setDeficiencySeverity(v)}>
                   <SelectTrigger id="deficiency-severity">
                     <SelectValue />
                   </SelectTrigger>

@@ -27,6 +27,8 @@ const DialogOverlay = React.forwardRef<
 ));
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
+const isMobileViewport = () => typeof window !== 'undefined' && window.innerWidth < 768;
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
@@ -35,6 +37,12 @@ const DialogContent = React.forwardRef<
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
+      onOpenAutoFocus={(e) => {
+        if (isMobileViewport()) {
+          e.preventDefault();
+          (e.currentTarget as HTMLElement).focus();
+        }
+      }}
       className={cn(
         "fixed inset-x-0 bottom-0 z-50 grid max-h-[90svh] w-full gap-4 overflow-y-auto overscroll-contain rounded-t-2xl border bg-background p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom md:left-[50%] md:top-[50%] md:bottom-auto md:w-full md:max-w-lg md:translate-x-[-50%] md:translate-y-[-50%] md:rounded-lg md:p-6 md:pb-6 md:data-[state=closed]:zoom-out-95 md:data-[state=open]:zoom-in-95 md:data-[state=closed]:slide-out-to-left-1/2 md:data-[state=closed]:slide-out-to-top-[48%] md:data-[state=open]:slide-in-from-left-1/2 md:data-[state=open]:slide-in-from-top-[48%]",
         className,
