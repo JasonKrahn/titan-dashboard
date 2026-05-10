@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileText, Settings, Users } from "lucide-react";
+import { FileText, Radar, Settings, Users } from "lucide-react";
 import { toast } from "sonner";
 import { RoleSwitcher } from "@/components/dashboard/RoleSwitcher";
 import { SettingsDialog } from "@/components/dashboard/SettingsDialog";
@@ -9,7 +9,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { getCurrentUser, getUsers, setCurrentUser } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-export type AppHeaderSection = "clients" | "dashboard" | "subs" | "activity";
+export type AppHeaderSection = "clients" | "dashboard" | "subs" | "activity" | "command";
 export type DashboardViewTarget = "clients" | "dashboard";
 
 interface AppHeaderProps {
@@ -82,6 +82,12 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch }
                 All Projects
               </button>
             </SegmentedControl>
+            {me?.role === "admin" && (
+              <Link to="/command" className={topNavClass(section === "command")}>
+                <Radar className="h-4 w-4" />
+                Command
+              </Link>
+            )}
             <Link to="/subs" className={topNavClass(section === "subs")}>
               <Users className="h-4 w-4" />
               Subcontractor Rolodex
@@ -122,6 +128,12 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch }
             >
               All Projects
             </button>
+            {me?.role === "admin" && (
+              <Link to="/command" className={mobileTopNavClass(section === "command")}>
+                <Radar className="h-4 w-4" />
+                Command
+              </Link>
+            )}
             <Link to="/subs" className={mobileTopNavClass(section === "subs")}>
               <Users className="h-4 w-4" />
               Subs
@@ -151,6 +163,7 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch }
 function sectionFromPath(pathname: string): AppHeaderSection {
   if (pathname.startsWith("/subs")) return "subs";
   if (pathname.startsWith("/activity")) return "activity";
+  if (pathname.startsWith("/command")) return "command";
   if (pathname === "/") return "clients";
   return "dashboard";
 }
