@@ -1,7 +1,8 @@
 import { Activity, AlertTriangle, ClipboardCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { IconWell } from "@/components/ui/icon-well";
+import { SectionHeading } from "@/components/ui/section-heading";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
 
 interface StatsRowProps {
   activeProjects: number;
@@ -14,22 +15,24 @@ interface StatProps {
   label: string;
   value: number;
   icon: React.ReactNode;
-  accent: string;
+  tone: "primary" | "danger" | "ready";
   hint?: string;
 }
 
-function Stat({ label, value, icon, accent, hint }: StatProps) {
+function Stat({ label, value, icon, tone, hint }: StatProps) {
   return (
-    <Card className="bg-gradient-surface border-border p-3 sm:p-5 shadow-card">
+    <Card surface="panel" className="p-3 sm:p-5">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[10px] sm:text-xs uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
+          <SectionHeading as="p" size="sm" className="sm:text-xs">
+            {label}
+          </SectionHeading>
           <p className="text-xl sm:text-3xl font-bold mt-1 sm:mt-2 tabular-nums">{value}</p>
           {hint && <p className="hidden md:block text-xs text-muted-foreground mt-1">{hint}</p>}
         </div>
-        <div className={cn("h-7 w-7 sm:h-10 sm:w-10 rounded-lg flex items-center justify-center shrink-0", accent)}>
+        <IconWell tone={tone} size="xl" shape="panel" className="h-7 w-7 border-transparent sm:h-10 sm:w-10">
           {icon}
-        </div>
+        </IconWell>
       </div>
     </Card>
   );
@@ -52,21 +55,21 @@ export function StatsRow({ activeProjects, blockedItems, inspectionsDueThisWeek,
         value={activeProjects}
         hint="Visible to your role"
         icon={<Activity className="h-5 w-5 text-primary" />}
-        accent="bg-primary/15"
+        tone="primary"
       />
       <Stat
         label="Blocked items"
         value={blockedItems}
         hint="Across phases & gates"
         icon={<AlertTriangle className="h-5 w-5 text-status-blocked" />}
-        accent="bg-status-blocked/15"
+        tone="danger"
       />
       <Stat
         label="Inspections due"
         value={inspectionsDueThisWeek}
         hint="Phases ready for inspection"
         icon={<ClipboardCheck className="h-5 w-5 text-status-ready" />}
-        accent="bg-status-ready/15"
+        tone="ready"
       />
     </div>
   );

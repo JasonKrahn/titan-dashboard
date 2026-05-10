@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
+  completeInspection,
+  completeSiteCheck,
   getAllDeficiencies,
   getAllGates,
   getAllPhases,
@@ -7,9 +9,18 @@ import {
   getClients,
   getProject,
   getProjects,
+  markPhaseReadyForInspection,
+  updateAtticGate,
 } from "./index";
 
 describe("prototype seed data", () => {
+  beforeAll(() => {
+    vi.stubGlobal("URL", {
+      ...URL,
+      createObjectURL: vi.fn(() => "blob:test"),
+    });
+  });
+
   it("contains seeded Acme projects across draft, active, and completed stages", async () => {
     const clientsResult = await getClients();
     const projectsResult = await getProjects();
@@ -88,5 +99,76 @@ describe("prototype seed data", () => {
       (photo) => photo.purpose === "attic_check" && photo.status === "confirmed",
     );
     expect(hasConfirmedAtticEvidence).toBe(true);
+  });
+
+  it("promotes an active project to completed when the attic gate is the last remaining requirement", async () => {
+    const file = new File(["attic"], "attic.jpg", { type: "image/jpeg" });
+
+    await markPhaseReadyForInspection({
+      projectId: "proj-acme-active",
+      phaseId: "proj-acme-active-phase-insulation",
+    });
+    await completeInspection({
+      gateId: "proj-acme-active-gate-insulation-inspection",
+      phaseId: "proj-acme-active-phase-insulation",
+      projectId: "proj-acme-active",
+      passed: true,
+      inspectorName: "Inspector One",
+      inspectionDate: new Date().toISOString(),
+    });
+    await completeSiteCheck({
+      gateId: "proj-acme-active-gate-drywall-site-check",
+      phaseId: "proj-acme-active-phase-drywall",
+      projectId: "proj-acme-active",
+    });
+    await markPhaseReadyForInspection({
+      projectId: "proj-acme-active",
+      phaseId: "proj-acme-active-phase-drywall",
+    });
+    await completeInspection({
+      gateId: "proj-acme-active-gate-drywall-inspection",
+      phaseId: "proj-acme-active-phase-drywall",
+      projectId: "proj-acme-active",
+      passed: true,
+      inspectorName: "Inspector One",
+      inspectionDate: new Date().toISOString(),
+    });
+    await completeSiteCheck({
+      gateId: "proj-acme-active-gate-finishing-site-check",
+      phaseId: "proj-acme-active-phase-finishing",
+      projectId: "proj-acme-active",
+    });
+    await markPhaseReadyForInspection({
+      projectId: "proj-acme-active",
+      phaseId: "proj-acme-active-phase-finishing",
+    });
+    await completeInspection({
+      gateId: "proj-acme-active-gate-finishing-inspection",
+      phaseId: "proj-acme-active-phase-finishing",
+      projectId: "proj-acme-active",
+      passed: true,
+      inspectorName: "Inspector One",
+      inspectionDate: new Date().toISOString(),
+    });
+
+    const beforeAttic = await getProject("proj-acme-active");
+    expect(beforeAttic.ok).toBe(true);
+    if (!beforeAttic.ok) return;
+    expect(beforeAttic.data.project.status).toBe("active");
+
+    const atticResult = await updateAtticGate({
+      gateId: "proj-acme-active-gate-attic",
+      projectId: "proj-acme-active",
+      installDate: new Date().toISOString(),
+      photo: file,
+    });
+
+    expect(atticResult.ok).toBe(true);
+
+    const afterAttic = await getProject("proj-acme-active");
+    expect(afterAttic.ok).toBe(true);
+    if (!afterAttic.ok) return;
+    expect(afterAttic.data.project.status).toBe("completed");
+    expect(afterAttic.data.project.completedAt).toBeTruthy();
   });
 });

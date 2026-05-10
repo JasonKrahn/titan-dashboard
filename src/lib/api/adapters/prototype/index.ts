@@ -138,6 +138,33 @@ function projectMissingAtticEvidence(p: Project): boolean {
   return !confirmed && p.atticCheckStatus !== "passed";
 }
 
+function syncProjectCompletion(projectId: string, actorUserId: string, nowIso: string) {
+  const project = seedProjects.find((p) => p.id === projectId);
+  if (!project || project.status === "completed" || project.status === "archived") return;
+
+  const projectPhases = seedPhases.filter((phase) => phase.projectId === projectId);
+  const atticGate = seedGates.find((gate) => gate.projectId === projectId && gate.type === "attic_check");
+  const allPhasesClosed = projectPhases.length > 0 && projectPhases.every((phase) => phase.status === "closed");
+  const atticPassed = atticGate?.status === "passed";
+
+  if (!allPhasesClosed || !atticPassed) return;
+
+  project.status = "completed";
+  project.completedAt = nowIso;
+  project.updatedAt = nowIso;
+
+  seedAuditEvents.unshift({
+    id: `audit-${Date.now()}`,
+    entityType: "project",
+    entityId: projectId,
+    action: "complete_project",
+    actorUserId,
+    previousValue: "active",
+    nextValue: "completed",
+    createdAt: nowIso,
+  });
+}
+
 export async function getProjects(filters?: ProjectFilters): Promise<ApiResult<Project[]>> {
   const me = seedUsers.find((u) => u.id === currentUserId);
   if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
@@ -751,6 +778,8 @@ export async function completeInspection(input: CompleteInspectionInput): Promis
     createdAt: nowIso,
   });
 
+  syncProjectCompletion(input.projectId, me.id, nowIso);
+
   return delay(ok(gate));
 }
 
@@ -1240,6 +1269,8 @@ export async function updateAtticGate(input: UpdateAtticGateInput): Promise<ApiR
     },
     createdAt: nowIso,
   });
+
+  syncProjectCompletion(input.projectId, me.id, nowIso);
 
   return delay(ok(gate));
 }

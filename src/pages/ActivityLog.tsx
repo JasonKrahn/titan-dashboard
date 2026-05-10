@@ -3,7 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Clock, FileText, Search } from "lucide-react";
 import { AppHeader } from "@/components/dashboard/AppHeader";
 import { Card } from "@/components/ui/card";
+import { IconWell } from "@/components/ui/icon-well";
 import { Input } from "@/components/ui/input";
+import { SectionHeading } from "@/components/ui/section-heading";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ActionBadge } from "@/components/ui/action-badge";
@@ -296,22 +298,25 @@ export default function ActivityLogPage() {
 
         {filtered.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
-            <FileText className="h-8 w-8 mx-auto mb-3 opacity-50" />
+            <IconWell tone="muted" size="xl" shape="panel" className="mx-auto mb-3 border-transparent">
+              <FileText className="h-8 w-8 opacity-50" />
+            </IconWell>
             <p className="text-sm">No activity matches your filters.</p>
           </div>
         ) : (
           <div className="space-y-6">
             {GROUP_ORDER.filter((g) => grouped[g]?.length).map((group) => (
               <div key={group}>
-                <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                <SectionHeading as="h2" className="mb-3">
                   {group}
-                </h2>
+                </SectionHeading>
                 <div className="space-y-2">
                   {grouped[group]!.map(({ event, display }) => {
                     return (
                       <Card
                         key={event.id}
-                        className={`border-border bg-card p-4 shadow-card ${display.priorityBorderClass ?? ""}`}
+                        surface="default"
+                        className={`p-4 shadow-card ${display.priorityBorderClass ?? ""}`}
                       >
                         <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
                           <div className="flex items-center gap-2">
@@ -319,9 +324,9 @@ export default function ActivityLogPage() {
                           </div>
                           <div className="flex items-center gap-3 ml-auto text-xs text-muted-foreground">
                             {display.actorInitials && display.actorName && (
-                              <div className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-[10px] font-semibold text-primary" title={display.actorName}>
+                              <IconWell tone="primary" size="sm" shape="pill" className="text-eyebrow font-semibold" title={display.actorName}>
                                 {display.actorInitials}
-                              </div>
+                              </IconWell>
                             )}
                             <span className="flex items-center gap-1">
                               <Clock className="h-3.5 w-3.5" />

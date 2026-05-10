@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Bold, Italic, Underline, List, Pencil, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { SectionHeading } from "@/components/ui/section-heading";
 import { updateProjectNotes, type UpdateProjectNotesInput } from "@/lib/api";
 import { relativeTime } from "@/lib/derived";
 
@@ -70,9 +71,9 @@ export function ProjectNotes({ projectId, notes, notesLastEditedBy, notesLastEdi
   const hasNotes = Boolean(notes && notes.trim() && notes !== "<br>" && notes !== "<div><br></div>");
 
   return (
-    <Card className="border-border bg-card p-5 shadow-card">
+    <Card surface="default" className="p-5 shadow-card">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Project Notes</h3>
+        <SectionHeading as="h3">Project Notes</SectionHeading>
         <div className="flex items-center gap-2">
           {notesLastEditedAt && !isEditing && (
             <span className="text-xs text-muted-foreground">

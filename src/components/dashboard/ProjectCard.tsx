@@ -1,5 +1,6 @@
 import { AlertOctagon, Archive, ArrowUpRight, Camera, MapPin, Pencil } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { IconWell } from "@/components/ui/icon-well";
 import { StatusBadge } from "./StatusBadge";
 import { PhaseProgress } from "./PhaseProgress";
 import {
@@ -75,16 +76,13 @@ export function ProjectCard({
   return (
     <Card
       onClick={() => onOpen?.(project.id)}
-      className={cn(
-        "group bg-gradient-surface border-border cursor-pointer p-4 shadow-card sm:p-5",
-        "transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-glow",
-        "animate-fade-in",
-      )}
+      surface="interactive"
+      className={cn("group cursor-pointer p-4 sm:p-5", "animate-fade-in")}
     >
       {/* Header */}
       <div className="mb-3 flex items-start justify-between gap-3 sm:mb-4">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 text-[11px] text-muted-foreground font-mono mb-1">
+          <div className="mb-1 flex items-center gap-2 font-mono text-meta text-muted-foreground">
             {project.projectNumber}
           </div>
           <h3 className="text-base font-semibold leading-tight transition-colors group-hover:text-primary md:truncate">
@@ -159,16 +157,19 @@ export function ProjectCard({
           )}
           <span className="text-[11px] text-muted-foreground">Updated {relativeTime(project.updatedAt)}</span>
           {pm ? (
-            <div
-              className="h-7 w-7 rounded-full bg-primary/15 text-primary text-[11px] font-semibold flex items-center justify-center border border-primary/30"
+            <IconWell
+              tone="primary"
+              size="sm"
+              shape="pill"
+              className="text-meta font-semibold"
               title={pm.fullName}
             >
               {initials(pm.fullName)}
-            </div>
+            </IconWell>
           ) : (
-            <div className="h-7 w-7 rounded-full bg-muted text-muted-foreground text-[11px] flex items-center justify-center" title="Unassigned">
+            <IconWell tone="muted" size="sm" shape="pill" className="text-meta" title="Unassigned">
               —
-            </div>
+            </IconWell>
           )}
         </div>
       </div>

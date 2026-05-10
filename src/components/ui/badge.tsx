@@ -92,6 +92,7 @@ export interface BadgeProps
   /** Legacy shadcn variant — prefer `tone`/`appearance`. */
   variant?: "default" | "secondary" | "destructive" | "outline";
   icon?: LucideIcon;
+  iconClassName?: string;
   dot?: boolean;
   children?: React.ReactNode;
 }
@@ -103,6 +104,7 @@ function Badge({
   variant,
   size,
   icon: Icon,
+  iconClassName,
   dot,
   children,
   ...props
@@ -114,7 +116,7 @@ function Badge({
   return (
     <div className={cn(badgeVariants({ size }), appearanceClass(finalTone, finalAppearance), className)} {...props}>
       {Icon ? (
-        <Icon className={cn(iconSize, "shrink-0")} aria-hidden="true" />
+        <Icon className={cn(iconSize, "shrink-0", iconClassName)} aria-hidden="true" />
       ) : dot ? (
         <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", TONE_DOT[finalTone])} aria-hidden="true" />
       ) : null}

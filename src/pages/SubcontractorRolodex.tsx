@@ -21,7 +21,9 @@ import { AppHeader } from "@/components/dashboard/AppHeader";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { IconWell } from "@/components/ui/icon-well";
 import { Input } from "@/components/ui/input";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -359,6 +361,8 @@ export default function SubcontractorRolodexPage() {
     return map;
   }, [subAssignments]);
 
+  const isActive = (id: string) => (assignmentSummary.get(id)?.assignmentCount ?? 0) > 0;
+
   const rows = useMemo(
     () => buildSubcontractorRows(subs, search, SORT_STATE[sortOption], filters, assignmentSummary),
     [assignmentSummary, filters, search, sortOption, subs],
@@ -367,7 +371,7 @@ export default function SubcontractorRolodexPage() {
   const mobileActionSubcontractor = rows.find((row) => row.id === mobileActionSubcontractorId);
 
   const stats = useMemo(() => {
-    const active = subs.filter((sub) => sub.active).length;
+    const active = subs.filter((sub) => isActive(sub.id)).length;
     const assigned = subs.filter((sub) => (assignmentSummary.get(sub.id)?.assignmentCount ?? 0) > 0).length;
     return {
       total: subs.length,
@@ -551,22 +555,22 @@ export default function SubcontractorRolodexPage() {
               { label: "Assigned", value: stats.assigned, icon: BriefcaseBusiness },
               { label: "Unassigned", value: stats.unassigned, icon: CalendarClock },
             ].map((item) => (
-              <Card key={item.label} className="border-border bg-gradient-surface p-4 shadow-card">
+              <Card key={item.label} surface="panel" className="p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-medium text-muted-foreground">{item.label}</p>
                     <p className="mt-1 text-2xl font-semibold tabular-nums">{item.value}</p>
                   </div>
-                  <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/15 text-primary">
+                  <IconWell tone="primary" size="lg" shape="square" className="border-transparent">
                     <item.icon className="h-4 w-4" />
-                  </div>
+                  </IconWell>
                 </div>
               </Card>
             ))}
           </div>
         </section>
 
-        <Card className="border-border bg-gradient-surface p-3 shadow-card">
+        <Card surface="panel" className="p-3">
           <div className="grid gap-3 lg:grid-cols-[minmax(220px,1.4fr)_repeat(4,minmax(145px,0.75fr))_auto] lg:items-center">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -594,7 +598,7 @@ export default function SubcontractorRolodexPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="active">Assigned</SelectItem>
                 <SelectItem value="inactive">Inactive</SelectItem>
               </SelectContent>
             </Select>
@@ -622,7 +626,7 @@ export default function SubcontractorRolodexPage() {
               </SelectContent>
             </Select>
             <div className="hidden justify-end md:flex">
-              <div className="inline-flex w-fit gap-1 rounded-md border border-border bg-card p-1">
+              <SegmentedControl size="sm">
                 <Button
                   type="button"
                   variant={viewMode === "cards" ? "default" : "ghost"}
@@ -645,14 +649,16 @@ export default function SubcontractorRolodexPage() {
                   <List className="h-4 w-4" />
                   List
                 </Button>
-              </div>
+              </SegmentedControl>
             </div>
           </div>
         </Card>
 
         {rows.length === 0 ? (
-          <Card className="border-border bg-gradient-surface p-8 text-center shadow-card">
-            <Wrench className="h-8 w-8 mx-auto text-muted-foreground" />
+          <Card surface="panel" className="p-8 text-center">
+            <IconWell tone="muted" size="xl" shape="panel" className="mx-auto border-transparent">
+              <Wrench className="h-8 w-8 text-muted-foreground" />
+            </IconWell>
             <h3 className="mt-3 font-semibold">No subcontractors found</h3>
             <p className="mt-1 text-sm text-muted-foreground">Try a different search, trade, status, or assignment filter.</p>
           </Card>
@@ -669,12 +675,12 @@ export default function SubcontractorRolodexPage() {
                         onClick={() => setMobileActionSubcontractorId(s.id)}
                         className="flex min-w-0 flex-1 items-center gap-3 text-left"
                       >
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
+                        <IconWell tone="primary" size="md" shape="square">
                           <Wrench className="h-4 w-4" />
-                        </div>
+                        </IconWell>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <span className={`inline-block h-1.5 w-1.5 rounded-full ${s.active ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
+                            <span className={`inline-block h-1.5 w-1.5 rounded-full ${isActive(s.id) ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
                             <span className="truncate text-sm font-semibold">{s.displayName}</span>
                           </div>
                           <div className="truncate text-xs text-muted-foreground">
@@ -704,19 +710,19 @@ export default function SubcontractorRolodexPage() {
                 {rows.map((s) => {
                   const assignments = subAssignments.get(s.id) || [];
                   return (
-                    <Card key={s.id} className="group border-border bg-gradient-surface p-5 shadow-card transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-glow">
+                    <Card key={s.id} surface="interactive" className="group p-5">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                          <IconWell tone="primary" size="lg" shape="panel" className="mb-3">
                             <Wrench className="h-4 w-4" />
-                          </div>
+                          </IconWell>
                           <h3 className="truncate text-base font-semibold">{s.displayName}</h3>
                           <p className="mt-1 truncate text-sm text-muted-foreground">{s.companyName ?? "No company"}</p>
                         </div>
                         <div className="flex shrink-0 flex-col items-end gap-2">
                           <TradeBadge trade={s.trade} size="sm" />
-                          <Badge tone={s.active ? "success" : "neutral"} appearance="soft" size="xs" dot>
-                            {s.active ? "Active" : "Inactive"}
+                          <Badge tone={isActive(s.id) ? "success" : "neutral"} appearance="soft" size="xs" dot>
+                            {isActive(s.id) ? "Assigned" : "Unassigned"}
                           </Badge>
                         </div>
                       </div>
@@ -770,7 +776,7 @@ export default function SubcontractorRolodexPage() {
                 })}
               </div>
             ) : (
-              <Card className="hidden border-border bg-gradient-surface shadow-card md:block">
+              <Card surface="panel" className="hidden md:block">
                 <Table className="table-fixed">
                   <TableHeader>
                     <TableRow>
@@ -805,8 +811,8 @@ export default function SubcontractorRolodexPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className={`text-xs font-medium ${s.active ? "text-emerald-500" : "text-muted-foreground"}`}>
-                              {s.active ? "Active" : "Inactive"}
+                            <span className={`text-xs font-medium ${isActive(s.id) ? "text-emerald-500" : "text-muted-foreground"}`}>
+                              {isActive(s.id) ? "Assigned" : "Unassigned"}
                             </span>
                           </TableCell>
                           <TableCell className="text-right font-semibold tabular-nums">{assignments.length}</TableCell>
