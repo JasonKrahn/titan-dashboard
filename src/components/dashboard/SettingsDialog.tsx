@@ -51,6 +51,7 @@ export function SettingsDialog({ open, onOpenChange, user, onUpdated }: Settings
         qc.invalidateQueries({ queryKey: ["me"] });
         qc.invalidateQueries({ queryKey: ["users"] });
         reset();
+        (document.activeElement as HTMLElement)?.blur();
         onOpenChange(false);
         onUpdated?.();
         return;

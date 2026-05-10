@@ -1120,4 +1120,7 @@ export const seedAuditEvents: AuditEvent[] = [
   audit("audit-create-archived", "project", "proj-archived-history", "create_project", "user-admin", 160),
   audit("audit-complete-archived", "project", "proj-archived-history", "complete_project", "user-pm-2", 82, { previousValue: "active", nextValue: "completed" }),
   audit("audit-archive-history", "project", "proj-archived-history", "archive_project", "user-admin", 80, { previousValue: "completed", nextValue: "archived" }),
+  audit("audit-today-notes-finishing", "project", "proj-finishing-active", "project_notes_updated", "user-pm-1", 0),
+  audit("audit-today-photo-finishing", "photo_evidence", "photo-finishing-general", "photo_uploaded", "user-pm-1", 0),
+  audit("audit-today-attic-ready-inspection", "gate", "proj-ready-inspection-gate-attic", "attic_gate_updated", "user-pm-1", 0),
 ].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
