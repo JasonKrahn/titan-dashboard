@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   completeInspection,
   completeSiteCheck,
+  getAuditEvents,
   getAllDeficiencies,
   getAllGates,
   getAllPhases,
@@ -9,7 +10,9 @@ import {
   getClients,
   getProject,
   getProjects,
+  getUsers,
   markPhaseReadyForInspection,
+  setCurrentUser,
   updateAtticGate,
 } from "./index";
 
@@ -21,7 +24,8 @@ describe("prototype seed data", () => {
     });
   });
 
-  it("contains seeded Acme projects across draft, active, and completed stages", async () => {
+  it("contains exactly 10 seeded projects across all project stages", async () => {
+    setCurrentUser("user-admin");
     const clientsResult = await getClients();
     const projectsResult = await getProjects();
 
@@ -29,68 +33,108 @@ describe("prototype seed data", () => {
     expect(projectsResult.ok).toBe(true);
     if (!clientsResult.ok || !projectsResult.ok) return;
 
-    expect(clientsResult.data.some((client) => client.id === "client-2" && client.name === "Acme Construction")).toBe(true);
-    expect(projectsResult.data).toHaveLength(3);
+    expect(clientsResult.data.length).toBeGreaterThanOrEqual(4);
+    expect(projectsResult.data).toHaveLength(10);
 
     const ids = new Set(projectsResult.data.map((project) => project.id));
-    expect(ids).toEqual(new Set(["proj-acme-draft", "proj-acme-active", "proj-acme-completed"]));
+    expect(ids).toEqual(new Set([
+      "proj-draft-new-home",
+      "proj-active-insulation",
+      "proj-ready-inspection",
+      "proj-site-blocked",
+      "proj-failed-inspection",
+      "proj-deficiency-rework",
+      "proj-finishing-active",
+      "proj-ready-complete",
+      "proj-completed-archiveable",
+      "proj-archived-history",
+    ]));
 
-    const statusesById = new Map(projectsResult.data.map((project) => [project.id, project.status]));
-    expect(statusesById.get("proj-acme-draft")).toBe("draft");
-    expect(statusesById.get("proj-acme-active")).toBe("active");
-    expect(statusesById.get("proj-acme-completed")).toBe("completed");
+    expect(new Set(projectsResult.data.map((project) => project.status))).toEqual(
+      new Set(["draft", "active", "completed", "archived"]),
+    );
   });
 
-  it("has operational child records for seeded scenarios", async () => {
-    const [phasesResult, gatesResult, deficienciesResult, photosResult] = await Promise.all([
+  it("has complete operational child records for every seeded project", async () => {
+    setCurrentUser("user-admin");
+    const [phasesResult, gatesResult, deficienciesResult, photosResult, usersResult, auditResult] = await Promise.all([
       getAllPhases(),
       getAllGates(),
       getAllDeficiencies(),
       getAllPhotos(),
+      getUsers(),
+      getAuditEvents(),
     ]);
 
     expect(phasesResult.ok).toBe(true);
     expect(gatesResult.ok).toBe(true);
     expect(deficienciesResult.ok).toBe(true);
     expect(photosResult.ok).toBe(true);
-    if (!phasesResult.ok || !gatesResult.ok || !deficienciesResult.ok || !photosResult.ok) return;
+    expect(usersResult.ok).toBe(true);
+    expect(auditResult.ok).toBe(true);
+    if (!phasesResult.ok || !gatesResult.ok || !deficienciesResult.ok || !photosResult.ok || !usersResult.ok || !auditResult.ok) return;
 
-    expect(phasesResult.data).toHaveLength(9);
-    expect(gatesResult.data).toHaveLength(21);
-    expect(deficienciesResult.data).toEqual([]);
-    expect(photosResult.data.length).toBeGreaterThanOrEqual(2);
+    expect(phasesResult.data).toHaveLength(30);
+    expect(gatesResult.data).toHaveLength(70);
+    expect(auditResult.data.length).toBeGreaterThanOrEqual(25);
+
+    const photoPurposes = new Set(photosResult.data.map((photo) => photo.purpose));
+    expect(photoPurposes).toEqual(new Set([
+      "site_check",
+      "inspection",
+      "attic_check",
+      "deficiency_before",
+      "deficiency_after",
+      "general",
+    ]));
+
+    expect(new Set(deficienciesResult.data.map((deficiency) => deficiency.status))).toEqual(
+      new Set(["open", "in_progress", "resolved", "closed"]),
+    );
+
+    const projectManagers = usersResult.data.filter((user) => user.role === "project_manager" && user.active);
+    for (const pm of projectManagers) {
+      setCurrentUser(pm.id);
+      const visible = await getProjects();
+      expect(visible.ok).toBe(true);
+      if (!visible.ok) return;
+      expect(visible.data).toHaveLength(5);
+      expect(visible.data.every((project) => project.assignedProjectManagerId === pm.id)).toBe(true);
+    }
+    setCurrentUser("user-admin");
   });
 
-  it("returns stage-appropriate project detail for each seeded Acme project", async () => {
-    const [draftResult, activeResult, completedResult] = await Promise.all([
-      getProject("proj-acme-draft"),
-      getProject("proj-acme-active"),
-      getProject("proj-acme-completed"),
+  it("returns stage-appropriate project details for seeded review scenarios", async () => {
+    setCurrentUser("user-admin");
+    const [draftResult, readyResult, blockedResult, failedResult, completedResult, archivedResult] = await Promise.all([
+      getProject("proj-draft-new-home"),
+      getProject("proj-ready-inspection"),
+      getProject("proj-site-blocked"),
+      getProject("proj-failed-inspection"),
+      getProject("proj-completed-archiveable"),
+      getProject("proj-archived-history"),
     ]);
 
     expect(draftResult.ok).toBe(true);
-    expect(activeResult.ok).toBe(true);
+    expect(readyResult.ok).toBe(true);
+    expect(blockedResult.ok).toBe(true);
+    expect(failedResult.ok).toBe(true);
     expect(completedResult.ok).toBe(true);
-    if (!draftResult.ok || !activeResult.ok || !completedResult.ok) return;
+    expect(archivedResult.ok).toBe(true);
+    if (!draftResult.ok || !readyResult.ok || !blockedResult.ok || !failedResult.ok || !completedResult.ok || !archivedResult.ok) return;
 
-    // Draft project has no progressed phases or gates.
     expect(draftResult.data.project.status).toBe("draft");
-    expect(draftResult.data.project.clientId).toBe("client-2");
     expect(draftResult.data.phases).toHaveLength(3);
     expect(draftResult.data.phases.every((phase) => phase.status === "not_started")).toBe(true);
     expect(draftResult.data.gates).toHaveLength(7);
     expect(draftResult.data.gates.every((gate) => gate.status === "not_started")).toBe(true);
 
-    // Active project has progressed insulation site check.
-    expect(activeResult.data.project.status).toBe("active");
-    const activeInsulation = activeResult.data.phases.find((phase) => phase.type === "insulation");
-    expect(activeInsulation?.status).toBe("in_progress");
-    const activeInsulationSiteCheck = activeResult.data.gates.find(
-      (gate) => gate.phaseId === activeInsulation?.id && gate.type === "site_check",
-    );
-    expect(activeInsulationSiteCheck?.status).toBe("passed");
+    expect(readyResult.data.phases.some((phase) => phase.status === "ready_for_inspection")).toBe(true);
+    expect(blockedResult.data.phases.some((phase) => phase.status === "blocked")).toBe(true);
+    expect(blockedResult.data.gates.some((gate) => gate.status === "blocked")).toBe(true);
+    expect(failedResult.data.gates.some((gate) => gate.type === "inspection" && gate.status === "failed")).toBe(true);
+    expect(failedResult.data.deficiencies.some((deficiency) => deficiency.severity === "critical" && deficiency.status === "open")).toBe(true);
 
-    // Completed project has all phases closed and attic evidence present.
     expect(completedResult.data.project.status).toBe("completed");
     expect(completedResult.data.phases.every((phase) => phase.status === "closed")).toBe(true);
     const completedAtticGate = completedResult.data.gates.find((gate) => gate.type === "attic_check");
@@ -99,76 +143,119 @@ describe("prototype seed data", () => {
       (photo) => photo.purpose === "attic_check" && photo.status === "confirmed",
     );
     expect(hasConfirmedAtticEvidence).toBe(true);
+
+    expect(archivedResult.data.project.status).toBe("archived");
+  });
+
+  it("supports blocked-work and missing-attic-evidence dashboard filters", async () => {
+    setCurrentUser("user-admin");
+
+    const blocked = await getProjects({ hasBlockedWork: true });
+    const missingAttic = await getProjects({ missingAtticEvidence: true });
+
+    expect(blocked.ok).toBe(true);
+    expect(missingAttic.ok).toBe(true);
+    if (!blocked.ok || !missingAttic.ok) return;
+
+    expect(new Set(blocked.data.map((project) => project.id))).toEqual(new Set(["proj-site-blocked", "proj-failed-inspection"]));
+    expect(new Set(missingAttic.data.map((project) => project.id))).toEqual(
+      new Set(["proj-active-insulation", "proj-ready-inspection", "proj-site-blocked", "proj-failed-inspection", "proj-deficiency-rework", "proj-finishing-active"]),
+    );
+  });
+
+  it("enforces project manager visibility for seeded projects", async () => {
+    setCurrentUser("user-pm-1");
+    const pmOneProjects = await getProjects();
+    const forbidden = await getProject("proj-active-insulation");
+
+    expect(pmOneProjects.ok).toBe(true);
+    if (!pmOneProjects.ok) return;
+    expect(pmOneProjects.data).toHaveLength(5);
+    expect(pmOneProjects.data.every((project) => project.assignedProjectManagerId === "user-pm-1")).toBe(true);
+    expect(forbidden.ok).toBe(false);
+    if (forbidden.ok) return;
+    expect(forbidden.error.code).toBe("FORBIDDEN");
+
+    setCurrentUser("user-pm-2");
+    const pmTwoProjects = await getProjects();
+    expect(pmTwoProjects.ok).toBe(true);
+    if (!pmTwoProjects.ok) return;
+    expect(pmTwoProjects.data).toHaveLength(5);
+    expect(pmTwoProjects.data.every((project) => project.assignedProjectManagerId === "user-pm-2")).toBe(true);
+
+    setCurrentUser("user-admin");
   });
 
   it("promotes an active project to completed when the attic gate is the last remaining requirement", async () => {
+    setCurrentUser("user-pm-2");
     const file = new File(["attic"], "attic.jpg", { type: "image/jpeg" });
 
     await markPhaseReadyForInspection({
-      projectId: "proj-acme-active",
-      phaseId: "proj-acme-active-phase-insulation",
+      projectId: "proj-active-insulation",
+      phaseId: "proj-active-insulation-phase-insulation",
     });
     await completeInspection({
-      gateId: "proj-acme-active-gate-insulation-inspection",
-      phaseId: "proj-acme-active-phase-insulation",
-      projectId: "proj-acme-active",
+      gateId: "proj-active-insulation-gate-insulation-inspection",
+      phaseId: "proj-active-insulation-phase-insulation",
+      projectId: "proj-active-insulation",
       passed: true,
       inspectorName: "Inspector One",
       inspectionDate: new Date().toISOString(),
     });
     await completeSiteCheck({
-      gateId: "proj-acme-active-gate-drywall-site-check",
-      phaseId: "proj-acme-active-phase-drywall",
-      projectId: "proj-acme-active",
+      gateId: "proj-active-insulation-gate-drywall-site-check",
+      phaseId: "proj-active-insulation-phase-drywall",
+      projectId: "proj-active-insulation",
     });
     await markPhaseReadyForInspection({
-      projectId: "proj-acme-active",
-      phaseId: "proj-acme-active-phase-drywall",
+      projectId: "proj-active-insulation",
+      phaseId: "proj-active-insulation-phase-drywall",
     });
     await completeInspection({
-      gateId: "proj-acme-active-gate-drywall-inspection",
-      phaseId: "proj-acme-active-phase-drywall",
-      projectId: "proj-acme-active",
+      gateId: "proj-active-insulation-gate-drywall-inspection",
+      phaseId: "proj-active-insulation-phase-drywall",
+      projectId: "proj-active-insulation",
       passed: true,
       inspectorName: "Inspector One",
       inspectionDate: new Date().toISOString(),
     });
     await completeSiteCheck({
-      gateId: "proj-acme-active-gate-finishing-site-check",
-      phaseId: "proj-acme-active-phase-finishing",
-      projectId: "proj-acme-active",
+      gateId: "proj-active-insulation-gate-finishing-site-check",
+      phaseId: "proj-active-insulation-phase-finishing",
+      projectId: "proj-active-insulation",
     });
     await markPhaseReadyForInspection({
-      projectId: "proj-acme-active",
-      phaseId: "proj-acme-active-phase-finishing",
+      projectId: "proj-active-insulation",
+      phaseId: "proj-active-insulation-phase-finishing",
     });
     await completeInspection({
-      gateId: "proj-acme-active-gate-finishing-inspection",
-      phaseId: "proj-acme-active-phase-finishing",
-      projectId: "proj-acme-active",
+      gateId: "proj-active-insulation-gate-finishing-inspection",
+      phaseId: "proj-active-insulation-phase-finishing",
+      projectId: "proj-active-insulation",
       passed: true,
       inspectorName: "Inspector One",
       inspectionDate: new Date().toISOString(),
     });
 
-    const beforeAttic = await getProject("proj-acme-active");
+    const beforeAttic = await getProject("proj-active-insulation");
     expect(beforeAttic.ok).toBe(true);
     if (!beforeAttic.ok) return;
     expect(beforeAttic.data.project.status).toBe("active");
 
     const atticResult = await updateAtticGate({
-      gateId: "proj-acme-active-gate-attic",
-      projectId: "proj-acme-active",
+      gateId: "proj-active-insulation-gate-attic",
+      projectId: "proj-active-insulation",
       installDate: new Date().toISOString(),
       photo: file,
     });
 
     expect(atticResult.ok).toBe(true);
 
-    const afterAttic = await getProject("proj-acme-active");
+    const afterAttic = await getProject("proj-active-insulation");
     expect(afterAttic.ok).toBe(true);
     if (!afterAttic.ok) return;
     expect(afterAttic.data.project.status).toBe("completed");
     expect(afterAttic.data.project.completedAt).toBeTruthy();
+    setCurrentUser("user-admin");
   });
 });
