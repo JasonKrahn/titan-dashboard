@@ -49,10 +49,11 @@ function matchesFilters(
   assignments: Map<string, SubcontractorAssignmentSummary>,
 ) {
   if (filters.trade !== "all" && sub.trade !== filters.trade) return false;
-  if (filters.status === "active" && !sub.active) return false;
-  if (filters.status === "inactive" && sub.active) return false;
 
   const assignmentCount = assignments.get(sub.id)?.assignmentCount ?? 0;
+  if (filters.status === "active" && assignmentCount === 0) return false;
+  if (filters.status === "inactive" && assignmentCount > 0) return false;
+
   if (filters.assignment === "assigned" && assignmentCount === 0) return false;
   if (filters.assignment === "unassigned" && assignmentCount > 0) return false;
 
@@ -84,7 +85,7 @@ export function sortSubcontractors(
     } else if (sort.key === "nextScheduledFinish") {
       result = compareDates(assignments.get(a.id)?.nextScheduledFinish, assignments.get(b.id)?.nextScheduledFinish);
     } else {
-      result = Number(b.active) - Number(a.active);
+      result = (assignments.get(b.id)?.assignmentCount ?? 0) - (assignments.get(a.id)?.assignmentCount ?? 0);
     }
 
     if (result === 0) {

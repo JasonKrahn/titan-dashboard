@@ -3,6 +3,8 @@ import { ArrowLeft, Grid2X2, List, Mail, Phone, Plus, Search } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { SectionHeading } from "@/components/ui/section-heading";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProjectResults, type ProjectDisplayMode } from "@/components/dashboard/ProjectResults";
 import type { ClientRecord, Deficiency, Gate, Phase, Project, ProjectStatus, User } from "@/lib/types";
@@ -98,13 +100,13 @@ export function ClientProjectsView({
       </div>
 
       {client.notes && (
-        <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+        <Card surface="inset" className="p-4 text-sm text-muted-foreground">
           {client.notes}
-        </div>
+        </Card>
       )}
 
       <div className="flex items-baseline gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Projects</h2>
+        <SectionHeading>Projects</SectionHeading>
         <span className="text-xs text-muted-foreground tabular-nums">
           {visibleProjects.length} shown
         </span>
@@ -144,7 +146,7 @@ export function ClientProjectsView({
               ))}
             </SelectContent>
           </Select>
-          <div className="inline-flex w-fit gap-1 rounded-md border border-border bg-card p-1 shadow-card">
+          <SegmentedControl>
             <Button
               type="button"
               variant={displayMode === "list" ? "default" : "ghost"}
@@ -167,7 +169,7 @@ export function ClientProjectsView({
               <Grid2X2 className="h-4 w-4" />
               Cards
             </Button>
-          </div>
+          </SegmentedControl>
         </div>
       </div>
 
@@ -181,7 +183,7 @@ export function ClientProjectsView({
         deficiencies={deficiencies}
         includeClientColumn={false}
         emptyState={
-          <Card className="border-border bg-gradient-surface p-8 text-center">
+          <Card surface="panel" className="p-8 text-center">
             <h3 className="font-semibold">No projects in this view</h3>
             <p className="mt-1 text-sm text-muted-foreground">Try another project status.</p>
           </Card>

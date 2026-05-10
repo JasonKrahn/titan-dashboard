@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AlertOctagon, Archive, ArrowDown, ArrowUp, Grid2X2, List, Pencil, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { IconWell } from "@/components/ui/icon-well";
+import { SectionHeading } from "@/components/ui/section-heading";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -20,7 +23,6 @@ import {
   initials,
   openDeficiencyCount,
   projectPhases,
-  projectStatusTone,
   relativeTime,
 } from "@/lib/derived";
 import type { ClientRecord, Deficiency, Gate, Phase, Project, User } from "@/lib/types";
@@ -161,7 +163,7 @@ export function ProjectResults({
   };
 
   const viewToggle = !externalDisplayMode ? (
-    <div className="inline-flex w-fit rounded-md border border-border bg-card p-1 shadow-card">
+    <SegmentedControl>
       <Button
         type="button"
         variant={displayMode === "list" ? "default" : "ghost"}
@@ -184,7 +186,7 @@ export function ProjectResults({
         <Grid2X2 className="h-4 w-4" />
         Cards
       </Button>
-    </div>
+    </SegmentedControl>
   ) : null;
 
   return (
@@ -193,7 +195,7 @@ export function ProjectResults({
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           {showTitle && (
             <div className="flex items-baseline gap-3">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{title}</h2>
+              <SectionHeading>{title}</SectionHeading>
               <span className="text-xs text-muted-foreground tabular-nums">
                 {loading ? "-" : `${projects.length} shown`}
               </span>
@@ -215,7 +217,7 @@ export function ProjectResults({
                 <Skeleton key={item} className="mx-3 my-2 h-12" />
               ))}
             </div>
-            <Card className="hidden border-border bg-gradient-surface p-3 md:block">
+            <Card surface="panel" className="hidden p-3 md:block">
               {[0, 1, 2, 3, 4].map((item) => (
                 <Skeleton key={item} className="mb-2 h-12 last:mb-0" />
               ))}
@@ -275,7 +277,7 @@ export function ProjectResults({
             ))}
           </ul>
 
-          <Card className="hidden border-border bg-gradient-surface shadow-card md:block">
+          <Card surface="panel" className="hidden md:block">
             <Table className="table-fixed">
               <TableHeader>
                 <TableRow>
@@ -377,9 +379,9 @@ export function ProjectResults({
                     </TableCell>
                     <TableCell className="hidden xl:table-cell">
                       {row.pm ? (
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-[11px] font-semibold text-primary" title={row.pmName}>
+                        <IconWell tone="primary" size="sm" shape="pill" className="text-meta font-semibold" title={row.pmName}>
                           {initials(row.pm.fullName)}
-                        </span>
+                        </IconWell>
                       ) : (
                         <UserCircle className="h-5 w-5 text-muted-foreground" />
                       )}

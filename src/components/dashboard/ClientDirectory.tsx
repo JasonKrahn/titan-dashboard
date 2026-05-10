@@ -3,7 +3,9 @@ import { ArrowUpRight, Building2, Grid2X2, List, Mail, MoreHorizontal, Phone, Pe
 import { Button } from "@/components/ui/button";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Card } from "@/components/ui/card";
+import { IconWell } from "@/components/ui/icon-well";
 import { Input } from "@/components/ui/input";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
   Table,
   TableBody,
@@ -108,7 +110,7 @@ export function ClientDirectory({
         </div>
 
         <div className="hidden md:flex flex-wrap items-center gap-2">
-          <div className="inline-flex w-fit gap-1 rounded-md border border-border bg-card p-1 shadow-card">
+          <SegmentedControl>
             <Button
               type="button"
               variant={displayMode === "list" ? "default" : "ghost"}
@@ -131,13 +133,13 @@ export function ClientDirectory({
               <Grid2X2 className="h-4 w-4" />
               Cards
             </Button>
-          </div>
+          </SegmentedControl>
         </div>
       </div>
 
       {loading ? (
         displayMode === "list" ? (
-          <Card className="border-border bg-gradient-surface p-3">
+          <Card surface="panel" className="p-3">
             {[0, 1, 2, 3].map((item) => (
               <div key={item} className="mb-2 h-12 animate-pulse rounded-md bg-card/60 last:mb-0" />
             ))}
@@ -145,19 +147,21 @@ export function ClientDirectory({
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {[0, 1, 2, 3].map((item) => (
-              <Card key={item} className="h-[210px] animate-pulse border-border bg-card/60" />
+              <Card key={item} surface="muted" className="h-[210px] animate-pulse" />
             ))}
           </div>
         )
       ) : rows.length === 0 ? (
-        <Card className="border-border bg-gradient-surface p-8 text-center">
-          <Building2 className="mx-auto h-8 w-8 text-muted-foreground" />
+        <Card surface="panel" className="p-8 text-center">
+          <IconWell tone="muted" size="xl" shape="panel" className="mx-auto border-transparent">
+            <Building2 className="h-8 w-8 text-muted-foreground" />
+          </IconWell>
           <h3 className="mt-3 font-semibold">No clients found</h3>
           <p className="mt-1 text-sm text-muted-foreground">Try a different name, contact, phone, or email.</p>
         </Card>
       ) : displayMode === "list" ? (
         <>
-        <Card className="hidden border-border bg-gradient-surface shadow-card md:block">
+        <Card surface="panel" className="hidden md:block">
           <Table className="table-fixed">
             <TableHeader>
               <TableRow>
@@ -230,9 +234,9 @@ export function ClientDirectory({
                   onClick={() => onOpenClient?.(row.client.id)}
                   className="flex min-w-0 flex-1 items-center gap-3 text-left"
                 >
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
+                  <IconWell tone="primary" size="md" shape="square">
                     <Building2 className="h-4 w-4" />
-                  </div>
+                  </IconWell>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold">{row.client.name}</div>
                     <div className="truncate text-xs text-muted-foreground">
@@ -270,9 +274,9 @@ export function ClientDirectory({
                     onClick={() => onOpenClient?.(row.client.id)}
                     className="flex min-w-0 flex-1 items-center gap-3 text-left"
                   >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
+                    <IconWell tone="primary" size="md" shape="square">
                       <Building2 className="h-4 w-4" />
-                    </div>
+                    </IconWell>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-semibold">{row.client.name}</div>
                       <div className="truncate text-xs text-muted-foreground">
@@ -304,13 +308,14 @@ export function ClientDirectory({
               <Card
                 key={row.client.id}
                 onClick={() => onOpenClient?.(row.client.id)}
-                className="group cursor-pointer border-border bg-gradient-surface p-5 shadow-card transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-glow"
+                surface="interactive"
+                className="group cursor-pointer p-5"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                    <IconWell tone="primary" size="lg" shape="panel" className="mb-3">
                       <Building2 className="h-4 w-4" />
-                    </div>
+                    </IconWell>
                     <h3 className="truncate text-base font-semibold">{row.client.name}</h3>
                     <p className="mt-1 truncate text-sm text-muted-foreground">
                       {row.client.primaryContactName ?? "No primary contact"}

@@ -1,5 +1,6 @@
 import { ArrowUpRight, Archive, ClipboardCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { IconWell } from "@/components/ui/icon-well";
 import type { Phase, Project } from "@/lib/types";
 
 interface DueInspectionsPanelProps {
@@ -17,12 +18,12 @@ export function DueInspectionsPanel({ projects, phases, onOpen }: DueInspections
   if (!items.length) return null;
 
   return (
-    <Card className="bg-gradient-surface border-status-ready/35 p-4 shadow-card">
+    <Card surface="panel" className="border-status-ready/35 p-4">
       <div className="flex items-center justify-between gap-3 mb-2">
         <div className="flex items-center gap-2">
-        <div className="h-8 w-8 rounded-lg bg-status-ready/15 flex items-center justify-center">
+        <IconWell tone="ready" size="md" shape="panel" className="border-transparent">
           <ClipboardCheck className="h-4 w-4 text-status-ready" />
-        </div>
+        </IconWell>
         <div>
           <h3 className="font-semibold text-sm">Due inspections</h3>
           <p className="text-xs text-muted-foreground">{items.length} phase{items.length === 1 ? "" : "s"} ready</p>
@@ -63,12 +64,12 @@ export function ArchivePanel({ projects, onOpen, onArchive }: ArchivePanelProps)
   if (!items.length) return null;
 
   return (
-    <Card className="bg-gradient-surface border-status-success/35 p-4 shadow-card">
+    <Card surface="panel" className="border-status-success/35 p-4">
       <div className="flex items-center justify-between gap-3 mb-2">
         <div className="flex items-center gap-2">
-        <div className="h-8 w-8 rounded-lg bg-status-success/15 flex items-center justify-center">
+        <IconWell tone="success" size="md" shape="panel" className="border-transparent">
           <Archive className="h-4 w-4 text-status-success" />
-        </div>
+        </IconWell>
         <div>
           <h3 className="font-semibold text-sm">Ready to archive</h3>
           <p className="text-xs text-muted-foreground">{items.length} project{items.length === 1 ? "" : "s"} ready</p>

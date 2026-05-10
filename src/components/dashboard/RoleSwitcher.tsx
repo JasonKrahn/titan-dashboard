@@ -7,6 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { IconWell } from "@/components/ui/icon-well";
 import type { User } from "@/lib/types";
 import { initials } from "@/lib/derived";
 
@@ -20,9 +21,9 @@ export function RoleSwitcher({ current, users, onSwitch }: RoleSwitcherProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-2.5 py-1.5 transition-colors hover:bg-accent">
-        <div className="h-7 w-7 rounded-full bg-primary/15 text-primary text-xs font-semibold flex items-center justify-center border border-primary/30">
+        <IconWell tone="primary" size="sm" shape="pill" className="text-xs font-semibold">
           {initials(current.fullName)}
-        </div>
+        </IconWell>
         <div className="min-w-0 text-left hidden lg:block">
           <div className="max-w-[140px] truncate text-xs font-medium leading-tight">{current.fullName}</div>
           <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
@@ -38,9 +39,9 @@ export function RoleSwitcher({ current, users, onSwitch }: RoleSwitcherProps) {
         <DropdownMenuSeparator />
         {users.map((u) => (
           <DropdownMenuItem key={u.id} onClick={() => onSwitch(u.id)} className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded-full bg-muted text-xs flex items-center justify-center">
+            <IconWell tone="muted" size="sm" shape="pill" className="border-transparent text-xs">
               {initials(u.fullName)}
-            </div>
+            </IconWell>
             <div className="flex-1">
               <div className="text-sm">{u.fullName}</div>
               <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{u.role.replace("_", " ")}</div>

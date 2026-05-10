@@ -35,12 +35,14 @@ interface StatusBadgeProps {
 
 export function StatusBadge({ tone, label, className, size = "md", dot, withIcon = true }: StatusBadgeProps) {
   const Icon = withIcon && !dot ? STATUS_ICON[tone] : undefined;
+  const iconClassName = tone === "in-progress" ? "motion-safe:animate-spin motion-reduce:animate-none" : undefined;
   return (
     <Badge
       tone={STATUS_TONE[tone]}
       appearance="soft"
       size={size}
       icon={Icon}
+      iconClassName={iconClassName}
       dot={!Icon && dot !== false}
       className={className}
     >

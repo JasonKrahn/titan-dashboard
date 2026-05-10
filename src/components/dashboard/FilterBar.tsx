@@ -1,6 +1,7 @@
 import { Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -33,7 +34,7 @@ export function FilterBar({ filters, search, onSearchChange, onChange, clients, 
     !!filters.missingAtticEvidence;
 
   return (
-    <div className="bg-card border border-border rounded-lg p-4 space-y-3 md:sticky md:top-2 md:z-10 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+    <Card surface="inset" className="space-y-3 p-4 md:sticky md:top-2 md:z-10 backdrop-blur supports-[backdrop-filter]:bg-card/80">
       <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
         <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -140,6 +141,6 @@ export function FilterBar({ filters, search, onSearchChange, onChange, clients, 
           </Button>
         )}
       </div>
-    </div>
+    </Card>
   );
 }

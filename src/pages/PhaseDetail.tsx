@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef, type RefObject } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -18,7 +18,9 @@ import {
   XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { BadgeTone } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { SectionHeading } from "@/components/ui/section-heading";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
@@ -30,7 +32,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { SeverityBadge } from "@/components/ui/severity-badge";
-import { KpiChip } from "@/components/ui/kpi-chip";
 import { statusToTone } from "@/components/dashboard/StatusBadge";
 import { PhaseHealthPill } from "@/components/dashboard/PhaseHealthPill";
 import { SiteCheckDialog } from "@/components/dashboard/SiteCheckDialog";
@@ -109,6 +110,8 @@ export default function PhaseDetailPage() {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [highlightedDeficiencyId, setHighlightedDeficiencyId] = useState<string | null>(null);
   const deficiencyRefs = useRef<Record<string, HTMLLIElement | null>>({});
+  const siteCheckHeadingRef = useRef<HTMLHeadingElement | null>(null);
+  const inspectionHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const [dateValidationError, setDateValidationError] = useState<string | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
@@ -175,6 +178,20 @@ export default function PhaseDetailPage() {
     !!inspectionGate &&
     phase.status === "ready_for_inspection" &&
     activeDefs.length === 0;
+  const jumpToSection = ({
+    tab,
+    focusRef,
+  }: {
+    tab: string;
+    focusRef?: RefObject<HTMLElement | null>;
+  }) => {
+    setActiveTab(tab);
+    if (!focusRef?.current) return;
+    window.setTimeout(() => {
+      focusRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+      focusRef.current?.focus();
+    }, 0);
+  };
   const phaseMobileActions: MobileActionItem[] = [
     ...(phase.status !== "closed"
       ? [
@@ -284,18 +301,18 @@ export default function PhaseDetailPage() {
         />
 
         {/* Hero */}
-        <section className="rounded-xl border border-border bg-gradient-surface p-4 shadow-card sm:p-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-stretch md:gap-6">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <Card surface="panel" className="rounded-xl p-4 sm:p-6">
+          <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8">
+            <div className="min-w-0">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="text-eyebrow font-semibold uppercase tracking-widest text-muted-foreground sm:text-[10px]">
                     {project.projectNumber} · Phase
                   </div>
                   <h1 className="mt-1 truncate text-2xl font-bold leading-tight sm:text-3xl">{PHASE_LABEL[phase.type]}</h1>
                   <p className="mt-1 text-xs sm:text-sm text-muted-foreground">{health.reason}</p>
                 </div>
-                <PhaseHealthPill health={health} size="md" />
+                <PhaseHealthPill health={health} size="md" className="self-start" />
               </div>
               {dateValidationError && (
                 <Alert variant="destructive" className="mt-4">
@@ -304,144 +321,119 @@ export default function PhaseDetailPage() {
                   <AlertDescription>{dateValidationError}</AlertDescription>
                 </Alert>
               )}
-              {/* Mobile schedule summary */}
               <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3 md:hidden">
-                <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Schedule</div>
+                <SectionHeading as="div" size="sm">Schedule</SectionHeading>
                 <div className="mt-1 text-sm font-semibold">
                   {fmt(phase.scheduledStart)} → {fmt(phase.scheduledEnd)}
                 </div>
               </div>
-              {phase.type === "finishing" && project.finishLevel && (
-                <div className="mt-4 hidden md:block">
-                  <div className="text-xs text-muted-foreground">Finish level</div>
-                  <div className="mt-1 text-sm font-medium">{project.finishLevel}</div>
+              <div className="mt-4 hidden md:flex md:flex-wrap md:items-center md:gap-x-5 md:gap-y-2 md:text-sm md:text-muted-foreground">
+                <span className="font-medium text-foreground">{fmt(phase.scheduledStart)} → {fmt(phase.scheduledEnd)}</span>
+                <span>Last update: <span className="font-medium text-foreground">{relativeTime(phase.updatedAt)}</span></span>
+                <span>Closed: <span className="font-medium text-foreground">{fmt(phase.closedAt)}</span></span>
+                {phase.type === "finishing" && project.finishLevel && (
+                  <span>Finish level: <span className="font-medium text-foreground">{project.finishLevel}</span></span>
+                )}
+              </div>
+            </div>
+
+            <div className="hidden md:flex md:flex-col md:items-stretch md:gap-3">
+              {siteGate?.status === "not_started" && (
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" className="flex-1" onClick={() => setSiteCheckOpen(true)}>
+                    <CheckCircle2 className="mr-1.5 h-4 w-4" /> Site Checked
+                  </Button>
+                  <Button size="sm" variant="outline" className="flex-1" onClick={() => setSiteBlockOpen(true)}>
+                    <AlertTriangle className="mr-1.5 h-4 w-4" /> Site Blocked
+                  </Button>
+                </div>
+              )}
+              {siteGate?.status === "blocked" && (
+                <Button size="sm" variant="outline" onClick={() => setSiteUnblockOpen(true)}>
+                  <ShieldCheck className="mr-1.5 h-4 w-4" /> Site Cleared
+                </Button>
+              )}
+              {showReadyButton && (
+                <Button
+                  size="sm"
+                  onClick={() => readyMutation.mutate({ phaseId: phase.id, projectId: project.id })}
+                  disabled={readyMutation.isPending}
+                >
+                  <ShieldCheck className="mr-1.5 h-4 w-4" />
+                  {readyMutation.isPending ? "Marking ready…" : "Ready for Inspection"}
+                </Button>
+              )}
+              {showPassedFailed && inspectionGate && (
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      setSelectedGateId(inspectionGate.id);
+                      setInspectionResultMode("passed");
+                      setInspectionResultOpen(true);
+                    }}
+                  >
+                    <CheckCircle2 className="mr-1.5 h-4 w-4" /> Mark Passed
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      setSelectedGateId(inspectionGate.id);
+                      setInspectionResultMode("failed");
+                      setInspectionResultOpen(true);
+                    }}
+                  >
+                    <XCircle className="mr-1.5 h-4 w-4" /> Mark Failed
+                  </Button>
                 </div>
               )}
             </div>
-
-            {/* Desktop: Schedule card on the right */}
-            <aside className="hidden w-72 shrink-0 rounded-lg border border-border bg-card/60 p-4 md:block">
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Schedule</div>
-              <div className="mt-3 space-y-3">
-                <div>
-                  <div className="text-xs text-muted-foreground">Scheduled start</div>
-                  <DatePicker
-                    value={phase.scheduledStart ? new Date(phase.scheduledStart) : undefined}
-                    onChange={(date) => {
-                      if (date) {
-                        updatePhaseMutation.mutate({ phaseId: phase.id, scheduledStart: date.toISOString() });
-                      }
-                    }}
-                    placeholder="Not set"
-                    disabled={updatePhaseMutation.isPending || phase.status === "closed"}
-                  />
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">Scheduled end</div>
-                  <DatePicker
-                    value={phase.scheduledEnd ? new Date(phase.scheduledEnd) : undefined}
-                    onChange={(date) => {
-                      if (date) {
-                        updatePhaseMutation.mutate({ phaseId: phase.id, scheduledEnd: date.toISOString() });
-                      }
-                    }}
-                    placeholder="Not set"
-                    disabled={updatePhaseMutation.isPending || phase.status === "closed"}
-                  />
-                </div>
-              </div>
-              <div className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">
-                <div>Closed: <span className="font-medium text-foreground">{fmt(phase.closedAt)}</span></div>
-                <div className="mt-1">Last update: <span className="font-medium text-foreground">{relativeTime(phase.updatedAt)}</span></div>
-              </div>
-            </aside>
           </div>
-        </section>
+        </Card>
 
-        {/* Desktop KPI strip + primary action bar */}
-        <section className="hidden gap-3 md:flex md:flex-wrap md:items-center md:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            <KpiChip
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <div className="hidden md:grid md:grid-cols-4 md:gap-3">
+            <DesktopSummaryButton
+              ariaLabel="Open deficiencies summary"
               label="Open deficiencies"
               value={String(activeDefs.length)}
               tone={activeDefs.length > 0 ? "danger" : "success"}
+              onClick={() => jumpToSection({ tab: "deficiencies" })}
             />
-            <KpiChip
+            <DesktopSummaryButton
+              ariaLabel="Photos summary"
               label="Photos"
               value={String(photoEvidence.length)}
               tone={photoEvidence.length > 0 ? "accent" : "neutral"}
+              onClick={() => jumpToSection({ tab: "photos" })}
             />
-            {siteGate && (
-              <KpiChip
+            {siteGate ? (
+              <DesktopSummaryButton
+                ariaLabel="Site check summary"
                 label="Site check"
                 value={STATUS_LABEL[siteGate.status]}
                 tone={statusToTone(gateStatusTone(siteGate.status))}
+                onClick={() => jumpToSection({ tab: "overview", focusRef: siteCheckHeadingRef })}
               />
+            ) : (
+              <div />
             )}
-            {inspectionGate && (
-              <KpiChip
+            {inspectionGate ? (
+              <DesktopSummaryButton
+                ariaLabel="Inspection summary"
                 label="Inspection"
                 value={STATUS_LABEL[inspectionGate.status]}
                 tone={statusToTone(gateStatusTone(inspectionGate.status))}
+                onClick={() => jumpToSection({ tab: "overview", focusRef: inspectionHeadingRef })}
               />
+            ) : (
+              <div />
             )}
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {siteGate?.status === "not_started" && (
-              <>
-                <Button size="sm" variant="outline" onClick={() => setSiteCheckOpen(true)}>
-                  <CheckCircle2 className="mr-1.5 h-4 w-4" /> Site Checked
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setSiteBlockOpen(true)}>
-                  <AlertTriangle className="mr-1.5 h-4 w-4" /> Site Blocked
-                </Button>
-              </>
-            )}
-            {siteGate?.status === "blocked" && (
-              <Button size="sm" variant="outline" onClick={() => setSiteUnblockOpen(true)}>
-                <ShieldCheck className="mr-1.5 h-4 w-4" /> Site Cleared
-              </Button>
-            )}
-            {showReadyButton && (
-              <Button
-                size="sm"
-                onClick={() => readyMutation.mutate({ phaseId: phase.id, projectId: project.id })}
-                disabled={readyMutation.isPending}
-              >
-                <ShieldCheck className="mr-1.5 h-4 w-4" />
-                {readyMutation.isPending ? "Marking ready…" : "Ready for Inspection"}
-              </Button>
-            )}
-            {showPassedFailed && inspectionGate && (
-              <>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setSelectedGateId(inspectionGate.id);
-                    setInspectionResultMode("passed");
-                    setInspectionResultOpen(true);
-                  }}
-                >
-                  <CheckCircle2 className="mr-1.5 h-4 w-4" /> Mark Passed
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedGateId(inspectionGate.id);
-                    setInspectionResultMode("failed");
-                    setInspectionResultOpen(true);
-                  }}
-                >
-                  <XCircle className="mr-1.5 h-4 w-4" /> Mark Failed
-                </Button>
-              </>
-            )}
-          </div>
-        </section>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="bg-card border border-border p-1 shadow-sm">
+          <TabsList className="border border-border p-1 shadow-sm bg-card">
             <TabsTrigger value="overview" className="font-semibold data-[state=active]:bg-background data-[state=active]:shadow-sm hover:bg-muted/50">Overview</TabsTrigger>
             <TabsTrigger value="deficiencies" className="font-semibold data-[state=active]:bg-background data-[state=active]:shadow-sm hover:bg-muted/50">
               Deficiencies {activeDefs.length > 0 && <span className="ml-1 text-status-blocked">({activeDefs.length})</span>}
@@ -521,56 +513,177 @@ export default function PhaseDetailPage() {
               )}
             </div>
 
-            <div className="hidden gap-4 md:grid md:grid-cols-2">
-              {gates.length === 0 ? (
-                <EmptyCard icon={<ShieldCheck className="h-5 w-5" />} text="No gates configured for this phase yet." />
-              ) : (
-                gates.map((g) => {
-                  const gatePhotos = photoEvidence.filter((p) => p.gateId === g.id);
-                  const tone = gateStatusTone(g.status);
-                  return (
-                    <Card key={g.id} className="border-border bg-card p-5 shadow-card">
-                      <div className="mb-3 flex items-center justify-between gap-2">
-                        <h3 className="font-semibold">{GATE_LABEL[g.type]}</h3>
-                        <StatusBadge tone={tone} label={STATUS_LABEL[g.status]} size="sm" />
-                      </div>
-                      <div className="space-y-2 text-xs text-muted-foreground">
-                        {gatePhotos.length > 0 ? (
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <Camera className="h-3.5 w-3.5" />
-                            {gatePhotos.map((p) => (
-                              <button
-                                key={p.id}
-                                onClick={() => { setSelectedPhoto(p); setPhotoViewerOpen(true); }}
-                                className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/30 px-2 py-0.5 text-xs hover:bg-muted/50"
-                              >
-                                <ImageIcon className="h-3 w-3" />
-                                {PURPOSE_LABEL[p.purpose] ?? p.purpose}
-                              </button>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1.5">
-                            <Camera className="h-3.5 w-3.5" />
-                            {g.requiredPhotoEvidence ? "Photo evidence required" : "No photo required"}
-                          </div>
-                        )}
-                        <div className="flex items-center gap-1.5">
-                          <Clock className="h-3.5 w-3.5" />
-                          Updated {relativeTime(g.updatedAt)}
+            <div className="hidden gap-4 md:grid md:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.95fr)]">
+              <div className="space-y-4">
+                {gates.length === 0 ? (
+                  <EmptyCard icon={<ShieldCheck className="h-5 w-5" />} text="No gates configured for this phase yet." />
+                ) : (
+                  gates.map((g) => {
+                    const gatePhotos = photoEvidence.filter((p) => p.gateId === g.id);
+                    const tone = gateStatusTone(g.status);
+                    const headingRef = g.type === "site_check" ? siteCheckHeadingRef : g.type === "inspection" ? inspectionHeadingRef : undefined;
+                    return (
+                      <Card key={g.id} className="p-5 shadow-card">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <h3 ref={headingRef} tabIndex={-1} className="font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            {GATE_LABEL[g.type]}
+                          </h3>
+                          <StatusBadge tone={tone} label={STATUS_LABEL[g.status]} size="sm" />
                         </div>
-                        {g.notes && <p className="text-foreground">{g.notes}</p>}
+                        <div className="space-y-2 text-xs text-muted-foreground">
+                          {gatePhotos.length > 0 ? (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <Camera className="h-3.5 w-3.5" />
+                              {gatePhotos.map((p) => (
+                                <button
+                                  key={p.id}
+                                  onClick={() => { setSelectedPhoto(p); setPhotoViewerOpen(true); }}
+                                  className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/30 px-2 py-0.5 text-xs hover:bg-muted/50"
+                                >
+                                  <ImageIcon className="h-3 w-3" />
+                                  {PURPOSE_LABEL[p.purpose] ?? p.purpose}
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <Camera className="h-3.5 w-3.5" />
+                              {g.requiredPhotoEvidence ? "Photo evidence required" : "No photo required"}
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="h-3.5 w-3.5" />
+                            Updated {relativeTime(g.updatedAt)}
+                          </div>
+                          {g.notes && <p className="text-foreground">{g.notes}</p>}
+                        </div>
+                      </Card>
+                    );
+                  })
+                )}
+                {activeDefs.length > 0 && (
+                  <Card className="p-5 shadow-card">
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                      <SectionHeading as="h3">Open Deficiencies</SectionHeading>
+                      <Button size="sm" variant="ghost" onClick={() => setActiveTab("deficiencies")}>
+                        View all
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      {activeDefs.slice(0, 3).map((d) => (
+                        <button
+                          key={d.id}
+                          type="button"
+                          onClick={() => {
+                            setActiveTab("deficiencies");
+                            setHighlightedDeficiencyId(d.id);
+                          }}
+                          className="flex w-full items-start justify-between gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2 text-left hover:bg-muted/35"
+                        >
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-medium text-foreground">{d.title}</div>
+                            <div className="mt-0.5 text-xs text-muted-foreground">{STATUS_LABEL[phase.status]}</div>
+                          </div>
+                          <SeverityBadge severity={d.severity} size="xs" />
+                        </button>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                <Card className="p-5 shadow-card">
+                  <SectionHeading as="h3">Schedule</SectionHeading>
+                  <div className="mt-3 space-y-3">
+                    <div>
+                      <div className="text-xs text-muted-foreground">Scheduled start</div>
+                      <DatePicker
+                        value={phase.scheduledStart ? new Date(phase.scheduledStart) : undefined}
+                        onChange={(date) => {
+                          if (date) {
+                            updatePhaseMutation.mutate({ phaseId: phase.id, scheduledStart: date.toISOString() });
+                          }
+                        }}
+                        placeholder="Not set"
+                        disabled={updatePhaseMutation.isPending || phase.status === "closed"}
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Scheduled end</div>
+                      <DatePicker
+                        value={phase.scheduledEnd ? new Date(phase.scheduledEnd) : undefined}
+                        onChange={(date) => {
+                          if (date) {
+                            updatePhaseMutation.mutate({ phaseId: phase.id, scheduledEnd: date.toISOString() });
+                          }
+                        }}
+                        placeholder="Not set"
+                        disabled={updatePhaseMutation.isPending || phase.status === "closed"}
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
+                    <div>Closed: <span className="font-medium text-foreground">{fmt(phase.closedAt)}</span></div>
+                    <div>Last update: <span className="font-medium text-foreground">{relativeTime(phase.updatedAt)}</span></div>
+                  </div>
+                </Card>
+
+                <Card className="p-5 shadow-card">
+                  <SectionHeading as="h3">Personnel</SectionHeading>
+                  <div className="mt-3 space-y-3">
+                    <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-4 py-3 text-sm">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                        <UserIcon className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-medium text-muted-foreground">Subcontractor</div>
+                        <Select
+                          value={phase.assignedSubcontractorId || "unassigned"}
+                          onValueChange={(value) => {
+                            if (value === "unassigned") return;
+                            assignSubcontractorToPhase(phase.id, value).then((res) => {
+                              if (res.ok) {
+                                qc.invalidateQueries({ queryKey: ["phase", phaseId] });
+                              }
+                            });
+                          }}
+                        >
+                          <SelectTrigger className="mt-1 h-8 border border-input bg-background px-3 py-2 text-xs font-medium">
+                            <SelectValue placeholder="Select subcontractor" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="unassigned">Not assigned</SelectItem>
+                            {subcontractors
+                              .filter((s) => s.trade === phase.type)
+                              .map((s) => (
+                                <SelectItem key={s.id} value={s.id}>
+                                  {s.displayName}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
                       </div>
-                    </Card>
-                  );
-                })
-              )}
+                    </div>
+                    <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-4 py-3 text-sm">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                        <UserIcon className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-medium text-muted-foreground">Project manager</div>
+                        <div className="mt-1 truncate text-sm font-semibold text-foreground">
+                          {detail.assignedProjectManager?.fullName ?? "Unassigned"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              </div>
             </div>
 
-            {/* Personnel */}
-            <Card className="border-border bg-card p-0 shadow-card md:p-5">
+            <Card className="border-border bg-card p-0 shadow-card md:hidden md:p-5">
               <div className="p-4 pb-2 md:p-0">
-                <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Personnel</h4>
+                <SectionHeading as="h4" size="sm">Personnel</SectionHeading>
               </div>
               <div className="grid gap-3 md:mt-3 md:grid-cols-2">
                 <div className="flex items-center gap-3 px-4 pb-4 pt-2 text-sm md:rounded-md md:border md:border-border md:bg-muted/30 md:p-3">
@@ -606,8 +719,8 @@ export default function PhaseDetailPage() {
                     </Select>
                   </div>
                 </div>
-                <div className="hidden items-center gap-3 px-4 pb-4 pt-2 text-sm md:flex md:rounded-md md:border md:border-border md:bg-muted/30 md:p-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground md:h-auto md:w-auto md:bg-transparent">
+                <div className="flex items-center gap-3 px-4 pb-4 pt-2 text-sm">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
                     <UserIcon className="h-4 w-4" />
                   </span>
                   <div className="min-w-0 flex-1">
@@ -622,11 +735,11 @@ export default function PhaseDetailPage() {
 
             {/* Activity (mobile only — desktop has its own tab) */}
             <section className="md:hidden">
-              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Activity</h3>
+              <SectionHeading as="h3" className="mb-3">Activity</SectionHeading>
               {auditEvents.length === 0 ? (
                 <EmptyCard icon={<FileText className="h-5 w-5" />} text="No activity recorded for this phase yet." />
               ) : (
-                <Card className="border-border bg-card p-5 shadow-card">
+                <Card className="p-5 shadow-card">
                   <ActivityList
                     events={auditEvents}
                     lookups={{
@@ -646,7 +759,7 @@ export default function PhaseDetailPage() {
             {auditEvents.length === 0 ? (
               <EmptyCard icon={<FileText className="h-5 w-5" />} text="No activity recorded for this phase yet." />
             ) : (
-              <Card className="border-border bg-card p-5 shadow-card">
+              <Card className="p-5 shadow-card">
                 <ActivityList
                   events={auditEvents}
                   lookups={{
@@ -670,7 +783,7 @@ export default function PhaseDetailPage() {
             {deficiencies.length === 0 ? (
               <EmptyCard icon={<AlertTriangle className="h-5 w-5" />} text="No deficiencies logged for this phase." />
             ) : (
-              <Card className="border-border bg-card p-2 shadow-card">
+              <Card className="p-2 shadow-card">
                 <ul className="divide-y divide-border">
                   {deficiencies.map((d) => {
                     const deficiencyPhotos = photoEvidence.filter((p) => p.deficiencyId === d.id);
@@ -1015,3 +1128,41 @@ function PhotoCard({
   );
 }
 
+function DesktopSummaryButton({
+  label,
+  value,
+  tone,
+  onClick,
+  ariaLabel,
+}: {
+  label: string;
+  value: string;
+  tone: BadgeTone;
+  onClick: () => void;
+  ariaLabel: string;
+}) {
+  const toneClasses: Record<BadgeTone, string> = {
+    neutral: "border-status-not-started/30 bg-status-not-started/10 text-status-not-started",
+    info: "border-status-in-progress/30 bg-status-in-progress/10 text-status-in-progress",
+    ready: "border-status-ready/30 bg-status-ready/10 text-status-ready",
+    success: "border-status-closed/30 bg-status-closed/10 text-status-closed",
+    warning: "border-status-attention/30 bg-status-attention/10 text-status-attention",
+    danger: "border-status-blocked/30 bg-status-blocked/10 text-status-blocked",
+    accent: "border-status-accent/30 bg-status-accent/10 text-status-accent",
+  };
+
+  return (
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      onClick={onClick}
+      className={cn(
+        "flex items-center justify-between rounded-xl border px-4 py-3 text-left transition hover:border-border-emphasis hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        toneClasses[tone],
+      )}
+    >
+      <span className="text-[11px] font-semibold uppercase tracking-widest opacity-75">{label}</span>
+      <span className="text-sm font-semibold">{value}</span>
+    </button>
+  );
+}

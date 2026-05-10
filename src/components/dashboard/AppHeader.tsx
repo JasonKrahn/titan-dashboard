@@ -5,6 +5,7 @@ import { FileText, Settings, Users } from "lucide-react";
 import { toast } from "sonner";
 import { RoleSwitcher } from "@/components/dashboard/RoleSwitcher";
 import { SettingsDialog } from "@/components/dashboard/SettingsDialog";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { getCurrentUser, getUsers, setCurrentUser } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -65,7 +66,7 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch }
           </button>
 
           <div className="hidden min-w-0 flex-1 items-center gap-2 lg:flex">
-            <div className="inline-flex w-fit rounded-lg border border-border bg-card p-1 shadow-card">
+            <SegmentedControl className="rounded-lg">
               <button
                 type="button"
                 onClick={() => goToDashboardView("clients")}
@@ -80,7 +81,7 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch }
               >
                 All Projects
               </button>
-            </div>
+            </SegmentedControl>
             <Link to="/subs" className={topNavClass(section === "subs")}>
               <Users className="h-4 w-4" />
               Subcontractor Rolodex

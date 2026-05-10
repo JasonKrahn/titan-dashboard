@@ -1,5 +1,6 @@
 import * as React from "react";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { IconWell } from "@/components/ui/icon-well";
 import { cn } from "@/lib/utils";
 
 export interface MobileActionItem {
@@ -38,9 +39,9 @@ export function MobileActionSheet({ open, onOpenChange, title, actions }: Mobile
               "enabled:active:bg-muted/60 enabled:hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-50",
             )}
           >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
+            <IconWell tone="primary" size="lg" shape="square" className="border-transparent">
               {action.icon}
-            </span>
+            </IconWell>
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-medium text-foreground">{action.label}</span>
               {action.helperText && (
