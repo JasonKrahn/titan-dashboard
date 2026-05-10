@@ -8,6 +8,7 @@ import ProjectDetail from "./pages/ProjectDetail.tsx";
 import PhaseDetail from "./pages/PhaseDetail.tsx";
 import SubcontractorRolodex from "./pages/SubcontractorRolodex.tsx";
 import ActivityLog from "./pages/ActivityLog.tsx";
+import AdminCommandCenter from "./pages/AdminCommandCenter.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
           <Route path="/project/:projectId/phase/:phaseId" element={<PhaseDetail />} />
           <Route path="/subs" element={<SubcontractorRolodex />} />
           <Route path="/activity" element={<ActivityLog />} />
+          <Route path="/command" element={<AdminCommandCenter />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
