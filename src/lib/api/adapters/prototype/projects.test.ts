@@ -174,7 +174,8 @@ describe("prototype seed data", () => {
     expect(pmOneProjects.data.every((project) => project.assignedProjectManagerId === "user-pm-1")).toBe(true);
     expect(forbidden.ok).toBe(false);
     if (forbidden.ok) return;
-    expect(forbidden.error.code).toBe("FORBIDDEN");
+    const forbiddenErr = forbidden as Extract<typeof forbidden, { ok: false }>;
+    expect(forbiddenErr.error.code).toBe("FORBIDDEN");
 
     setCurrentUser("user-pm-2");
     const pmTwoProjects = await getProjects();
