@@ -1,8 +1,8 @@
-import { ArrowRight, AlertOctagon, AlertTriangle, Info } from "lucide-react";
+import { ArrowRight, Check, AlertOctagon, AlertTriangle, Info } from "lucide-react";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { QueueItem, QueueSeverity } from "@/lib/command/attentionQueue";
+import { QUEUE_TYPE_LABEL, type QueueItem, type QueueSeverity } from "@/lib/command/attentionQueue";
 
 const SEV_TONE: Record<QueueSeverity, BadgeTone> = {
   critical: "danger",
@@ -33,9 +33,10 @@ function ageLabel(days: number) {
 interface Props {
   item: QueueItem;
   onOpen: (projectId: string) => void;
+  onMarkResolved: (itemId: string) => void;
 }
 
-export function AttentionQueueItem({ item, onOpen }: Props) {
+export function AttentionQueueItem({ item, onOpen, onMarkResolved }: Props) {
   const Icon = SEV_ICON[item.severity];
   return (
     <div
@@ -86,10 +87,35 @@ export function AttentionQueueItem({ item, onOpen }: Props) {
           <span className="font-semibold uppercase tracking-wider text-foreground/60">Next: </span>
           {item.nextAction}
         </p>
+
+        {item.secondaryFlags && item.secondaryFlags.length > 0 && (
+          <div className="flex flex-wrap gap-1 pt-0.5">
+            {item.secondaryFlags.map((flag) => (
+              <Badge
+                key={flag.type}
+                tone={SEV_TONE[flag.severity]}
+                appearance="outline"
+                size="xs"
+                className="uppercase"
+              >
+                {QUEUE_TYPE_LABEL[flag.type]}
+              </Badge>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Action */}
-      <div className="flex items-start">
+      {/* Actions */}
+      <div className="flex items-start gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 gap-1 text-xs"
+          onClick={() => onMarkResolved(item.id)}
+        >
+          <Check className="h-3.5 w-3.5" />
+          Resolve
+        </Button>
         <Button
           size="sm"
           variant="outline"

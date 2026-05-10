@@ -13,6 +13,16 @@ import { PHASE_LABEL } from "@/lib/derived";
 
 export type QueueSeverity = "critical" | "warning" | "info";
 export type QueueCategory = "critical" | "warning" | "ready" | "completed";
+export type QueueFilter = "all" | QueueCategory | QueueItemType | "date_range" | "client" | "user";
+
+export interface QueueFilters {
+  dateRange?: {
+    start?: string;
+    end?: string;
+  };
+  client?: string;
+  user?: string;
+}
 
 export type QueueItemType =
   | "critical_blocker"
@@ -37,6 +47,14 @@ export interface QueueItem {
   clientName: string;
   pmName: string;
   phaseLabel: string;
+  secondaryFlags?: QueueFlag[];
+  resolved?: boolean;
+}
+
+export interface QueueFlag {
+  type: QueueItemType;
+  severity: QueueSeverity;
+  title: string;
 }
 
 const DAY = 1000 * 60 * 60 * 24;
@@ -65,6 +83,36 @@ function phaseLabelOf(p: Phase | undefined): string {
 }
 
 const SEVERITY_RANK: Record<QueueSeverity, number> = { critical: 0, warning: 1, info: 2 };
+
+const TYPE_RANK: Record<QueueItemType, number> = {
+  critical_blocker: 0,
+  failed_inspection: 1,
+  past_scheduled_end: 2,
+  missing_attic_evidence: 3,
+  stale_project: 4,
+  aging_ready_inspection: 5,
+  awaiting_archive: 6,
+};
+
+const SECONDARY_FLAG_RANK: Record<QueueItemType, number> = {
+  critical_blocker: 0,
+  failed_inspection: 1,
+  missing_attic_evidence: 2,
+  past_scheduled_end: 3,
+  stale_project: 4,
+  aging_ready_inspection: 5,
+  awaiting_archive: 6,
+};
+
+export const QUEUE_TYPE_LABEL: Record<QueueItemType, string> = {
+  critical_blocker: "Blocked",
+  failed_inspection: "Failed inspection",
+  aging_ready_inspection: "Inspection ready",
+  missing_attic_evidence: "Attic missing",
+  past_scheduled_end: "Past target",
+  awaiting_archive: "Archive ready",
+  stale_project: "Stale",
+};
 
 export interface BuildAttentionQueueArgs {
   projects: Project[];
@@ -104,7 +152,13 @@ export function buildAttentionQueue(args: BuildAttentionQueueArgs): QueueItem[] 
     };
 
     // Critical blockers — phase or gate blocked
-    const blockedPhase = projectPhases.find((p) => p.status === "blocked");
+    const failedInspections = projectGates.filter(
+      (g) => g.type === "inspection" && g.status === "failed",
+    );
+    const failedInspectionPhaseIds = new Set(failedInspections.map((g) => g.phaseId).filter(Boolean));
+    const blockedPhase = projectPhases.find(
+      (p) => p.status === "blocked" && !failedInspectionPhaseIds.has(p.id),
+    );
     const blockedGate = projectGates.find((g) => g.status === "blocked");
     if (blockedPhase || blockedGate) {
       const phase = blockedPhase ?? activePhase(projectPhases);
@@ -124,9 +178,6 @@ export function buildAttentionQueue(args: BuildAttentionQueueArgs): QueueItem[] 
     }
 
     // Failed inspections w/ open severe deficiency
-    const failedInspections = projectGates.filter(
-      (g) => g.type === "inspection" && g.status === "failed",
-    );
     for (const gate of failedInspections) {
       const phase = projectPhases.find((p) => p.id === gate.phaseId) ?? activePhase(projectPhases);
       const phaseDefs = projectDefs.filter(
@@ -160,7 +211,7 @@ export function buildAttentionQueue(args: BuildAttentionQueueArgs): QueueItem[] 
           severity: age >= 7 ? "warning" : "info",
           category: age >= 7 ? "warning" : "ready",
           title: "Inspection waiting",
-          reason: `${phaseLabelOf(phase)} ready for inspection ${age}d`,
+          reason: `${phaseLabelOf(phase)} ready for inspection ${age}d, past 3d target`,
           nextAction: "Assign inspector and confirm date",
           ageDays: age,
           phaseLabel: phaseLabelOf(phase),
@@ -173,7 +224,7 @@ export function buildAttentionQueue(args: BuildAttentionQueueArgs): QueueItem[] 
           severity: "info",
           category: "ready",
           title: "Ready for inspection",
-          reason: `${phaseLabelOf(phase)} marked ready`,
+          reason: `${phaseLabelOf(phase)} marked ready, within 3d target`,
           nextAction: "Schedule inspection visit",
           ageDays: age,
           phaseLabel: phaseLabelOf(phase),
@@ -217,7 +268,7 @@ export function buildAttentionQueue(args: BuildAttentionQueueArgs): QueueItem[] 
         severity: overdue >= 7 ? "critical" : "warning",
         category: overdue >= 7 ? "critical" : "warning",
         title: "Past scheduled end",
-        reason: `Scheduled end ${overdue}d ago, still ${project.status}`,
+        reason: `${overdue}d past scheduled end, still ${project.status}`,
         nextAction: "Reforecast end date or close out remaining work",
         ageDays: overdue,
         phaseLabel: phaseLabelOf(activePhase(projectPhases)),
@@ -233,7 +284,7 @@ export function buildAttentionQueue(args: BuildAttentionQueueArgs): QueueItem[] 
         severity: "info",
         category: "completed",
         title: "Ready to archive",
-        reason: `Completed ${daysSince(project.completedAt ?? project.updatedAt)}d ago`,
+        reason: `Completed ${daysSince(project.completedAt ?? project.updatedAt)}d ago, past 7d archive target`,
         nextAction: "Archive project to clear the active board",
         ageDays: daysSince(project.completedAt ?? project.updatedAt),
         phaseLabel: phaseLabelOf(activePhase(projectPhases)),
@@ -249,7 +300,7 @@ export function buildAttentionQueue(args: BuildAttentionQueueArgs): QueueItem[] 
         severity: "warning",
         category: "warning",
         title: "Stale project",
-        reason: `No updates in ${daysSince(project.updatedAt)}d`,
+        reason: `No updates in ${daysSince(project.updatedAt)}d, past 14d stale threshold`,
         nextAction: "Check in with PM for status update",
         ageDays: daysSince(project.updatedAt),
         phaseLabel: phaseLabelOf(activePhase(projectPhases)),
@@ -257,8 +308,112 @@ export function buildAttentionQueue(args: BuildAttentionQueueArgs): QueueItem[] 
     }
   }
 
-  items.sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || b.ageDays - a.ageDays);
+  items.sort(compareQueueItems);
   return items;
+}
+
+function compareQueueItems(a: QueueItem, b: QueueItem) {
+  return (
+    SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] ||
+    TYPE_RANK[a.type] - TYPE_RANK[b.type] ||
+    b.ageDays - a.ageDays
+  );
+}
+
+function matchesFilter(item: QueueItem, filter: QueueFilter) {
+  return filter === "all" || item.category === filter || item.type === filter;
+}
+
+export function buildVisibleQueue(items: QueueItem[], filter: QueueFilter, filters?: QueueFilters): QueueItem[] {
+  let filtered = items.filter((item) => !item.resolved);
+  
+  // Apply basic filter
+  if (filter !== "all" && filter !== "date_range" && filter !== "client" && filter !== "user") {
+    filtered = filtered.filter((item) => item.category === filter || item.type === filter);
+  }
+  
+  // Apply advanced filters
+  if (filters) {
+    if (filters.dateRange?.start || filters.dateRange?.end) {
+      filtered = filtered.filter((item) => {
+        const itemDate = new Date(Date.now() - item.ageDays * 24 * 60 * 60 * 1000);
+        const start = filters.dateRange?.start ? new Date(filters.dateRange.start) : null;
+        const end = filters.dateRange?.end ? new Date(filters.dateRange.end) : null;
+        
+        if (start && itemDate < start) return false;
+        if (end && itemDate > end) return false;
+        return true;
+      });
+    }
+    
+    if (filters.client) {
+      filtered = filtered.filter((item) => filters.client === item.clientName);
+    }
+    
+    if (filters.user) {
+      filtered = filtered.filter((item) => filters.user === item.pmName);
+    }
+  }
+  
+  if (filter !== "all") return filtered;
+
+  const byProject = new Map<string, QueueItem[]>();
+  for (const item of filtered) {
+    const group = byProject.get(item.projectId) ?? [];
+    group.push(item);
+    byProject.set(item.projectId, group);
+  }
+
+  const grouped = Array.from(byProject.values()).map((group) => {
+    const [primary] = [...group].sort(compareQueueItems);
+    const secondary = group
+      .filter((item) => item.id !== primary.id)
+      .sort((a, b) => SECONDARY_FLAG_RANK[a.type] - SECONDARY_FLAG_RANK[b.type]);
+    return {
+      ...primary,
+      id: `${primary.projectId}-queue-summary`,
+      secondaryFlags: secondary.map((item) => ({
+        type: item.type,
+        severity: item.severity,
+        title: QUEUE_TYPE_LABEL[item.type],
+      })),
+    };
+  });
+
+  return grouped.sort(compareQueueItems);
+}
+
+export function getQueueCounts(items: QueueItem[]): Record<QueueFilter, number> {
+  const counts = {
+    all: buildVisibleQueue(items, "all").length,
+    critical: 0,
+    warning: 0,
+    ready: 0,
+    completed: 0,
+    critical_blocker: 0,
+    failed_inspection: 0,
+    aging_ready_inspection: 0,
+    missing_attic_evidence: 0,
+    past_scheduled_end: 0,
+    awaiting_archive: 0,
+    stale_project: 0,
+    date_range: 0,
+    client: 0,
+    user: 0,
+  } satisfies Record<QueueFilter, number>;
+
+  for (const item of items) {
+    counts[item.category] += 1;
+    counts[item.type] += 1;
+  }
+
+  return counts;
+}
+
+export function markItemResolved(items: QueueItem[], itemId: string): QueueItem[] {
+  return items.map((item) =>
+    item.id === itemId ? { ...item, resolved: true } : item
+  );
 }
 
 export const QUEUE_FILTERS: { value: QueueCategory | "all"; label: string }[] = [

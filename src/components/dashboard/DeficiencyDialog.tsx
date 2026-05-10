@@ -218,7 +218,7 @@ export function DeficiencyDialog({
             <div className="grid gap-1.5">
               <Label htmlFor="def-severity">Severity *</Label>
               <div className="flex items-center gap-2">
-                <Select value={severity} onValueChange={(v: any) => setSeverity(v)}>
+                <Select value={severity} onValueChange={(v: Deficiency["severity"]) => setSeverity(v)}>
                   <SelectTrigger id="def-severity" className="flex-1">
                     <SelectValue />
                   </SelectTrigger>

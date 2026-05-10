@@ -42,6 +42,12 @@ const COL_TONE: Record<HeatmapColKey, BadgeTone> = {
 };
 
 const PHASE_TYPES: PhaseType[] = ["insulation", "drywall", "finishing"];
+const DAY = 1000 * 60 * 60 * 24;
+
+function daysSince(iso?: string | null): number {
+  if (!iso) return 0;
+  return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / DAY));
+}
 
 function emptyCells(applicable: HeatmapColKey | "all"): Record<HeatmapColKey, HeatmapCell> {
   const out = {} as Record<HeatmapColKey, HeatmapCell>;
@@ -57,6 +63,7 @@ function emptyCells(applicable: HeatmapColKey | "all"): Record<HeatmapColKey, He
 
 export function buildHeatmap(projects: Project[], phases: Phase[]): HeatmapMatrix {
   const rows: HeatmapRow[] = [];
+  const activeProjectIds = new Set(projects.filter((p) => p.status === "active").map((p) => p.id));
 
   // Draft (project status)
   const draftRow: HeatmapRow = {
@@ -75,7 +82,7 @@ export function buildHeatmap(projects: Project[], phases: Phase[]): HeatmapMatri
       label: type.charAt(0).toUpperCase() + type.slice(1),
       cells: emptyCells("all"),
     };
-    const ofType = phases.filter((p) => p.type === type);
+    const ofType = phases.filter((p) => p.type === type && activeProjectIds.has(p.projectId));
     for (const c of COLS) {
       row.cells[c.key].count = ofType.filter((p) => p.status === (c.key as PhaseStatus)).length;
     }
@@ -136,12 +143,12 @@ export function buildBottleneckInsights(matrix: HeatmapMatrix, projects: Project
     }
   }
 
-  const completed = projects.filter((p) => p.status === "completed").length;
+  const completed = projects.filter((p) => p.status === "completed" && daysSince(p.completedAt ?? p.updatedAt) >= 7).length;
   if (completed > 0) {
     out.push({
       id: "archive",
       tone: "success",
-      message: `${completed} completed project${completed === 1 ? "" : "s"} ready to archive.`,
+      message: `${completed} completed project${completed === 1 ? "" : "s"} ready to archive after 7 days.`,
     });
   }
 

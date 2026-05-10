@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, useEffect } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   
   ArrowRight,
@@ -53,10 +53,12 @@ import { SiteUnblockDialog } from "@/components/dashboard/SiteUnblockDialog";
 import { ArchiveProjectDialog } from "@/components/dashboard/ArchiveProjectDialog";
 import { NewProjectDialog } from "@/components/dashboard/NewProjectDialog";
 import { ProjectNotes } from "@/components/dashboard/ProjectNotes";
+import { ProjectScheduleTimeline } from "@/components/dashboard/ProjectScheduleTimeline";
 import { PhotoViewerDialog } from "@/components/dashboard/PhotoViewerDialog";
 import { DeficiencyDialog } from "@/components/dashboard/DeficiencyDialog";
 import { PhotoUploadDialog } from "@/components/dashboard/PhotoUploadDialog";
-import { getProject, updateAtticGate, getPhotoViewUrl } from "@/lib/api";
+import { getProject, updateAtticGate, getPhotoViewUrl, updatePhaseSchedules } from "@/lib/api";
+import type { PhaseScheduleChange } from "@/lib/schedule";
 import type { Gate, Phase, PhotoEvidence } from "@/lib/types";
 import {
   PHASE_LABEL,
@@ -118,6 +120,19 @@ export default function ProjectDetailPage() {
   const qc = useQueryClient();
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const scheduleMutation = useMutation({
+    mutationFn: (changes: PhaseScheduleChange[]) => updatePhaseSchedules({ projectId: id!, changes }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        setScheduleError(res.error.message);
+        return;
+      }
+      setScheduleError(null);
+      qc.invalidateQueries({ queryKey: ["project", id] });
+      qc.invalidateQueries({ queryKey: ["phases"] });
+    },
+  });
 
   const [callInOpen, setCallInOpen] = useState(false);
   const [callInDate, setCallInDate] = useState<Date | undefined>(undefined);
@@ -450,6 +465,16 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         </Card>
+
+        <ProjectScheduleTimeline
+          project={p}
+          phases={detail.phases}
+          gates={detail.gates}
+          deficiencies={detail.deficiencies}
+          saving={scheduleMutation.isPending}
+          errorMessage={scheduleError}
+          onScheduleChange={(changes) => scheduleMutation.mutate(changes)}
+        />
 
         {/* Phases */}
         <section className={mobileTab === "overview" ? "" : "hidden md:block"}>

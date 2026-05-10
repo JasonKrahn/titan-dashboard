@@ -21,6 +21,7 @@ import type {
   UpdateSubcontractorInput,
   User,
 } from "@/lib/types";
+import { orderedSchedulePhases, parseScheduleDate, toScheduleDate } from "@/lib/schedule";
 import {
   seedAuditEvents,
   seedClients,
@@ -982,6 +983,15 @@ export interface UpdatePhaseInput {
   scheduledEnd?: string;
 }
 
+export interface UpdatePhaseSchedulesInput {
+  projectId: string;
+  changes: {
+    phaseId: string;
+    scheduledStart: string;
+    scheduledEnd: string;
+  }[];
+}
+
 export async function updatePhase(input: UpdatePhaseInput): Promise<ApiResult<Phase>> {
   const me = seedUsers.find((u) => u.id === currentUserId);
   if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
@@ -1056,6 +1066,109 @@ export async function updatePhase(input: UpdatePhaseInput): Promise<ApiResult<Ph
   });
 
   return delay(ok(phase));
+}
+
+export async function updatePhaseSchedules(input: UpdatePhaseSchedulesInput): Promise<ApiResult<Phase[]>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+
+  const project = seedProjects.find((p) => p.id === input.projectId);
+  if (!project) return delay({ ok: false, error: { code: "NOT_FOUND", message: "Project not found" } });
+
+  if (me.role === "project_manager" && project.assignedProjectManagerId !== me.id) {
+    return delay({ ok: false, error: { code: "FORBIDDEN", message: "Access denied" } });
+  }
+
+  if (project.status === "completed" || project.status === "archived") {
+    return delay({ ok: false, error: { code: "STATE_VIOLATION", message: "Cannot edit completed or archived projects" } });
+  }
+
+  if (!input.changes.length) {
+    return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "At least one schedule change is required" } });
+  }
+
+  const projectPhases = seedPhases.filter((phase) => phase.projectId === input.projectId);
+  const finalSchedules = new Map(
+    projectPhases.map((phase) => [
+      phase.id,
+      {
+        scheduledStart: phase.scheduledStart,
+        scheduledEnd: phase.scheduledEnd,
+      },
+    ]),
+  );
+
+  for (const change of input.changes) {
+    const phase = projectPhases.find((item) => item.id === change.phaseId);
+    if (!phase) {
+      return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Schedule change includes a phase outside this project" } });
+    }
+    finalSchedules.set(change.phaseId, {
+      scheduledStart: toScheduleDate(parseScheduleDate(change.scheduledStart)),
+      scheduledEnd: toScheduleDate(parseScheduleDate(change.scheduledEnd)),
+    });
+  }
+
+  const projectStartMs = project.scheduledStart ? parseScheduleDate(project.scheduledStart) : undefined;
+  const projectEndMs = project.scheduledEnd ? parseScheduleDate(project.scheduledEnd) : undefined;
+  const ordered = orderedSchedulePhases(projectPhases);
+
+  for (const phase of ordered) {
+    const schedule = finalSchedules.get(phase.id);
+    if (!schedule?.scheduledStart || !schedule.scheduledEnd) {
+      return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Every phase requires scheduled start and end dates" } });
+    }
+
+    const startMs = parseScheduleDate(schedule.scheduledStart);
+    const endMs = parseScheduleDate(schedule.scheduledEnd);
+    if (endMs <= startMs) {
+      return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Phase end dates must be after phase start dates" } });
+    }
+    if ((projectStartMs !== undefined && startMs < projectStartMs) || (projectEndMs !== undefined && endMs > projectEndMs)) {
+      return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Phase schedules must stay inside the project schedule" } });
+    }
+  }
+
+  for (let index = 1; index < ordered.length; index += 1) {
+    const previous = finalSchedules.get(ordered[index - 1].id)!;
+    const current = finalSchedules.get(ordered[index].id)!;
+    if (parseScheduleDate(current.scheduledStart!) < parseScheduleDate(previous.scheduledEnd!)) {
+      return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Phase schedules cannot overlap" } });
+    }
+  }
+
+  const nowIso = new Date().toISOString();
+  const updatedPhases: Phase[] = [];
+  for (const change of input.changes) {
+    const phase = seedPhases.find((item) => item.id === change.phaseId)!;
+    const schedule = finalSchedules.get(change.phaseId)!;
+    const previousValue = {
+      scheduledStart: phase.scheduledStart,
+      scheduledEnd: phase.scheduledEnd,
+    };
+    phase.scheduledStart = schedule.scheduledStart;
+    phase.scheduledEnd = schedule.scheduledEnd;
+    phase.updatedAt = nowIso;
+    updatedPhases.push(phase);
+
+    seedAuditEvents.unshift({
+      id: `audit-${Date.now()}-${phase.id}`,
+      entityType: "phase",
+      entityId: phase.id,
+      action: "updated",
+      actorUserId: me.id,
+      previousValue,
+      nextValue: {
+        scheduledStart: phase.scheduledStart,
+        scheduledEnd: phase.scheduledEnd,
+      },
+      createdAt: nowIso,
+    });
+  }
+
+  project.updatedAt = nowIso;
+
+  return delay(ok(updatedPhases));
 }
 
 export async function createSubcontractorContact(input: CreateSubcontractorInput): Promise<ApiResult<SubcontractorContact>> {
@@ -1330,6 +1443,23 @@ export async function getPhotoViewUrl(photoId: string): Promise<ApiResult<{ url:
   return delay(ok({ url, expiresAt }));
 }
 
+function seedSequentialPhaseSchedules(projectStart: string, projectEnd: string, phaseCount: number) {
+  const startMs = parseScheduleDate(projectStart);
+  const endMs = parseScheduleDate(projectEnd);
+  const totalMs = endMs - startMs;
+  if (phaseCount <= 0 || totalMs < phaseCount * 24 * 60 * 60 * 1000) return [];
+
+  const phaseDurationMs = Math.floor(totalMs / phaseCount);
+  return Array.from({ length: phaseCount }, (_, index) => {
+    const scheduledStartMs = startMs + phaseDurationMs * index;
+    const scheduledEndMs = index === phaseCount - 1 ? endMs : scheduledStartMs + phaseDurationMs;
+    return {
+      scheduledStart: toScheduleDate(scheduledStartMs),
+      scheduledEnd: toScheduleDate(scheduledEndMs),
+    };
+  });
+}
+
 export async function createProject(input: CreateProjectInput): Promise<ApiResult<Project>> {
   const me = seedUsers.find((u) => u.id === currentUserId);
   if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
@@ -1366,13 +1496,19 @@ export async function createProject(input: CreateProjectInput): Promise<ApiResul
 
   // Auto-create the three default phases + standard gates per spec.
   const phaseTypes: Phase["type"][] = ["insulation", "drywall", "finishing"];
-  phaseTypes.forEach((type) => {
+  const phaseSchedules =
+    input.scheduledStart && input.scheduledEnd
+      ? seedSequentialPhaseSchedules(input.scheduledStart, input.scheduledEnd, phaseTypes.length)
+      : [];
+  phaseTypes.forEach((type, index) => {
     const phaseId = `${id}-phase-${type}`;
     const phase: Phase = {
       id: phaseId,
       projectId: id,
       type,
       status: "not_started",
+      scheduledStart: phaseSchedules[index]?.scheduledStart,
+      scheduledEnd: phaseSchedules[index]?.scheduledEnd,
       createdAt: nowIso,
       updatedAt: nowIso,
     };

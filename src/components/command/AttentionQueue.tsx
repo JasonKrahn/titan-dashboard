@@ -1,19 +1,32 @@
-import { Inbox } from "lucide-react";
+import { Calendar, Users, Filter, Inbox } from "lucide-react";
+import { Badge, type BadgeTone } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import {
+  QUEUE_FILTERS,
+  buildVisibleQueue,
+  getQueueCounts,
+  type QueueFilter,
+  type QueueItem,
+  type QueueFilters,
+} from "@/lib/command/attentionQueue";
 import { AttentionQueueItem } from "./AttentionQueueItem";
-import { QUEUE_FILTERS, type QueueCategory, type QueueItem } from "@/lib/command/attentionQueue";
 
 interface Props {
   items: QueueItem[];
-  filter: QueueCategory | "all";
-  onFilterChange: (f: QueueCategory | "all") => void;
+  filter: QueueFilter;
+  onFilterChange: (f: QueueFilter) => void;
   onOpenProject: (id: string) => void;
+  onMarkResolved: (id: string) => void;
+  filters?: QueueFilters;
+  onFiltersChange: (filters: QueueFilters) => void;
+  clients?: string[];
+  users?: string[];
 }
 
-export function AttentionQueue({ items, filter, onFilterChange, onOpenProject }: Props) {
-  const filtered = filter === "all" ? items : items.filter((i) => i.category === filter);
-  const counts: Record<string, number> = { all: items.length };
-  for (const it of items) counts[it.category] = (counts[it.category] ?? 0) + 1;
+export function AttentionQueue({ items, filter, onFilterChange, onOpenProject, onMarkResolved, filters, onFiltersChange, clients = [], users = [] }: Props) {
+  const filtered = buildVisibleQueue(items, filter, filters);
+  const counts = getQueueCounts(items);
 
   return (
     <section className="flex h-full flex-col rounded-md border border-border bg-surface-panel shadow-card">
@@ -22,7 +35,7 @@ export function AttentionQueue({ items, filter, onFilterChange, onOpenProject }:
         <div>
           <h2 className="text-sm font-bold uppercase tracking-widest">Attention Queue</h2>
           <p className="text-[11px] text-muted-foreground">
-            Sorted by severity, then age. {items.length} item{items.length === 1 ? "" : "s"}.
+            Sorted by severity, then age. {filtered.length} item{filtered.length === 1 ? "" : "s"}.
           </p>
         </div>
       </header>
@@ -58,6 +71,92 @@ export function AttentionQueue({ items, filter, onFilterChange, onOpenProject }:
         })}
       </div>
 
+      {/* Advanced filters */}
+      {(filters?.dateRange || filters?.clients?.length || filters?.users?.length || true) && (
+        <div className="border-b border-border bg-surface-elevated px-4 py-3">
+          <div className="flex items-center gap-2 mb-3">
+            <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Advanced Filters</span>
+          </div>
+          
+          <div className="grid gap-3 sm:grid-cols-3">
+            {/* Date range filter */}
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-1.5">
+                <Calendar className="h-3 w-3.5" />
+                Date Range
+              </label>
+              <div className="flex gap-1">
+                <input
+                  type="date"
+                  className="h-8 flex-1 rounded border border-border bg-background px-2 text-xs"
+                  placeholder="Start"
+                  value={filters?.dateRange?.start || ""}
+                  onChange={(e) => onFiltersChange({
+                    ...filters,
+                    dateRange: { ...filters?.dateRange, start: e.target.value }
+                  })}
+                />
+                <input
+                  type="date"
+                  className="h-8 flex-1 rounded border border-border bg-background px-2 text-xs"
+                  placeholder="End"
+                  value={filters?.dateRange?.end || ""}
+                  onChange={(e) => onFiltersChange({
+                    ...filters,
+                    dateRange: { ...filters?.dateRange, end: e.target.value }
+                  })}
+                />
+              </div>
+            </div>
+
+            {/* Client filter */}
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-1.5">
+                <Users className="h-3 w-3.5" />
+                Clients
+              </label>
+              <select
+                className="h-8 w-full rounded border border-border bg-background px-2 text-xs"
+                value={filters?.client || ""}
+                onChange={(e) => {
+                  onFiltersChange({ ...filters, client: e.target.value || undefined });
+                }}
+              >
+                <option value="" className="text-xs">All Clients</option>
+                {clients.map((client) => (
+                  <option key={client} value={client} className="text-xs">
+                    {client}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* User filter */}
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-1.5">
+                <Users className="h-3 w-3.5" />
+                Users
+              </label>
+              <select
+                className="h-8 w-full rounded border border-border bg-background px-2 text-xs"
+                value={filters?.user || ""}
+                onChange={(e) => {
+                  onFiltersChange({ ...filters, user: e.target.value || undefined });
+                }}
+              >
+                <option value="" className="text-xs">All Users</option>
+                {users.map((user) => (
+                  <option key={user} value={user} className="text-xs">
+                    {user}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* List */}
       <div className="flex-1 divide-y divide-border overflow-y-auto">
         {filtered.length === 0 ? (
@@ -70,7 +169,7 @@ export function AttentionQueue({ items, filter, onFilterChange, onOpenProject }:
           </div>
         ) : (
           filtered.map((item) => (
-            <AttentionQueueItem key={item.id} item={item} onOpen={onOpenProject} />
+            <AttentionQueueItem key={item.id} item={item} onOpen={onOpenProject} onMarkResolved={onMarkResolved} />
           ))
         )}
       </div>

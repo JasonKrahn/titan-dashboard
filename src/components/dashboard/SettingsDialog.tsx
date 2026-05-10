@@ -93,7 +93,6 @@ export function SettingsDialog({ open, onOpenChange, user, onUpdated }: Settings
               value={form.fullName}
               onChange={(e) => setField("fullName", e.target.value)}
               placeholder="Your full name"
-              autoFocus
             />
             {errors.fullName && <p className="text-xs text-destructive">{errors.fullName}</p>}
           </div>

@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ShieldAlert } from "lucide-react";
 import { AppHeader } from "@/components/dashboard/AppHeader";
 import { KpiStrip, type KpiData, type KpiKey } from "@/components/command/KpiStrip";
@@ -17,21 +17,19 @@ import {
   getProjects,
   getUsers,
 } from "@/lib/api";
-import { buildAttentionQueue, type QueueCategory } from "@/lib/command/attentionQueue";
+import { buildAttentionQueue, markItemResolved, type QueueFilter, type QueueFilters, type QueueItem } from "@/lib/command/attentionQueue";
 import { buildBottleneckInsights, buildHeatmap } from "@/lib/command/heatmap";
-
-const KPI_TO_FILTER: Record<KpiKey, QueueCategory | "all"> = {
-  active: "all",
-  blocked: "critical",
-  failed: "critical",
-  ready: "ready",
-  attic: "warning",
-};
+import { KPI_TO_FILTER, buildCommandKpis } from "@/lib/command/kpis";
 
 export default function AdminCommandCenter() {
   const navigate = useNavigate();
-  const [filter, setFilter] = useState<QueueCategory | "all">("all");
+  const queryClient = useQueryClient();
+  const [filter, setFilter] = useState<QueueFilter>("all");
   const [activeKpi, setActiveKpi] = useState<KpiKey | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
+  const [advancedFilters, setAdvancedFilters] = useState<QueueFilters>({});
 
   const meQ = useQuery({ queryKey: ["me"], queryFn: getCurrentUser });
   const usersQ = useQuery({ queryKey: ["users"], queryFn: getUsers });
@@ -43,44 +41,29 @@ export default function AdminCommandCenter() {
   const photosQ = useQuery({ queryKey: ["photos"], queryFn: getAllPhotos });
 
   const me = meQ.data?.ok ? meQ.data.data : undefined;
-  const users = usersQ.data?.ok ? usersQ.data.data : [];
-  const clients = clientsQ.data?.ok ? clientsQ.data.data : [];
-  const projects = projectsQ.data?.ok ? projectsQ.data.data : [];
-  const phases = phasesQ.data?.ok ? phasesQ.data.data : [];
-  const gates = gatesQ.data?.ok ? gatesQ.data.data : [];
-  const deficiencies = defsQ.data?.ok ? defsQ.data.data : [];
-  const photos = photosQ.data?.ok ? photosQ.data.data : [];
+  const users = useMemo(() => (usersQ.data?.ok ? usersQ.data.data : []), [usersQ.data]);
+  const clients = useMemo(() => (clientsQ.data?.ok ? clientsQ.data.data : []), [clientsQ.data]);
+  const projects = useMemo(() => (projectsQ.data?.ok ? projectsQ.data.data : []), [projectsQ.data]);
+  const phases = useMemo(() => (phasesQ.data?.ok ? phasesQ.data.data : []), [phasesQ.data]);
+  const gates = useMemo(() => (gatesQ.data?.ok ? gatesQ.data.data : []), [gatesQ.data]);
+  const deficiencies = useMemo(() => (defsQ.data?.ok ? defsQ.data.data : []), [defsQ.data]);
+  const photos = useMemo(() => (photosQ.data?.ok ? photosQ.data.data : []), [photosQ.data]);
 
   const queue = useMemo(
     () => buildAttentionQueue({ projects, phases, gates, deficiencies, photos, users, clients }),
     [projects, phases, gates, deficiencies, photos, users, clients],
   );
 
+  // Update queue items when data changes
+  useEffect(() => {
+    setQueueItems(queue);
+  }, [queue]);
+
   const matrix = useMemo(() => buildHeatmap(projects, phases), [projects, phases]);
   const insights = useMemo(() => buildBottleneckInsights(matrix, projects), [matrix, projects]);
 
   const kpis: KpiData[] = useMemo(() => {
-    const active = projects.filter((p) => p.status === "active").length;
-    const blocked =
-      phases.filter((p) => p.status === "blocked").length +
-      gates.filter((g) => g.status === "blocked").length;
-    const failed = gates.filter((g) => g.type === "inspection" && g.status === "failed").length;
-    const ready = phases.filter((p) => p.status === "ready_for_inspection").length;
-    const atticMissing = projects.filter((p) => {
-      if (p.status === "draft" || p.status === "archived") return false;
-      if (p.atticCheckStatus === "passed") return false;
-      return !photos.some(
-        (ph) => ph.projectId === p.id && ph.purpose === "attic_check" && ph.status === "confirmed",
-      );
-    }).length;
-
-    return [
-      { key: "active", label: "Active projects", count: active, tone: "info" },
-      { key: "blocked", label: "Blocked work", count: blocked, tone: blocked ? "danger" : "neutral" },
-      { key: "failed", label: "Failed inspections", count: failed, tone: failed ? "danger" : "neutral" },
-      { key: "ready", label: "Ready inspections", count: ready, tone: ready ? "ready" : "neutral" },
-      { key: "attic", label: "Missing attic", count: atticMissing, tone: atticMissing ? "warning" : "neutral" },
-    ];
+    return buildCommandKpis({ projects, phases, gates, photos });
   }, [projects, phases, gates, photos]);
 
   const handleKpi = (key: KpiKey) => {
@@ -93,12 +76,50 @@ export default function AdminCommandCenter() {
     setFilter(KPI_TO_FILTER[key]);
   };
 
-  const handleFilter = (f: QueueCategory | "all") => {
+  const handleFilter = (f: QueueFilter) => {
     setFilter(f);
     setActiveKpi(null);
   };
 
+  const handleMarkResolved = (itemId: string) => {
+    setQueueItems((prev) => markItemResolved(prev, itemId));
+  };
+
+  const handleFiltersChange = (filters: QueueFilters) => {
+    setAdvancedFilters(filters);
+  };
+
+  const clientNames = useMemo(() => clients.map(c => c.name), [clients]);
+  const userNames = useMemo(() => users.map(u => u.fullName), [users]);
+
   const isAdmin = me?.role === "admin";
+
+  // Simple polling for real-time updates
+  useEffect(() => {
+    const startPolling = () => {
+      intervalRef.current = setInterval(() => {
+        queryClient.refetchQueries();
+        setLastUpdated(new Date());
+      }, 30000); // 30 seconds
+    };
+
+    startPolling();
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [queryClient]);
+
+  const formatLastUpdated = () => {
+    const seconds = Math.floor((Date.now() - lastUpdated.getTime()) / 1000);
+    if (seconds < 60) return `${seconds}s ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ago`;
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -106,7 +127,12 @@ export default function AdminCommandCenter() {
       <main className="container py-6 space-y-5">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold sm:text-3xl">Command Center</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold sm:text-3xl">Command Center</h1>
+              <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md">
+                Updated {formatLastUpdated()}
+              </span>
+            </div>
             <p className="text-sm text-muted-foreground mt-1">
               Org-wide operational risk. Triage what needs admin attention right now.
             </p>
@@ -128,10 +154,15 @@ export default function AdminCommandCenter() {
             <div className="grid gap-4 lg:grid-cols-12">
               <div className="lg:col-span-7 xl:col-span-8">
                 <AttentionQueue
-                  items={queue}
+                  items={queueItems}
                   filter={filter}
+                  filters={advancedFilters}
                   onFilterChange={handleFilter}
+                  onFiltersChange={handleFiltersChange}
+                  clients={clientNames}
+                  users={userNames}
                   onOpenProject={(id) => navigate(`/project/${id}`)}
+                  onMarkResolved={handleMarkResolved}
                 />
               </div>
               <div className="space-y-4 lg:col-span-5 xl:col-span-4">

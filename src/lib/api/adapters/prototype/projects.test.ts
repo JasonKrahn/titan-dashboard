@@ -14,6 +14,7 @@ import {
   markPhaseReadyForInspection,
   setCurrentUser,
   updateAtticGate,
+  updatePhaseSchedules,
 } from "./index";
 
 describe("prototype seed data", () => {
@@ -161,6 +162,96 @@ describe("prototype seed data", () => {
     expect(new Set(missingAttic.data.map((project) => project.id))).toEqual(
       new Set(["proj-active-insulation", "proj-ready-inspection", "proj-site-blocked", "proj-failed-inspection", "proj-deficiency-rework", "proj-finishing-active"]),
     );
+  });
+
+  it("updates cascaded phase schedules atomically", async () => {
+    setCurrentUser("user-pm-2");
+
+    const result = await updatePhaseSchedules({
+      projectId: "proj-active-insulation",
+      changes: [
+        {
+          phaseId: "proj-active-insulation-phase-insulation",
+          scheduledStart: "2026-05-01",
+          scheduledEnd: "2026-05-10",
+        },
+        {
+          phaseId: "proj-active-insulation-phase-drywall",
+          scheduledStart: "2026-05-10",
+          scheduledEnd: "2026-05-16",
+        },
+        {
+          phaseId: "proj-active-insulation-phase-finishing",
+          scheduledStart: "2026-05-16",
+          scheduledEnd: "2026-05-22",
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.map((phase) => [phase.id, phase.scheduledStart, phase.scheduledEnd])).toEqual([
+      ["proj-active-insulation-phase-insulation", "2026-05-01", "2026-05-10"],
+      ["proj-active-insulation-phase-drywall", "2026-05-10", "2026-05-16"],
+      ["proj-active-insulation-phase-finishing", "2026-05-16", "2026-05-22"],
+    ]);
+  });
+
+  it("rejects batch schedule updates outside project bounds", async () => {
+    setCurrentUser("user-pm-2");
+
+    const result = await updatePhaseSchedules({
+      projectId: "proj-active-insulation",
+      changes: [
+        {
+          phaseId: "proj-active-insulation-phase-finishing",
+          scheduledStart: "2099-05-16",
+          scheduledEnd: "2099-05-22",
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("blocks PM schedule updates for unassigned projects", async () => {
+    setCurrentUser("user-pm-1");
+
+    const result = await updatePhaseSchedules({
+      projectId: "proj-active-insulation",
+      changes: [
+        {
+          phaseId: "proj-active-insulation-phase-insulation",
+          scheduledStart: "2026-05-01",
+          scheduledEnd: "2026-05-10",
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe("FORBIDDEN");
+  });
+
+  it("blocks schedule updates for completed or archived projects", async () => {
+    setCurrentUser("user-admin");
+
+    const result = await updatePhaseSchedules({
+      projectId: "proj-completed-archiveable",
+      changes: [
+        {
+          phaseId: "proj-completed-archiveable-phase-insulation",
+          scheduledStart: "2026-05-01",
+          scheduledEnd: "2026-05-10",
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe("STATE_VIOLATION");
   });
 
   it("enforces project manager visibility for seeded projects", async () => {

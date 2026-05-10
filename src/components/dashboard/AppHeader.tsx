@@ -85,7 +85,7 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch }
             {me?.role === "admin" && (
               <Link to="/command" className={topNavClass(section === "command")}>
                 <Radar className="h-4 w-4" />
-                Command
+                Admin Overview
               </Link>
             )}
             <Link to="/subs" className={topNavClass(section === "subs")}>
@@ -131,7 +131,7 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch }
             {me?.role === "admin" && (
               <Link to="/command" className={mobileTopNavClass(section === "command")}>
                 <Radar className="h-4 w-4" />
-                Command
+                Admin Overview
               </Link>
             )}
             <Link to="/subs" className={mobileTopNavClass(section === "subs")}>
