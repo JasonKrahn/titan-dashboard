@@ -89,6 +89,14 @@ export interface PhaseHealth {
   reason: string;
 }
 
+export interface PhaseSummaryItem {
+  type: PhaseType;
+  abbrev: string;
+  tone: PhaseHealthTone;
+  label: string;
+  reason: string;
+}
+
 const HEALTH_TONE_CLASSES: Record<PhaseHealthTone, { bg: string; text: string; border: string; dot: string }> = {
   blocked: { bg: "bg-status-blocked/15", text: "text-status-blocked", border: "border-status-blocked/40", dot: "bg-status-blocked" },
   attention: { bg: "bg-status-attention/15", text: "text-status-attention", border: "border-status-attention/40", dot: "bg-status-attention" },
@@ -100,6 +108,10 @@ const HEALTH_TONE_CLASSES: Record<PhaseHealthTone, { bg: string; text: string; b
 
 export function phaseHealthClasses(tone: PhaseHealthTone) {
   return HEALTH_TONE_CLASSES[tone];
+}
+
+export function phaseHealthDotClass(tone: PhaseHealthTone): string {
+  return HEALTH_TONE_CLASSES[tone].dot;
 }
 
 export function computePhaseHealth(
@@ -133,7 +145,10 @@ export function computePhaseHealth(
     return { tone: "in-progress", label: "In progress", reason: "Work in progress" };
   }
   if (phase.status === "closed") {
-    return { tone: "closed", label: "Closed", reason: "Phase complete" };
+    const reason = phase.closedAt
+      ? `Phase completed ${new Date(phase.closedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`
+      : "Phase complete";
+    return { tone: "closed", label: "Closed", reason };
   }
   return { tone: "not-started", label: "Not started", reason: "Awaiting site check" };
 }

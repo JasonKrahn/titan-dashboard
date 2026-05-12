@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Phase } from "@/lib/types";
 import {
   computeScheduleDraft,
+  formatDateWithOptions,
   parseScheduleDate,
   toScheduleDate,
 } from "./schedule";
@@ -130,5 +131,20 @@ describe("schedule helpers", () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.message).toMatch(/project deadline/i);
+  });
+
+  it("formats dates using local timezone consistently", () => {
+    const testDate = "2026-05-10";
+    const short = formatDateWithOptions(testDate, { showYear: false });
+    const full = formatDateWithOptions(testDate, { showYear: true });
+
+    // Short format should not include year
+    expect(short).not.toContain("2026");
+    // Full format should include year
+    expect(full).toContain("2026");
+    // Both should show the same month and day
+    expect(short).toBe(full.split(",")[0]);
+    // Undefined values should return dash
+    expect(formatDateWithOptions("")).toBe("—");
   });
 });

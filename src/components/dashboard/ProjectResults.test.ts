@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { PhaseSummaryItem } from "@/lib/derived";
 import { sortProjectRows, type ProjectRow, type ProjectSortState } from "./ProjectResultsSort";
 
 function row(overrides: Partial<ProjectRow>): ProjectRow {
@@ -16,7 +17,11 @@ function row(overrides: Partial<ProjectRow>): ProjectRow {
     },
     clientName: "Client",
     pmName: "Unassigned",
-    phaseSummary: "INSU Not started / DRYW Not started / FINI Not started",
+    phaseSummary: [
+      { type: "insulation", abbrev: "INSU", tone: "not-started", label: "Not started", reason: "Phase not yet created" },
+      { type: "drywall", abbrev: "DRYW", tone: "not-started", label: "Not started", reason: "Phase not yet created" },
+      { type: "finishing", abbrev: "FINI", tone: "not-started", label: "Not started", reason: "Phase not yet created" },
+    ] as PhaseSummaryItem[],
     openIssues: 0,
     ...overrides,
   };

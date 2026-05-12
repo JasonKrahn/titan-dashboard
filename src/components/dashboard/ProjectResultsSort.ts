@@ -1,4 +1,5 @@
 import type { ClientRecord, Project, User } from "@/lib/types";
+import type { PhaseSummaryItem } from "@/lib/derived";
 
 export type ProjectSortKey = "project" | "client" | "status" | "openIssues" | "updated" | "pm";
 export type ProjectSortDirection = "asc" | "desc";
@@ -14,7 +15,7 @@ export interface ProjectRow {
   clientName: string;
   pm?: User;
   pmName: string;
-  phaseSummary: string;
+  phaseSummary: PhaseSummaryItem[];
   openIssues: number;
 }
 

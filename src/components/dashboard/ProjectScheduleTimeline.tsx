@@ -6,9 +6,9 @@ import { PHASE_LABEL, computePhaseHealth, phaseHealthClasses } from "@/lib/deriv
 import {
   computeScheduleDraft,
   daysBetween,
+  formatDateWithOptions,
   orderedSchedulePhases,
   parseScheduleDate,
-  shortScheduleDate,
   toScheduleDate,
   type PhaseScheduleChange,
   type ScheduleDragMode,
@@ -143,7 +143,7 @@ export function ProjectScheduleTimeline({
             <SectionHeading as="h2">Project Schedule</SectionHeading>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            {shortScheduleDate(projectStart)} - {shortScheduleDate(projectEnd)}
+            {formatDateWithOptions(projectStart, { showYear: false })} - {formatDateWithOptions(projectEnd, { showYear: false })}
           </p>
         </div>
         {readOnly && (
@@ -164,8 +164,8 @@ export function ProjectScheduleTimeline({
         <div className="grid grid-cols-[112px_minmax(0,1fr)] gap-3 text-xs text-muted-foreground">
           <div>Phase</div>
           <div className="relative h-6">
-            <span className="absolute left-0 top-0">{shortScheduleDate(projectStart)}</span>
-            <span className="absolute right-0 top-0">{shortScheduleDate(projectEnd)}</span>
+            <span className="absolute left-0 top-0">{formatDateWithOptions(projectStart, { showYear: false })}</span>
+            <span className="absolute right-0 top-0">{formatDateWithOptions(projectEnd, { showYear: false })}</span>
             {todayPct >= 0 && todayPct <= 100 && (
               <span
                 className="absolute top-0 -translate-x-1/2 rounded-sm bg-status-blocked px-1 py-0.5 text-[10px] font-medium text-status-blocked-foreground"
@@ -221,7 +221,7 @@ export function ProjectScheduleTimeline({
                     )}
                     style={{ left: `${left}%`, width: `${width}%`, minWidth: 64 }}
                   >
-                    <span className="truncate font-semibold">{shortScheduleDate(schedule.scheduledStart)} - {shortScheduleDate(schedule.scheduledEnd)}</span>
+                    <span className="truncate font-semibold">{formatDateWithOptions(schedule.scheduledStart, { showYear: false })} - {formatDateWithOptions(schedule.scheduledEnd, { showYear: false })}</span>
                     {!readOnly && (
                       <>
                         <span
@@ -259,7 +259,7 @@ export function ProjectScheduleTimeline({
             <ChevronDown className={cn("h-4 w-4 transition-transform", mobileExpanded && "rotate-180")} />
             <span className="font-medium">Schedule</span>
             <span className="text-xs text-muted-foreground">
-              {orderedPhases.filter(p => p.scheduledStart && p.scheduledEnd).length} phases · {shortScheduleDate(projectStart)} - {shortScheduleDate(projectEnd)}
+              {orderedPhases.filter(p => p.scheduledStart && p.scheduledEnd).length} phases · {formatDateWithOptions(projectStart, { showYear: false })} - {formatDateWithOptions(projectEnd, { showYear: false })}
             </span>
           </div>
           {readOnly && (
@@ -299,9 +299,9 @@ export function ProjectScheduleTimeline({
                   <span className={cn("text-xs", classes.text)}>{health.label}</span>
                 </div>
                 <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>{shortScheduleDate(schedule.scheduledStart)}</span>
+                  <span>{formatDateWithOptions(schedule.scheduledStart, { showYear: false })}</span>
                   <span>→</span>
-                  <span>{shortScheduleDate(schedule.scheduledEnd)}</span>
+                  <span>{formatDateWithOptions(schedule.scheduledEnd, { showYear: false })}</span>
                   <span className="ml-auto">({duration} days)</span>
                 </div>
                 {/* Mini timeline bar */}

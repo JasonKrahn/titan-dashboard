@@ -34,11 +34,12 @@ export function toScheduleDate(ms: number): string {
   return `${year}-${month}-${day}`;
 }
 
-export function shortScheduleDate(value: string): string {
-  return new Date(parseScheduleDate(value)).toLocaleDateString(undefined, {
+export function formatDateWithOptions(value: string, options: { showYear?: boolean } = {}): string {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
-    timeZone: "UTC",
+    year: options.showYear ? "numeric" : undefined,
   });
 }
 
