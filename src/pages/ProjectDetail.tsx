@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { IconWell } from "@/components/ui/icon-well";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -58,7 +59,7 @@ import { PhotoViewerDialog } from "@/components/dashboard/PhotoViewerDialog";
 import { DeficiencyDialog } from "@/components/dashboard/DeficiencyDialog";
 import { PhotoUploadDialog } from "@/components/dashboard/PhotoUploadDialog";
 import { getProject, updateAtticGate, getPhotoViewUrl, updatePhaseSchedules } from "@/lib/api";
-import type { PhaseScheduleChange } from "@/lib/schedule";
+import { formatDateWithOptions, type PhaseScheduleChange } from "@/lib/schedule";
 import type { Gate, Phase, PhotoEvidence } from "@/lib/types";
 import {
   PHASE_LABEL,
@@ -239,7 +240,6 @@ export default function ProjectDetailPage() {
   }
 
   const p = detail.project;
-  const formatDate = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—");
   const phaseActionGates = phaseActionsTarget
     ? detail.gates.filter((g) => g.phaseId === phaseActionsTarget.id)
     : [];
@@ -373,7 +373,7 @@ export default function ProjectDetailPage() {
           {mobileInfoOpen && (
             <div className="mt-2 space-y-1 border-t border-border pt-2 text-xs text-muted-foreground">
               <div className="flex items-center gap-1.5"><MapPin className="h-3 w-3" />{p.siteAddress}</div>
-              <div className="flex items-center gap-1.5"><Calendar className="h-3 w-3" />{formatDate(p.scheduledStart)} → {formatDate(p.scheduledEnd)}</div>
+              <div className="flex items-center gap-1.5"><Calendar className="h-3 w-3" />{formatDateWithOptions(p.scheduledStart, { showYear: true })} → {formatDateWithOptions(p.scheduledEnd, { showYear: true })}</div>
               {detail.assignedProjectManager && (
                 <div className="flex items-center gap-1.5"><User className="h-3 w-3" />{detail.assignedProjectManager.fullName}</div>
               )}
@@ -423,7 +423,7 @@ export default function ProjectDetailPage() {
                 </span>
                 <span className="inline-flex items-center gap-1.5">
                   <Calendar className="h-4 w-4" />
-                  {formatDate(p.scheduledStart)} → {formatDate(p.scheduledEnd)}
+                  {formatDateWithOptions(p.scheduledStart, { showYear: true })} → {formatDateWithOptions(p.scheduledEnd, { showYear: true })}
                 </span>
               </div>
 
@@ -450,10 +450,17 @@ export default function ProjectDetailPage() {
                 </Button>
               )}
               {p.status === "completed" && (
-                <Button variant="outline" size="sm" onClick={() => setArchiveOpen(true)}>
-                  <Archive className="mr-1 h-4 w-4" />
-                  Archive
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="default" size="sm" onClick={() => setArchiveOpen(true)}>
+                      <Archive className="mr-1 h-4 w-4" />
+                      Archive
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>This project will be moved out of active views. This action cannot be undone.</p>
+                  </TooltipContent>
+                </Tooltip>
               )}
               <KpiChip
                 label="Last update"

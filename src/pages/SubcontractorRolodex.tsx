@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { getSubcontractorContacts, getAllPhases, getProjects, createSubcontractorContact, updateSubcontractorContact, deleteSubcontractorContact } from "@/lib/api";
+import { formatDateWithOptions } from "@/lib/schedule";
 import type { Phase, Project, TradeType, SubcontractorContact } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { TradeBadge } from "@/components/ui/trade-badge";
@@ -102,10 +103,6 @@ const SORT_STATE: Record<SortOption, SubcontractorSortState> = {
   next: { key: "nextScheduledFinish", direction: "asc" },
 };
 
-function formatDate(value?: string) {
-  if (!value) return "No scheduled finish";
-  return new Date(value).toLocaleDateString();
-}
 
 function firstScheduledAssignment(assignments: SubcontractorAssignment[] = []) {
   return assignments.find((assignment) => assignment.phase.scheduledEnd) ?? assignments[0];
@@ -488,7 +485,7 @@ export default function SubcontractorRolodexPage() {
           className="mt-1 block truncate text-xs text-primary hover:underline"
           aria-label={`Open ${primaryAssignment.project.name} ${phaseLabel(primaryAssignment.phase)} phase`}
         >
-          {phaseLabel(primaryAssignment.phase)} · finish {formatDate(primaryAssignment.phase.scheduledEnd)}
+          {phaseLabel(primaryAssignment.phase)} · finish {formatDateWithOptions(primaryAssignment.phase.scheduledEnd, { showYear: true })}
         </Link>
       </div>
     );
@@ -823,7 +820,7 @@ export default function SubcontractorRolodexPage() {
                                 className="hover:underline text-primary"
                                 aria-label={`Open ${primaryAssignment.project.name} ${phaseLabel(primaryAssignment.phase)} phase`}
                               >
-                                {formatDate(primaryAssignment.phase.scheduledEnd)} · {primaryAssignment.project.name}
+                                {formatDateWithOptions(primaryAssignment.phase.scheduledEnd, { showYear: true })} · {primaryAssignment.project.name}
                               </Link>
                             ) : (
                               "No scheduled finish"

@@ -1022,26 +1022,6 @@ export async function updatePhase(input: UpdatePhaseInput): Promise<ApiResult<Ph
     return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Phase end must be on or before project end date" } });
   }
 
-  // Validate: must not overlap with other phases
-  const otherPhases = seedPhases.filter((p) => p.projectId === phase.projectId && p.id !== phase.id);
-  for (const other of otherPhases) {
-    const otherStart = other.scheduledStart ? new Date(other.scheduledStart) : undefined;
-    const otherEnd = other.scheduledEnd ? new Date(other.scheduledEnd) : undefined;
-
-    if (!otherStart || !otherEnd) continue; // Skip phases without dates
-
-    // Check for overlap: (newStart < otherEnd) && (newEnd > otherStart)
-    if (newStart && newEnd && newStart < otherEnd && newEnd > otherStart) {
-      return delay({
-        ok: false,
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "Phase dates overlap with another phase in this project",
-        },
-      });
-    }
-  }
-
   const nowIso = new Date().toISOString();
   if (input.scheduledStart !== undefined) phase.scheduledStart = input.scheduledStart;
   if (input.scheduledEnd !== undefined) phase.scheduledEnd = input.scheduledEnd;
@@ -1126,14 +1106,6 @@ export async function updatePhaseSchedules(input: UpdatePhaseSchedulesInput): Pr
     }
     if ((projectStartMs !== undefined && startMs < projectStartMs) || (projectEndMs !== undefined && endMs > projectEndMs)) {
       return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Phase schedules must stay inside the project schedule" } });
-    }
-  }
-
-  for (let index = 1; index < ordered.length; index += 1) {
-    const previous = finalSchedules.get(ordered[index - 1].id)!;
-    const current = finalSchedules.get(ordered[index].id)!;
-    if (parseScheduleDate(current.scheduledStart!) < parseScheduleDate(previous.scheduledEnd!)) {
-      return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Phase schedules cannot overlap" } });
     }
   }
 

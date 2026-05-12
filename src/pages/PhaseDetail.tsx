@@ -43,6 +43,7 @@ import { PhotoViewerDialog } from "@/components/dashboard/PhotoViewerDialog";
 import { PhotoUploadDialog } from "@/components/dashboard/PhotoUploadDialog";
 import { DatePicker } from "@/components/ui/date-picker";
 import { assignSubcontractorToPhase, getPhase, getPhotoViewUrl, markPhaseReadyForInspection, updatePhase } from "@/lib/api";
+import { formatDateWithOptions } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import type { Deficiency, Gate, PhaseStatus, PhotoEvidence } from "@/lib/types";
 import {
@@ -324,13 +325,13 @@ export default function PhaseDetailPage() {
               <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3 md:hidden">
                 <SectionHeading as="div" size="sm">Schedule</SectionHeading>
                 <div className="mt-1 text-sm font-semibold">
-                  {fmt(phase.scheduledStart)} → {fmt(phase.scheduledEnd)}
+                  {formatDateWithOptions(phase.scheduledStart, { showYear: true })} → {formatDateWithOptions(phase.scheduledEnd, { showYear: true })}
                 </div>
               </div>
               <div className="mt-4 hidden md:flex md:flex-wrap md:items-center md:gap-x-5 md:gap-y-2 md:text-sm md:text-muted-foreground">
-                <span className="font-medium text-foreground">{fmt(phase.scheduledStart)} → {fmt(phase.scheduledEnd)}</span>
+                <span className="font-medium text-foreground">{formatDateWithOptions(phase.scheduledStart, { showYear: true })} → {formatDateWithOptions(phase.scheduledEnd, { showYear: true })}</span>
                 <span>Last update: <span className="font-medium text-foreground">{relativeTime(phase.updatedAt)}</span></span>
-                <span>Closed: <span className="font-medium text-foreground">{fmt(phase.closedAt)}</span></span>
+                <span>Closed: <span className="font-medium text-foreground">{formatDateWithOptions(phase.closedAt, { showYear: true })}</span></span>
                 {phase.type === "finishing" && project.finishLevel && (
                   <span>Finish level: <span className="font-medium text-foreground">{project.finishLevel}</span></span>
                 )}
@@ -599,10 +600,16 @@ export default function PhaseDetailPage() {
                     <div>
                       <div className="text-xs text-muted-foreground">Scheduled start</div>
                       <DatePicker
+                        id="scheduled-start"
                         value={phase.scheduledStart ? new Date(phase.scheduledStart) : undefined}
                         onChange={(date) => {
                           if (date) {
-                            updatePhaseMutation.mutate({ phaseId: phase.id, scheduledStart: date.toISOString() });
+                            const newStart = date.toISOString();
+                            if (newStart < project.scheduledStart || (phase.scheduledEnd && newStart > phase.scheduledEnd) || (project.scheduledEnd && newStart > project.scheduledEnd)) {
+                              setDateValidationError("Phase start must be on or before project end date.");
+                              return;
+                            }
+                            updatePhaseMutation.mutate({ phaseId: phase.id, scheduledStart: newStart });
                           }
                         }}
                         placeholder="Not set"
@@ -612,10 +619,16 @@ export default function PhaseDetailPage() {
                     <div>
                       <div className="text-xs text-muted-foreground">Scheduled end</div>
                       <DatePicker
+                        id="scheduled-end"
                         value={phase.scheduledEnd ? new Date(phase.scheduledEnd) : undefined}
                         onChange={(date) => {
                           if (date) {
-                            updatePhaseMutation.mutate({ phaseId: phase.id, scheduledEnd: date.toISOString() });
+                            const newEnd = date.toISOString();
+                            if (newEnd > project.scheduledEnd || (phase.scheduledStart && newEnd < phase.scheduledStart) || (project.scheduledStart && newEnd < project.scheduledStart)) {
+                              setDateValidationError("Phase end must be on or after project start date.");
+                              return;
+                            }
+                            updatePhaseMutation.mutate({ phaseId: phase.id, scheduledEnd: newEnd });
                           }
                         }}
                         placeholder="Not set"
@@ -624,7 +637,7 @@ export default function PhaseDetailPage() {
                     </div>
                   </div>
                   <div className="mt-4 grid gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
-                    <div>Closed: <span className="font-medium text-foreground">{fmt(phase.closedAt)}</span></div>
+                    <div>Closed: <span className="font-medium text-foreground">{formatDateWithOptions(phase.closedAt, { showYear: true })}</span></div>
                     <div>Last update: <span className="font-medium text-foreground">{relativeTime(phase.updatedAt)}</span></div>
                   </div>
                 </Card>
@@ -1016,9 +1029,6 @@ export default function PhaseDetailPage() {
   );
 }
 
-function fmt(iso?: string) {
-  return iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
-}
 
 function mobileGateHasAction({
   gate,

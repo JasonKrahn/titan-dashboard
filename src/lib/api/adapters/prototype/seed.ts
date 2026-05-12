@@ -493,9 +493,9 @@ const phaseSubcontractors = {
 } as const;
 
 const phaseWindows = {
-  insulation: { start: -18, end: -8 },
-  drywall: { start: -7, end: 5 },
-  finishing: { start: 6, end: 18 },
+  insulation: { start: 0, end: 10 },
+  drywall: { start: 8, end: 20 },
+  finishing: { start: 21, end: 33 },
 } as const;
 
 type PhaseSeed = {
@@ -613,8 +613,8 @@ const scenarios: Scenario[] = [
         scheduledEnd: iso(-days(5)),
         updatedAt: iso(-days(1)),
       },
-      drywall: { status: "not_started", scheduledStart: iso(days(1)), scheduledEnd: iso(days(11)) },
-      finishing: { status: "not_started", scheduledStart: iso(days(12)), scheduledEnd: iso(days(22)) },
+      drywall: { status: "not_started", scheduledStart: iso(-days(4)), scheduledEnd: iso(-days(5)) },
+      finishing: { status: "not_started", scheduledStart: iso(-days(4)), scheduledEnd: iso(-days(5)) },
     },
     gates: {
       "insulation-site_check": { status: "passed", completedByUserId: "user-pm-1", completedAt: iso(-days(18)) },
@@ -640,7 +640,7 @@ const scenarios: Scenario[] = [
         updatedAt: iso(-days(2)),
       },
       drywall: { status: "not_started", scheduledStart: iso(days(1)), scheduledEnd: iso(days(10)) },
-      finishing: { status: "not_started", scheduledStart: iso(days(11)), scheduledEnd: iso(days(24)) },
+      finishing: { status: "not_started", scheduledStart: iso(days(11)), scheduledEnd: iso(days(12)) },
     },
     gates: {
       "insulation-site_check": { status: "passed", completedByUserId: "user-pm-2", completedAt: iso(-days(30)) },
@@ -764,9 +764,29 @@ function defaultPhaseDates(projectId: string, type: (typeof phaseTypes)[number],
   const project = seedProjects.find((item) => item.id === projectId);
   const window = phaseWindows[type];
   const projectStart = project?.scheduledStart ? new Date(project.scheduledStart).getTime() : now - days(ageDays);
+  
+  let startOffset: number = window.start;
+  let endOffset: number = window.end;
+  
+  // Clamp to project boundaries if project has dates
+  if (project?.scheduledStart && project?.scheduledEnd) {
+    const projectEnd = new Date(project.scheduledEnd).getTime();
+    const projectDurationDays = Math.floor((projectEnd - projectStart) / days(1));
+    
+    // Ensure phase end doesn't exceed project end
+    if (endOffset > projectDurationDays) {
+      endOffset = projectDurationDays;
+    }
+    
+    // Ensure phase start doesn't exceed project end
+    if (startOffset > projectDurationDays) {
+      startOffset = projectDurationDays;
+    }
+  }
+  
   return {
-    scheduledStart: iso(projectStart - now + days(window.start)),
-    scheduledEnd: iso(projectStart - now + days(window.end)),
+    scheduledStart: iso(projectStart - now + days(startOffset)),
+    scheduledEnd: iso(projectStart - now + days(endOffset)),
   };
 }
 

@@ -22,8 +22,10 @@ import {
   computePhaseHealth,
   initials,
   openDeficiencyCount,
+  phaseHealthDotClass,
   projectPhases,
   relativeTime,
+  type PhaseSummaryItem,
 } from "@/lib/derived";
 import type { ClientRecord, Deficiency, Gate, Phase, Project, User } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -59,17 +61,26 @@ const sortLabels: Record<ProjectSortKey, string> = {
   pm: "PM",
 };
 
-function phaseSummary(project: Project, phases: Phase[], gates: Gate[], deficiencies: Deficiency[]) {
+const PHASE_ABBREV: Record<string, string> = {
+  insulation: "INSU",
+  drywall: "DRYW",
+  finishing: "FINI",
+};
+
+function phaseSummary(project: Project, phases: Phase[], gates: Gate[], deficiencies: Deficiency[]): PhaseSummaryItem[] {
   const byType = projectPhases(project.id, phases);
   return PHASE_ORDER.map((type) => {
     const phase = byType[type];
     const label = PHASE_LABEL[type];
-    if (!phase) return `${label} Not started`;
+    const abbrev = PHASE_ABBREV[type];
+    if (!phase) {
+      return { type, abbrev, tone: "not-started", label: "Not started", reason: "Phase not yet created" };
+    }
     const phaseGates = gates.filter((g) => g.phaseId === phase.id);
     const phaseDefs = deficiencies.filter((d) => d.phaseId === phase.id);
     const health = computePhaseHealth(phase, phaseGates, phaseDefs);
-    return `${label} ${health.label}`;
-  }).join(" / ");
+    return { type, abbrev, tone: health.tone, label: health.label, reason: health.reason };
+  });
 }
 
 function SortButton({
@@ -361,8 +372,15 @@ export function ProjectResults({
                     <TableCell>
                       {STATUS_LABEL[row.project.status]}
                     </TableCell>
-                    <TableCell className="hidden text-xs text-muted-foreground xl:table-cell">
-                      {row.phaseSummary}
+                    <TableCell className="hidden xl:table-cell">
+                      <div className="flex items-center gap-3">
+                        {row.phaseSummary.map((item) => (
+                          <div key={item.type} className="flex items-center gap-1.5" title={`${PHASE_LABEL[item.type]}: ${item.label} (${item.reason})`}>
+                            <span className={cn("h-1.5 w-1.5 rounded-full", phaseHealthDotClass(item.tone))} />
+                            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{item.abbrev}</span>
+                          </div>
+                        ))}
+                      </div>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
                       {row.openIssues > 0 ? (
