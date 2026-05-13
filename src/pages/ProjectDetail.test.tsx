@@ -5,15 +5,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import ProjectDetailPage from "./ProjectDetail";
 import type { InventoryPickup, ProjectDetail } from "@/lib/types";
 
-const { getProject, getCurrentUser, getPhotoViewUrl, getUsers, setCurrentUser, getProjectEquipment, getProjectInventoryPickups, updateProjectEquipmentBatch } = vi.hoisted(() => ({
+const { getProject, getCurrentUser, getPhotoViewUrl, getUsers, setCurrentUser, getProjectEquipment, getPhaseMaterials, getProjectInventoryPickups, updateProjectEquipmentBatch, exportProjectZip } = vi.hoisted(() => ({
   getProject: vi.fn(),
   getCurrentUser: vi.fn(),
   getPhotoViewUrl: vi.fn(),
   getUsers: vi.fn(),
   setCurrentUser: vi.fn(),
   getProjectEquipment: vi.fn(),
+  getPhaseMaterials: vi.fn(),
   getProjectInventoryPickups: vi.fn(),
   updateProjectEquipmentBatch: vi.fn(),
+  exportProjectZip: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -26,12 +28,17 @@ vi.mock("@/lib/api", async () => {
     getUsers,
     setCurrentUser,
     getProjectEquipment,
+    getPhaseMaterials,
     getProjectInventoryPickups,
     updateProjectEquipmentBatch,
     updateAtticGate: vi.fn(),
     updatePhaseSchedules: vi.fn(),
   };
 });
+
+vi.mock("@/lib/projectExport", () => ({
+  exportProjectZip,
+}));
 
 const equipmentLogs = [
   {
@@ -56,6 +63,15 @@ const equipmentPickup: InventoryPickup = {
   pickedUpByUserId: "user-inventory-1",
   items: [{ kind: "equipment", itemKey: "baker_scaffold", quantity: 1 }],
   createdAt: "2026-05-13T10:00:00.000Z",
+};
+
+const materialLog = {
+  id: "material-phase-insulation-r20-batt",
+  projectId: "proj-1",
+  phaseId: "phase-insulation",
+  itemKey: "r20_batt",
+  quantity: 4,
+  updatedAt: "2026-05-12T00:00:00.000Z",
 };
 
 const detail: ProjectDetail = {
@@ -142,7 +158,9 @@ describe("ProjectDetailPage schedule", () => {
     getPhotoViewUrl.mockResolvedValue({ ok: true, data: { url: "https://example.com/photo.jpg" } });
     getUsers.mockResolvedValue({ ok: true, data: [] });
     getProjectEquipment.mockResolvedValue({ ok: true, data: equipmentLogs });
+    getPhaseMaterials.mockResolvedValue({ ok: true, data: [materialLog] });
     getProjectInventoryPickups.mockResolvedValue({ ok: true, data: [] });
+    exportProjectZip.mockResolvedValue(undefined);
     updateProjectEquipmentBatch.mockResolvedValue({
       ok: true,
       data: {
@@ -197,7 +215,9 @@ describe("ProjectDetailPage equipment", () => {
     getPhotoViewUrl.mockResolvedValue({ ok: true, data: { url: "https://example.com/photo.jpg" } });
     getUsers.mockResolvedValue({ ok: true, data: [] });
     getProjectEquipment.mockResolvedValue({ ok: true, data: equipmentLogs });
+    getPhaseMaterials.mockResolvedValue({ ok: true, data: [materialLog] });
     getProjectInventoryPickups.mockResolvedValue({ ok: true, data: [] });
+    exportProjectZip.mockResolvedValue(undefined);
     updateProjectEquipmentBatch.mockResolvedValue({
       ok: true,
       data: {
@@ -248,6 +268,41 @@ describe("ProjectDetailPage equipment", () => {
     expect(screen.getByText("Inventory picked up")).toBeInTheDocument();
     expect(screen.getByText("Picked up: Baker Scaffolds ×1")).toBeInTheDocument();
     expect(screen.getByText("“North side”")).toBeInTheDocument();
+  });
+
+  it("exports equipment, pickups, and phase materials with the project archive", async () => {
+    getProject.mockResolvedValue({
+      ok: true,
+      data: {
+        ...detail,
+        project: {
+          ...detail.project,
+          status: "archived",
+        },
+      },
+    });
+    getProjectInventoryPickups.mockResolvedValue({ ok: true, data: [equipmentPickup] });
+
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Export" }));
+
+    await waitFor(() => {
+      expect(exportProjectZip).toHaveBeenCalledTimes(1);
+    });
+    expect(getPhaseMaterials).toHaveBeenCalledWith("phase-insulation");
+    expect(getPhaseMaterials).toHaveBeenCalledWith("phase-drywall");
+    expect(getPhaseMaterials).toHaveBeenCalledWith("phase-finishing");
+    expect(exportProjectZip).toHaveBeenCalledWith(
+      expect.objectContaining({ project: expect.objectContaining({ status: "archived" }) }),
+      detail.client,
+      undefined,
+      {
+        equipmentLogs,
+        inventoryPickups: [equipmentPickup],
+        materialLogs: [materialLog, materialLog, materialLog],
+      },
+    );
   });
 
   it("opens the equipment catalog and saves only changed draft quantities", async () => {
