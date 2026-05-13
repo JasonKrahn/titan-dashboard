@@ -27,6 +27,7 @@ import {
   relativeTime,
   type PhaseSummaryItem,
 } from "@/lib/derived";
+import { formatDateWithOptions } from "@/lib/schedule";
 import type { ClientRecord, Deficiency, Gate, Phase, Project, User } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { sortProjectRows, type ProjectRow, type ProjectSortKey, type ProjectSortState } from "./ProjectResultsSort";
@@ -282,6 +283,16 @@ export function ProjectResults({
                       {row.openIssues > 0 ? ` · ${row.openIssues} open` : ""}
                       {row.pm ? ` · ${initials(row.pm.fullName)}` : ""}
                     </div>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                      <span>
+                        <span className="font-medium text-foreground/80">Start</span>{" "}
+                        {formatDateWithOptions(row.project.scheduledStart ?? "")}
+                      </span>
+                      <span>
+                        <span className="font-medium text-foreground/80">End</span>{" "}
+                        {formatDateWithOptions(row.project.scheduledEnd ?? "")}
+                      </span>
+                    </div>
                   </div>
                 </button>
               </li>
@@ -346,6 +357,16 @@ export function ProjectResults({
                           <div className="truncate font-mono text-xs text-muted-foreground">{row.project.projectNumber}</div>
                           <div className="truncate font-semibold leading-tight text-foreground group-hover:text-primary">
                             {row.project.name}
+                          </div>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+                            <span>
+                              <span className="font-medium text-foreground/80">Start</span>{" "}
+                              {formatDateWithOptions(row.project.scheduledStart ?? "")}
+                            </span>
+                            <span>
+                              <span className="font-medium text-foreground/80">End</span>{" "}
+                              {formatDateWithOptions(row.project.scheduledEnd ?? "")}
+                            </span>
                           </div>
                         </button>
                         {row.project.status !== "completed" && row.project.status !== "archived" && onEditProject && (

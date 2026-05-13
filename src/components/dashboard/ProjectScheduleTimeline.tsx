@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { CalendarDays, ChevronDown } from "lucide-react";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { PHASE_LABEL, computePhaseHealth, phaseHealthClasses } from "@/lib/derived";
 import {
@@ -33,6 +37,12 @@ type DragState = {
   startX: number;
 };
 
+type MobileScheduleDraft = {
+  phaseId: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+} | null;
+
 export function ProjectScheduleTimeline({
   project,
   phases,
@@ -44,10 +54,14 @@ export function ProjectScheduleTimeline({
 }: ProjectScheduleTimelineProps) {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const draftRef = useRef<ScheduleDraftResult | null>(null);
+  const mobileStartInputRef = useRef<HTMLInputElement | null>(null);
+  const mobileEndInputRef = useRef<HTMLInputElement | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [draft, setDraft] = useState<ScheduleDraftResult | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [mobileExpanded, setMobileExpanded] = useState(false);
+  const [mobileDraft, setMobileDraft] = useState<MobileScheduleDraft>(null);
+  const [mobileError, setMobileError] = useState<string | null>(null);
 
   const orderedPhases = useMemo(() => orderedSchedulePhases(phases), [phases]);
   const readOnly = project.status === "completed" || project.status === "archived" || saving;
@@ -60,6 +74,8 @@ export function ProjectScheduleTimeline({
     setDraft(null);
     draftRef.current = null;
     setMessage(null);
+    setMobileDraft(null);
+    setMobileError(null);
   }, [phases]);
 
   useEffect(() => {
@@ -79,7 +95,11 @@ export function ProjectScheduleTimeline({
       });
       draftRef.current = nextDraft;
       setDraft(nextDraft);
-      setMessage(nextDraft.ok ? null : nextDraft.message);
+      if ("message" in nextDraft) {
+        setMessage(nextDraft.message);
+      } else {
+        setMessage(null);
+      }
     };
 
     const onPointerMove = (event: PointerEvent) => updateDraft(event.clientX);
@@ -87,7 +107,7 @@ export function ProjectScheduleTimeline({
       const current = draftRef.current;
       if (current?.ok && current.changes.length > 0) {
         onScheduleChange(current.changes);
-      } else if (current && !current.ok) {
+      } else if (current && "message" in current) {
         setMessage(current.message);
       }
       setDrag(null);
@@ -113,6 +133,8 @@ export function ProjectScheduleTimeline({
 
   const projectStartMs = parseScheduleDate(projectStart);
   const projectEndMs = parseScheduleDate(projectEnd);
+  const projectStartDate = toScheduleDate(projectStartMs);
+  const projectEndDate = toScheduleDate(projectEndMs);
   const totalMs = Math.max(1, projectEndMs - projectStartMs);
   const todayMs = parseScheduleDate(toScheduleDate(Date.now()));
   const todayPct = ((todayMs - projectStartMs) / totalMs) * 100;
@@ -125,6 +147,63 @@ export function ProjectScheduleTimeline({
     };
   };
 
+  const mobileEditingPhase = mobileDraft ? orderedPhases.find((phase) => phase.id === mobileDraft.phaseId) : undefined;
+
+  const openMobileEditor = (phase: Phase, scheduledStart: string, scheduledEnd: string) => {
+    if (readOnly) return;
+    setMobileDraft({
+      phaseId: phase.id,
+      scheduledStart: toScheduleDate(parseScheduleDate(scheduledStart)),
+      scheduledEnd: toScheduleDate(parseScheduleDate(scheduledEnd)),
+    });
+    setMobileError(null);
+  };
+
+  const closeMobileEditor = () => {
+    setMobileDraft(null);
+    setMobileError(null);
+  };
+
+  const saveMobileDraft = () => {
+    if (!mobileDraft || !mobileEditingPhase) return;
+
+    const scheduledStart = mobileStartInputRef.current?.value ?? mobileDraft.scheduledStart;
+    const scheduledEnd = mobileEndInputRef.current?.value ?? mobileDraft.scheduledEnd;
+    if (!scheduledStart || !scheduledEnd) {
+      setMobileError("Start and end dates are required.");
+      return;
+    }
+
+    const startMs = parseScheduleDate(scheduledStart);
+    const endMs = parseScheduleDate(scheduledEnd);
+    if (startMs < projectStartMs) {
+      setMobileError("Phase start must be on or after the project start date.");
+      return;
+    }
+    if (endMs > projectEndMs) {
+      setMobileError("Phase end must be on or before the project end date.");
+      return;
+    }
+    if (endMs <= startMs) {
+      setMobileError("Phase end must be after the phase start date.");
+      return;
+    }
+
+    const originalStart = mobileEditingPhase.scheduledStart
+      ? toScheduleDate(parseScheduleDate(mobileEditingPhase.scheduledStart))
+      : scheduledStart;
+    const originalEnd = mobileEditingPhase.scheduledEnd
+      ? toScheduleDate(parseScheduleDate(mobileEditingPhase.scheduledEnd))
+      : scheduledEnd;
+    if (scheduledStart === originalStart && scheduledEnd === originalEnd) {
+      closeMobileEditor();
+      return;
+    }
+
+    onScheduleChange([{ phaseId: mobileEditingPhase.id, scheduledStart, scheduledEnd }]);
+    closeMobileEditor();
+  };
+
   const startDrag = (event: ReactPointerEvent<HTMLElement>, phaseId: string, mode: ScheduleDragMode) => {
     if (readOnly) return;
     event.preventDefault();
@@ -135,6 +214,7 @@ export function ProjectScheduleTimeline({
   };
 
   return (
+    <>
     <Card surface="panel" className="rounded-xl p-4 sm:p-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -286,10 +366,15 @@ export function ProjectScheduleTimeline({
             const duration = Math.round((endMs - startMs) / (1000 * 60 * 60 * 24));
 
             return (
-              <div
+              <button
+                type="button"
                 key={phase.id}
+                disabled={readOnly}
+                onClick={() => openMobileEditor(phase, schedule.scheduledStart, schedule.scheduledEnd)}
                 className={cn(
-                  "rounded-lg border p-3",
+                  "w-full rounded-lg border p-3 text-left transition-colors",
+                  !readOnly && "active:bg-muted/50 hover:bg-muted/30",
+                  readOnly && "cursor-default",
                   classes.bg,
                   classes.border
                 )}
@@ -311,11 +396,71 @@ export function ProjectScheduleTimeline({
                     style={{ marginLeft: `${left}%`, width: `${width}%` }}
                   />
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
       )}
     </Card>
+    <BottomSheet
+      open={!!mobileDraft}
+      onOpenChange={(open) => {
+        if (!open) closeMobileEditor();
+      }}
+      title={mobileEditingPhase ? `Edit ${PHASE_LABEL[mobileEditingPhase.type]} schedule` : "Edit phase schedule"}
+      description="Update phase start and end dates within the project schedule window."
+    >
+      {mobileDraft && mobileEditingPhase && (
+        <div className="grid gap-4">
+          <p className="text-sm text-muted-foreground">
+            Project window: {formatDateWithOptions(projectStart, { showYear: true })} - {formatDateWithOptions(projectEnd, { showYear: true })}
+          </p>
+          <div className="grid gap-2">
+            <Label htmlFor="mobile-schedule-start">Start date</Label>
+            <Input
+              ref={mobileStartInputRef}
+              id="mobile-schedule-start"
+              type="date"
+              min={projectStartDate}
+              max={projectEndDate}
+              value={mobileDraft.scheduledStart}
+              onChange={(event) => {
+                setMobileDraft((current) => current ? { ...current, scheduledStart: event.target.value } : current);
+                setMobileError(null);
+              }}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="mobile-schedule-end">End date</Label>
+            <Input
+              ref={mobileEndInputRef}
+              id="mobile-schedule-end"
+              type="date"
+              min={projectStartDate}
+              max={projectEndDate}
+              value={mobileDraft.scheduledEnd}
+              onChange={(event) => {
+                setMobileDraft((current) => current ? { ...current, scheduledEnd: event.target.value } : current);
+                setMobileError(null);
+              }}
+            />
+          </div>
+          {mobileError && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {mobileError}
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <Button type="button" variant="outline" onClick={closeMobileEditor}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={saveMobileDraft}>
+              Save
+            </Button>
+          </div>
+        </div>
+      )}
+    </BottomSheet>
+    </>
   );
 }

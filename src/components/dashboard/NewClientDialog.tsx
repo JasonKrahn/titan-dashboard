@@ -2,12 +2,23 @@ import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { AddressAutocomplete } from "@/components/ui/address-autocomplete";
-import { createClient, updateClient, type CreateClientInput } from "@/lib/api";
+import { createClient, deleteClient, updateClient, type CreateClientInput } from "@/lib/api";
 import type { ClientRecord } from "@/lib/types";
 
 interface NewClientDialogProps {
@@ -16,11 +27,12 @@ interface NewClientDialogProps {
   client?: ClientRecord;
   onCreated?: (clientId: string) => void;
   onUpdated?: (clientId: string) => void;
+  onDeleted?: (clientId: string) => void;
 }
 
 const empty: CreateClientInput = { name: "" };
 
-export function NewClientDialog({ open, onOpenChange, client, onCreated, onUpdated }: NewClientDialogProps) {
+export function NewClientDialog({ open, onOpenChange, client, onCreated, onUpdated, onDeleted }: NewClientDialogProps) {
   const qc = useQueryClient();
   const [form, setForm] = useState<CreateClientInput>(empty);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -47,12 +59,19 @@ export function NewClientDialog({ open, onOpenChange, client, onCreated, onUpdat
     setErrors({});
   };
 
+  const invalidateClientData = () => {
+    qc.invalidateQueries({ queryKey: ["clients"] });
+    qc.invalidateQueries({ queryKey: ["projects"] });
+    qc.invalidateQueries({ queryKey: ["projects", "all-visible"] });
+    qc.invalidateQueries({ queryKey: ["audit-events"] });
+  };
+
   const mutation = useMutation({
     mutationFn: (data: CreateClientInput) => isEdit ? updateClient(client.id, data) : createClient(data),
     onSuccess: (res) => {
       if (res.ok === true) {
         toast.success(isEdit ? `Client "${res.data.name}" updated` : `Client "${res.data.name}" created`);
-        qc.invalidateQueries({ queryKey: ["clients"] });
+        invalidateClientData();
         reset();
         onOpenChange(false);
         if (isEdit) {
@@ -63,6 +82,21 @@ export function NewClientDialog({ open, onOpenChange, client, onCreated, onUpdat
         return;
       }
       setErrors(res.error.fieldErrors ?? {});
+      toast.error(res.error.message);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteClient(client!.id),
+    onSuccess: (res) => {
+      if (res.ok === true) {
+        toast.success(`Client "${res.data.name}" deleted`);
+        invalidateClientData();
+        reset();
+        onOpenChange(false);
+        onDeleted?.(res.data.id);
+        return;
+      }
       toast.error(res.error.message);
     },
   });
@@ -146,11 +180,46 @@ export function NewClientDialog({ open, onOpenChange, client, onCreated, onUpdat
             <Textarea id="notes" value={form.notes ?? ""} onChange={(e) => setField("notes", e.target.value)} rows={2} />
           </div>
 
+          {isEdit && client && (
+            <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm">
+              <div className="font-semibold text-destructive">Danger zone</div>
+              <p className="mt-1 text-muted-foreground">Deleting removes this client from active app views and cannot be restored from the UI.</p>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button type="button" variant="destructive" size="sm" className="mt-3" disabled={deleteMutation.isPending}>
+                    Delete client
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete {client.name}?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This is a destructive action. <strong>{client.name}</strong> will be removed from active app views and cannot be restored from the UI. Project managers must delete this client's projects first.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        deleteMutation.mutate();
+                      }}
+                      disabled={deleteMutation.isPending}
+                    >
+                      {deleteMutation.isPending ? "Deleting…" : "Yes, delete client"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
+
           <DialogFooter className="pt-2">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={mutation.isPending}>
+            <Button type="submit" disabled={mutation.isPending || deleteMutation.isPending}>
               {mutation.isPending ? (isEdit ? "Saving…" : "Creating…") : (isEdit ? "Save changes" : "Create client")}
             </Button>
           </DialogFooter>

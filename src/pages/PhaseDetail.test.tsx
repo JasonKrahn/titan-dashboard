@@ -1,11 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import PhaseDetailPage from "./PhaseDetail";
-import type { MaterialLog, PhaseDetail } from "@/lib/types";
+import type { InventoryPickup, MaterialLog, PhaseDetail } from "@/lib/types";
 
-const { getPhase, getCurrentUser, getPhotoViewUrl, getUsers, setCurrentUser, updatePhase, getPhaseMaterials, updatePhaseMaterial } = vi.hoisted(() => ({
+const { getPhase, getCurrentUser, getPhotoViewUrl, getUsers, setCurrentUser, updatePhase, getPhaseMaterials, getProjectInventoryPickups, updatePhaseMaterials } = vi.hoisted(() => ({
   getPhase: vi.fn(),
   getCurrentUser: vi.fn(),
   getPhotoViewUrl: vi.fn(),
@@ -13,7 +13,8 @@ const { getPhase, getCurrentUser, getPhotoViewUrl, getUsers, setCurrentUser, upd
   setCurrentUser: vi.fn(),
   updatePhase: vi.fn(),
   getPhaseMaterials: vi.fn(),
-  updatePhaseMaterial: vi.fn(),
+  getProjectInventoryPickups: vi.fn(),
+  updatePhaseMaterials: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -26,7 +27,8 @@ vi.mock("@/lib/api", async () => {
     getUsers,
     setCurrentUser,
     getPhaseMaterials,
-    updatePhaseMaterial,
+    getProjectInventoryPickups,
+    updatePhaseMaterials,
     markPhaseReadyForInspection: vi.fn(),
     updatePhase,
     assignSubcontractorToPhase: vi.fn(),
@@ -52,6 +54,14 @@ const insulationMaterials: MaterialLog[] = [
     updatedAt: "2026-05-08T10:00:00.000Z",
   },
 ];
+
+const materialPickup: InventoryPickup = {
+  id: "pickup-material-1",
+  projectId: "proj-1",
+  pickedUpByUserId: "user-inventory-1",
+  items: [{ kind: "material", itemKey: "r20_batt", quantity: 2 }],
+  createdAt: "2026-05-13T10:00:00.000Z",
+};
 
 const detail: PhaseDetail = {
   project: {
@@ -178,12 +188,13 @@ describe("PhaseDetailPage desktop status rail", () => {
     getUsers.mockResolvedValue({ ok: true, data: [detail.assignedProjectManager] });
     updatePhase.mockResolvedValue({ ok: true, data: detail.phase });
     getPhaseMaterials.mockResolvedValue({ ok: true, data: insulationMaterials });
-    updatePhaseMaterial.mockResolvedValue({
+    getProjectInventoryPickups.mockResolvedValue({ ok: true, data: [] });
+    updatePhaseMaterials.mockResolvedValue({
       ok: true,
-      data: {
+      data: [{
         ...insulationMaterials[0],
         quantity: 4,
-      },
+      }],
     });
   });
 
@@ -212,6 +223,49 @@ describe("PhaseDetailPage desktop status rail", () => {
   });
 });
 
+describe("PhaseDetailPage mobile and tablet overview order", () => {
+  beforeEach(() => {
+    getPhase.mockResolvedValue({ ok: true, data: detail });
+    getCurrentUser.mockResolvedValue({ ok: false, error: { message: "No current user" } });
+    getPhotoViewUrl.mockResolvedValue({ ok: true, data: { url: "https://example.com/photo.jpg" } });
+    getUsers.mockResolvedValue({ ok: true, data: [detail.assignedProjectManager] });
+    updatePhase.mockResolvedValue({ ok: true, data: detail.phase });
+    getPhaseMaterials.mockResolvedValue({ ok: true, data: insulationMaterials });
+    getProjectInventoryPickups.mockResolvedValue({ ok: true, data: [] });
+    updatePhaseMaterials.mockResolvedValue({
+      ok: true,
+      data: [{
+        ...insulationMaterials[0],
+        quantity: 4,
+      }],
+    });
+  });
+
+  it("places the narrow task checklist before personnel", async () => {
+    renderPage();
+
+    await screen.findByRole("heading", { name: "Insulation" });
+
+    const taskChecklist = screen.getByTestId("phase-narrow-task-checklist");
+    const personnel = screen.getByTestId("phase-narrow-personnel");
+
+    expect(taskChecklist.compareDocumentPosition(personnel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("renders narrow gates in a card without nesting photo actions in row buttons", async () => {
+    renderPage();
+
+    await screen.findByRole("heading", { name: "Insulation" });
+
+    const gates = screen.getByTestId("phase-narrow-gates");
+    const photoButton = within(gates).getByRole("button", { name: /1 photo/i });
+
+    expect(gates).toHaveTextContent("Site check");
+    expect(gates).toHaveTextContent("Inspection");
+    expect(photoButton.parentElement?.closest("button")).toBeNull();
+  });
+});
+
 describe("PhaseDetailPage schedule validation", () => {
   beforeEach(() => {
     getPhase.mockResolvedValue({ ok: true, data: detail });
@@ -220,12 +274,13 @@ describe("PhaseDetailPage schedule validation", () => {
     getUsers.mockResolvedValue({ ok: true, data: [detail.assignedProjectManager] });
     updatePhase.mockResolvedValue({ ok: true, data: detail.phase });
     getPhaseMaterials.mockResolvedValue({ ok: true, data: insulationMaterials });
-    updatePhaseMaterial.mockResolvedValue({
+    getProjectInventoryPickups.mockResolvedValue({ ok: true, data: [] });
+    updatePhaseMaterials.mockResolvedValue({
       ok: true,
-      data: {
+      data: [{
         ...insulationMaterials[0],
         quantity: 4,
-      },
+      }],
     });
   });
 
@@ -262,12 +317,13 @@ describe("PhaseDetailPage materials", () => {
     getUsers.mockResolvedValue({ ok: true, data: [detail.assignedProjectManager] });
     updatePhase.mockResolvedValue({ ok: true, data: detail.phase });
     getPhaseMaterials.mockResolvedValue({ ok: true, data: insulationMaterials });
-    updatePhaseMaterial.mockResolvedValue({
+    getProjectInventoryPickups.mockResolvedValue({ ok: true, data: [] });
+    updatePhaseMaterials.mockResolvedValue({
       ok: true,
-      data: {
+      data: [{
         ...insulationMaterials[0],
         quantity: 4,
-      },
+      }],
     });
   });
 
@@ -282,6 +338,17 @@ describe("PhaseDetailPage materials", () => {
     expect(screen.queryByText("Acoustic Sealant")).not.toBeInTheDocument();
   });
 
+  it("renders material pickup summaries for the phase catalog", async () => {
+    getProjectInventoryPickups.mockResolvedValue({ ok: true, data: [materialPickup] });
+
+    renderPage();
+
+    await screen.findByRole("heading", { name: "Insulation" });
+
+    expect(screen.getAllByText("Picked up:").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("R-20 Batts ×2").length).toBeGreaterThan(0);
+  });
+
   it("opens the current phase material catalog and saves only changed draft quantities", async () => {
     renderPage();
 
@@ -294,18 +361,17 @@ describe("PhaseDetailPage materials", () => {
     expect(screen.getByText("Attic Baffle Vents")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Increase R-20 Batts" }));
-    expect(updatePhaseMaterial).not.toHaveBeenCalled();
+    expect(updatePhaseMaterials).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
-      expect(updatePhaseMaterial).toHaveBeenCalledTimes(1);
+      expect(updatePhaseMaterials).toHaveBeenCalledTimes(1);
     });
-    expect(updatePhaseMaterial).toHaveBeenCalledWith({
+    expect(updatePhaseMaterials).toHaveBeenCalledWith({
       phaseId: "phase-1",
       projectId: "proj-1",
-      itemKey: "r20_batt",
-      quantity: 4,
+      changes: [{ itemKey: "r20_batt", quantity: 4 }],
     });
   });
 

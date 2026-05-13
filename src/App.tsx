@@ -11,6 +11,7 @@ import ActivityLog from "./pages/ActivityLog.tsx";
 import AdminCommandCenter from "./pages/AdminCommandCenter.tsx";
 import OrganizationMembers from "./pages/OrganizationMembers.tsx";
 import Archive from "./pages/Archive.tsx";
+import InventoryTracker from "./pages/InventoryTracker.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/activity" element={<ActivityLog />} />
           <Route path="/command" element={<AdminCommandCenter />} />
           <Route path="/archive" element={<Archive />} />
+          <Route path="/inventory" element={<InventoryTracker />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

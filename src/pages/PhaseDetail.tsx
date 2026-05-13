@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef, type RefObject } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -42,15 +42,15 @@ import { SiteBlockDialog } from "@/components/dashboard/SiteBlockDialog";
 import { SiteUnblockDialog } from "@/components/dashboard/SiteUnblockDialog";
 import { InspectionResultDialog } from "@/components/dashboard/InspectionResultDialog";
 import { DeficiencyDialog } from "@/components/dashboard/DeficiencyDialog";
-import { InventoryDisplayCard, type InventoryDisplayItem } from "@/components/dashboard/InventoryDisplayCard";
+import { InventoryDisplayCard, type InventoryDisplayItem, type InventoryPickupSummaryItem } from "@/components/dashboard/InventoryDisplayCard";
 import { PhotoViewerDialog, type PhotoViewerItem } from "@/components/dashboard/PhotoViewerDialog";
 import { PhotoUploadDialog } from "@/components/dashboard/PhotoUploadDialog";
 import { QuantityStepperModal } from "@/components/dashboard/QuantityStepperModal";
 import { DatePicker } from "@/components/ui/date-picker";
-import { assignSubcontractorToPhase, getPhase, getPhaseMaterials, getPhotoViewUrl, markPhaseReadyForInspection, updatePhase, updatePhaseMaterial } from "@/lib/api";
+import { assignSubcontractorToPhase, getCurrentUser, getPhase, getPhaseMaterials, getPhotoViewUrl, getProjectInventoryPickups, markPhaseReadyForInspection, updatePhase, updatePhaseMaterials } from "@/lib/api";
 import { formatDateWithOptions } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
-import type { Deficiency, Gate, MaterialLog, PhaseStatus, PhotoEvidence } from "@/lib/types";
+import type { Deficiency, Gate, InventoryPickup, MaterialLog, PhaseStatus, PhotoEvidence } from "@/lib/types";
 import {
   GATE_LABEL,
   PHASE_LABEL,
@@ -71,9 +71,31 @@ const GATE_BADGE_CLASS: Record<StatusTone, string> = {
   closed: "bg-status-closed/15 text-status-closed",
 };
 
+function formatMaterialPickupSummary(pickup: InventoryPickup, itemKeys: Set<string>, labelByKey: Map<string, string>) {
+  const parts = pickup.items
+    .filter((item) => item.kind === "material" && itemKeys.has(item.itemKey))
+    .map((item) => `${labelByKey.get(item.itemKey) ?? item.itemKey} ×${item.quantity}`);
+  return parts.length > 0 ? parts.join(", ") : undefined;
+}
+
+const EMPTY_PHASE_LOOKUPS = {
+  gates: [],
+  deficiencies: [],
+  photoEvidence: [],
+  auditEvents: [],
+  subcontractors: [],
+  materials: [],
+};
+
 export default function PhaseDetailPage() {
   const { projectId, phaseId } = useParams<{ projectId: string; phaseId: string }>();
-  
+  const navigate = useNavigate();
+
+  const meQ = useQuery({ queryKey: ["me"], queryFn: getCurrentUser });
+  useEffect(() => {
+    if (meQ.data?.ok && meQ.data.data.role === "inventory_viewer") navigate("/inventory");
+  }, [meQ.data, navigate]);
+
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") ?? "overview";
 
@@ -91,6 +113,11 @@ export default function PhaseDetailPage() {
     queryKey: ["phase-materials", detail?.phase.id],
     queryFn: () => getPhaseMaterials(detail!.phase.id),
     enabled: !!detail?.phase.id,
+  });
+  const pickupsQ = useQuery({
+    queryKey: ["project-inventory-pickups", detail?.project.id],
+    queryFn: () => getProjectInventoryPickups(detail!.project.id),
+    enabled: !!detail?.project.id,
   });
 
   const readyMutation = useMutation({
@@ -150,24 +177,14 @@ export default function PhaseDetailPage() {
       phaseId: string;
       projectId: string;
       changes: { itemKey: string; quantity: number }[];
-    }) =>
-      Promise.all(
-        changes.map((change) =>
-          updatePhaseMaterial({
-            phaseId,
-            projectId,
-            itemKey: change.itemKey,
-            quantity: change.quantity,
-          }),
-        ),
-      ),
-    onSuccess: async (results, variables) => {
-      const failed = results.find((result) => !result.ok);
-      if (failed && !failed.ok) {
-        setMaterialSaveError(failed.error.message);
+    }) => updatePhaseMaterials({ phaseId, projectId, changes }),
+    onSuccess: async (result, variables) => {
+      if (result.ok === false) {
+        setMaterialSaveError(result.error.message);
         return;
       }
       await qc.invalidateQueries({ queryKey: ["phase-materials", variables.phaseId] });
+      await qc.invalidateQueries({ queryKey: ["phase", variables.phaseId] });
       setMaterialsOpen(false);
       setMaterialDraft({});
       setMaterialSaveError(null);
@@ -258,7 +275,7 @@ export default function PhaseDetailPage() {
             backFallback={`/project/${detail?.project.id ?? ""}`}
             backLabel="Back to Project"
             items={[
-              { label: "All Projects", to: "/", state: { view: "dashboard" }, back: true },
+              { label: "All Projects", to: "/", state: { view: "dashboard" } },
               { label: "Phase" },
             ]}
             className="mb-4"
@@ -280,6 +297,7 @@ export default function PhaseDetailPage() {
   const materialCatalog = PHASE_MATERIAL_CATALOGS[phase.type];
   const materialLogs: MaterialLog[] = materialsQ.data?.ok ? materialsQ.data.data : [];
   const materialLabelByKey = new Map(materialCatalog.map((item) => [item.itemKey, item.label]));
+  const materialItemKeys = new Set(materialCatalog.map((item) => item.itemKey));
   const materialQuantityByKey = new Map(materialLogs.map((log) => [log.itemKey, log.quantity]));
   const materialItems: InventoryDisplayItem[] = materialLogs
     .filter((log) => log.quantity > 0)
@@ -287,6 +305,14 @@ export default function PhaseDetailPage() {
       label: materialLabelByKey.get(log.itemKey) ?? log.itemKey,
       quantity: log.quantity,
     }));
+  const pickups: InventoryPickup[] = pickupsQ.data?.ok ? pickupsQ.data.data : [];
+  const materialPickupSummaries: InventoryPickupSummaryItem[] = pickups
+    .map((pickup) => {
+      const text = formatMaterialPickupSummary(pickup, materialItemKeys, materialLabelByKey);
+      return text ? { id: pickup.id, text } : undefined;
+    })
+    .filter((item): item is InventoryPickupSummaryItem => Boolean(item))
+    .slice(0, 3);
   const materialModalItems = materialCatalog.map((item) => ({
     ...item,
     quantity: materialDraft[item.itemKey] ?? materialQuantityByKey.get(item.itemKey) ?? 0,
@@ -455,12 +481,12 @@ export default function PhaseDetailPage() {
     <div className="min-h-screen bg-background">
       <AppHeader activeSection="dashboard" />
 
-      <main className="container space-y-5 pb-28 pt-5 md:space-y-6 md:py-6">
+      <main className="container space-y-5 pb-28 pt-5 md:space-y-6 md:pt-6 lg:py-6">
         <PageNav
           backFallback={`/project/${project.id}`}
           backLabel="Back to Project"
           items={[
-            { label: "All Projects", to: "/", state: { view: "dashboard" }, back: true },
+            { label: "All Projects", to: "/", state: { view: "dashboard" } },
             { label: project.name, to: `/project/${project.id}` },
             { label: PHASE_LABEL[phase.type] },
           ]}
@@ -470,7 +496,7 @@ export default function PhaseDetailPage() {
         <Card surface="panel" className="rounded-xl p-4 sm:p-6">
           <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8">
             <div className="min-w-0">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
                 <div className="min-w-0">
                   <div className="text-eyebrow font-semibold uppercase tracking-widest text-muted-foreground sm:text-[10px]">
                     {project.projectNumber} · Phase
@@ -564,11 +590,11 @@ export default function PhaseDetailPage() {
           {/* Overview (Gates + Schedule/Personnel) */}
           <TabsContent value="overview" className="space-y-4">
             {/* Gates */}
-            <div className="md:hidden">
+            <div className="lg:hidden">
               {gates.length === 0 ? (
                 <EmptyCard icon={<ShieldCheck className="h-5 w-5" />} text="No gates configured for this phase yet." />
               ) : (
-                <div className="mobile-list overflow-hidden">
+                <Card data-testid="phase-narrow-gates" className="divide-y divide-border overflow-hidden p-0 shadow-card">
                   {gates.map((g) => {
                     if (g.type === "inspection" && siteGate?.status !== "passed") {
                       return null;
@@ -622,7 +648,7 @@ export default function PhaseDetailPage() {
                           {g.notes && <span className="mt-1 block text-xs text-foreground">{g.notes}</span>}
                         </span>
                         {g.type === "site_check" && g.status === "not_started" && (
-                          <div className="flex gap-2">
+                          <div className="flex w-full gap-2 pl-[3.25rem] sm:w-auto sm:pl-0">
                             <Button size="sm" variant="outline" className="h-8 px-2 text-xs" onClick={() => setSiteCheckOpen(true)}>
                               Site Checked
                             </Button>
@@ -640,7 +666,7 @@ export default function PhaseDetailPage() {
                     );
 
                     const inspectionButtons = g.type === "inspection" && showPassedFailed && (
-                      <div className="mt-3 flex gap-2">
+                      <div className="flex w-full gap-2 pl-[3.25rem] sm:w-auto sm:pl-0">
                         <Button
                           size="sm"
                           className="flex-1"
@@ -668,28 +694,34 @@ export default function PhaseDetailPage() {
                       </div>
                     );
 
-                    return hasMobileAction ? (
+                    const gateRowClass = "flex w-full flex-wrap items-start gap-3 px-4 py-4 text-left transition-colors active:bg-muted/60";
+                    const rowHasInlineAction =
+                      gatePhotos.length > 0 ||
+                      Boolean(inspectionButtons) ||
+                      (g.type === "site_check" && (g.status === "not_started" || g.status === "blocked"));
+
+                    return hasMobileAction && !rowHasInlineAction ? (
                       <button
                         key={g.id}
                         type="button"
                         onClick={() => setMobileActionsOpen(true)}
-                        className="flex w-full flex-col items-start gap-3 px-3 py-3 text-left active:bg-muted/60"
+                        className={gateRowClass}
                       >
                         {content}
                         {inspectionButtons}
                       </button>
                     ) : (
-                      <div key={g.id} className="flex flex-col items-start gap-3 px-3 py-3">
+                      <div key={g.id} className={gateRowClass}>
                         {content}
                         {inspectionButtons}
                       </div>
                     );
                   })}
-                </div>
+                </Card>
               )}
             </div>
 
-            <div className="hidden gap-4 md:grid md:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.95fr)]">
+            <div className="hidden gap-4 lg:grid lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.95fr)]">
               <div className="space-y-4">
                 {gates.length === 0 ? (
                   <EmptyCard icon={<ShieldCheck className="h-5 w-5" />} text="No gates configured for this phase yet." />
@@ -888,7 +920,9 @@ export default function PhaseDetailPage() {
                   title="Materials"
                   items={materialItems}
                   onManage={openMaterialsModal}
+                  layout="grid"
                   emptyText="No materials logged"
+                  pickupSummaries={materialPickupSummaries}
                 />
               </div>
 
@@ -993,60 +1027,8 @@ export default function PhaseDetailPage() {
               </div>
             </div>
 
-            <Card className="border-border bg-card p-0 shadow-card md:hidden md:p-5">
-              <div className="p-4 pb-2 md:p-0">
-                <SectionHeading as="h4" size="sm">Personnel</SectionHeading>
-              </div>
-              <div className="grid gap-3 md:mt-3 md:grid-cols-2">
-                <div className="flex items-center gap-3 px-4 pb-4 pt-2 text-sm md:rounded-md md:border md:border-border md:bg-muted/30 md:p-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground md:h-auto md:w-auto md:bg-transparent">
-                    <UserIcon className="h-4 w-4" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-medium text-muted-foreground">Subcontractor</div>
-                    <Select
-                      value={phase.assignedSubcontractorId || "unassigned"}
-                      onValueChange={(value) => {
-                        if (value === "unassigned") return;
-                        assignSubcontractorToPhase(phase.id, value).then((res) => {
-                          if (res.ok) {
-                            qc.invalidateQueries({ queryKey: ["phase", phaseId] });
-                          }
-                        });
-                      }}
-                    >
-                      <SelectTrigger className="mt-0.5 h-auto border-0 bg-transparent p-0 text-base md:text-xs font-semibold shadow-none ring-offset-0 focus:ring-0 focus:ring-offset-0 md:h-7 md:border md:border-input md:bg-background md:px-3 md:py-2 md:font-normal md:focus:ring-2 md:focus:ring-ring md:focus:ring-offset-2">
-                        <SelectValue placeholder="Select subcontractor" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="unassigned">Not assigned</SelectItem>
-                        {subcontractors
-                          .filter((s) => s.trade === phase.type)
-                          .map((s) => (
-                            <SelectItem key={s.id} value={s.id}>
-                              {s.displayName}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 px-4 pb-4 pt-2 text-sm">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                    <UserIcon className="h-4 w-4" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-medium text-muted-foreground">Project manager</div>
-                    <div className="mt-0.5 truncate text-sm font-semibold">
-                      {detail.assignedProjectManager?.fullName ?? "Unassigned"}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-
             {/* Task Checklist (mobile) */}
-            <Card className="border-border bg-card p-0 shadow-card md:hidden">
+            <Card data-testid="phase-narrow-task-checklist" className="border-border bg-card p-0 shadow-card lg:hidden">
               <div className="p-4 pb-2">
                 <SectionHeading as="h4" size="sm">Task Checklist</SectionHeading>
               </div>
@@ -1112,12 +1094,66 @@ export default function PhaseDetailPage() {
               </div>
             </Card>
 
-            <div className="md:hidden">
+            <Card data-testid="phase-narrow-personnel" className="border-border bg-card p-0 shadow-card lg:hidden md:p-5">
+              <div className="p-4 pb-2 md:p-0">
+                <SectionHeading as="h4" size="sm">Personnel</SectionHeading>
+              </div>
+              <div className="grid gap-3 md:mt-3 md:grid-cols-2">
+                <div className="flex items-center gap-3 px-4 pb-4 pt-2 text-sm md:rounded-md md:border md:border-border md:bg-muted/30 md:p-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground md:h-auto md:w-auto md:bg-transparent">
+                    <UserIcon className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-medium text-muted-foreground">Subcontractor</div>
+                    <Select
+                      value={phase.assignedSubcontractorId || "unassigned"}
+                      onValueChange={(value) => {
+                        if (value === "unassigned") return;
+                        assignSubcontractorToPhase(phase.id, value).then((res) => {
+                          if (res.ok) {
+                            qc.invalidateQueries({ queryKey: ["phase", phaseId] });
+                          }
+                        });
+                      }}
+                    >
+                      <SelectTrigger className="mt-0.5 h-auto border-0 bg-transparent p-0 text-base md:text-xs font-semibold shadow-none ring-offset-0 focus:ring-0 focus:ring-offset-0 md:h-7 md:border md:border-input md:bg-background md:px-3 md:py-2 md:font-normal md:focus:ring-2 md:focus:ring-ring md:focus:ring-offset-2">
+                        <SelectValue placeholder="Select subcontractor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">Not assigned</SelectItem>
+                        {subcontractors
+                          .filter((s) => s.trade === phase.type)
+                          .map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.displayName}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 px-4 pb-4 pt-2 text-sm">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                    <UserIcon className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-medium text-muted-foreground">Project manager</div>
+                    <div className="mt-0.5 truncate text-sm font-semibold">
+                      {detail.assignedProjectManager?.fullName ?? "Unassigned"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <div className="lg:hidden">
               <InventoryDisplayCard
                 title="Materials"
                 items={materialItems}
                 onManage={openMaterialsModal}
+                layout="grid"
                 emptyText="No materials logged"
+                pickupSummaries={materialPickupSummaries}
               />
             </div>
 
@@ -1272,7 +1308,7 @@ export default function PhaseDetailPage() {
         </Tabs>
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur md:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur lg:hidden">
         <Button
           type="button"
           className="h-12 w-full rounded-full text-sm font-semibold shadow-glow"

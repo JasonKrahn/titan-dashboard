@@ -3,16 +3,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ProjectDetailPage from "./ProjectDetail";
-import type { ProjectDetail } from "@/lib/types";
+import type { InventoryPickup, ProjectDetail } from "@/lib/types";
 
-const { getProject, getCurrentUser, getPhotoViewUrl, getUsers, setCurrentUser, getProjectEquipment, updateProjectEquipment } = vi.hoisted(() => ({
+const { getProject, getCurrentUser, getPhotoViewUrl, getUsers, setCurrentUser, getProjectEquipment, getProjectInventoryPickups, updateProjectEquipmentBatch } = vi.hoisted(() => ({
   getProject: vi.fn(),
   getCurrentUser: vi.fn(),
   getPhotoViewUrl: vi.fn(),
   getUsers: vi.fn(),
   setCurrentUser: vi.fn(),
   getProjectEquipment: vi.fn(),
-  updateProjectEquipment: vi.fn(),
+  getProjectInventoryPickups: vi.fn(),
+  updateProjectEquipmentBatch: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -25,7 +26,8 @@ vi.mock("@/lib/api", async () => {
     getUsers,
     setCurrentUser,
     getProjectEquipment,
-    updateProjectEquipment,
+    getProjectInventoryPickups,
+    updateProjectEquipmentBatch,
     updateAtticGate: vi.fn(),
     updatePhaseSchedules: vi.fn(),
   };
@@ -47,6 +49,14 @@ const equipmentLogs = [
     updatedAt: "2026-05-01T00:00:00.000Z",
   },
 ];
+
+const equipmentPickup: InventoryPickup = {
+  id: "pickup-equipment-1",
+  projectId: "proj-1",
+  pickedUpByUserId: "user-inventory-1",
+  items: [{ kind: "equipment", itemKey: "baker_scaffold", quantity: 1 }],
+  createdAt: "2026-05-13T10:00:00.000Z",
+};
 
 const detail: ProjectDetail = {
   project: {
@@ -132,7 +142,8 @@ describe("ProjectDetailPage schedule", () => {
     getPhotoViewUrl.mockResolvedValue({ ok: true, data: { url: "https://example.com/photo.jpg" } });
     getUsers.mockResolvedValue({ ok: true, data: [] });
     getProjectEquipment.mockResolvedValue({ ok: true, data: equipmentLogs });
-    updateProjectEquipment.mockResolvedValue({
+    getProjectInventoryPickups.mockResolvedValue({ ok: true, data: [] });
+    updateProjectEquipmentBatch.mockResolvedValue({
       ok: true,
       data: {
         ...equipmentLogs[0],
@@ -148,6 +159,34 @@ describe("ProjectDetailPage schedule", () => {
     expect(await screen.findByRole("heading", { name: "Project Schedule" })).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "Phases" })).toBeInTheDocument();
   });
+
+  it("keeps phase actions separate from phase navigation links", async () => {
+    getProject.mockResolvedValue({
+      ok: true,
+      data: {
+        ...detail,
+        gates: [
+          {
+            id: "gate-site-insulation",
+            projectId: "proj-1",
+            phaseId: "phase-insulation",
+            type: "site_check",
+            status: "not_started",
+            requiredPhotoEvidence: false,
+            createdAt: "2026-05-01T00:00:00.000Z",
+            updatedAt: "2026-05-01T00:00:00.000Z",
+          },
+        ],
+      },
+    });
+
+    renderPage();
+
+    const insulationLink = await screen.findByRole("link", { name: /Insulation/i });
+    expect(insulationLink).toHaveAttribute("href", "/project/proj-1/phase/phase-insulation");
+    expect(screen.getByRole("button", { name: "Site Checked" }).closest("a")).toBeNull();
+    expect(screen.getByRole("button", { name: "Site Blocked" }).closest("a")).toBeNull();
+  });
 });
 
 describe("ProjectDetailPage equipment", () => {
@@ -158,7 +197,8 @@ describe("ProjectDetailPage equipment", () => {
     getPhotoViewUrl.mockResolvedValue({ ok: true, data: { url: "https://example.com/photo.jpg" } });
     getUsers.mockResolvedValue({ ok: true, data: [] });
     getProjectEquipment.mockResolvedValue({ ok: true, data: equipmentLogs });
-    updateProjectEquipment.mockResolvedValue({
+    getProjectInventoryPickups.mockResolvedValue({ ok: true, data: [] });
+    updateProjectEquipmentBatch.mockResolvedValue({
       ok: true,
       data: {
         id: "equipment-proj-1-drywall-lift",
@@ -179,6 +219,37 @@ describe("ProjectDetailPage equipment", () => {
     expect(screen.queryByText("Temporary Site Lighting")).not.toBeInTheDocument();
   });
 
+  it("renders equipment pickup summaries and activity details", async () => {
+    getProject.mockResolvedValue({
+      ok: true,
+      data: {
+        ...detail,
+        auditEvents: [{
+          id: "audit-pickup-1",
+          entityType: "project",
+          entityId: "proj-1",
+          action: "inventory_picked_up",
+          actorUserId: "user-inventory-1",
+          metadata: {
+            pickupId: "pickup-equipment-1",
+            summary: "Baker Scaffolds ×1",
+            note: "North side",
+          },
+          createdAt: "2026-05-13T10:00:00.000Z",
+        }],
+      },
+    });
+    getProjectInventoryPickups.mockResolvedValue({ ok: true, data: [equipmentPickup] });
+
+    renderPage();
+
+    expect(await screen.findByText("Picked up:")).toBeInTheDocument();
+    expect(screen.getAllByText("Baker Scaffolds ×1").length).toBeGreaterThan(0);
+    expect(screen.getByText("Inventory picked up")).toBeInTheDocument();
+    expect(screen.getByText("Picked up: Baker Scaffolds ×1")).toBeInTheDocument();
+    expect(screen.getByText("“North side”")).toBeInTheDocument();
+  });
+
   it("opens the equipment catalog and saves only changed draft quantities", async () => {
     renderPage();
 
@@ -190,17 +261,16 @@ describe("ProjectDetailPage equipment", () => {
     expect(screen.getByText("Drywall Lifts")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Increase Drywall Lifts" }));
-    expect(updateProjectEquipment).not.toHaveBeenCalled();
+    expect(updateProjectEquipmentBatch).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
-      expect(updateProjectEquipment).toHaveBeenCalledTimes(1);
+      expect(updateProjectEquipmentBatch).toHaveBeenCalledTimes(1);
     });
-    expect(updateProjectEquipment).toHaveBeenCalledWith({
+    expect(updateProjectEquipmentBatch).toHaveBeenCalledWith({
       projectId: "proj-1",
-      itemKey: "drywall_lift",
-      quantity: 1,
+      changes: [{ itemKey: "drywall_lift", quantity: 1 }],
     });
   });
 });

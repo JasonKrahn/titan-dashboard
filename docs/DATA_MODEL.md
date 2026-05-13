@@ -18,7 +18,7 @@ Source of truth: backend-shaped entity model for prototype fixtures and future S
 ### User
 
 ```ts
-type UserRole = "admin" | "project_manager";
+type UserRole = "admin" | "project_manager" | "inventory_viewer";
 
 interface User {
   id: string;
@@ -72,6 +72,8 @@ interface Project {
 ```
 
 MVP Project Manager access derives from `assignedProjectManagerId`. Admin can access all project data. A Project Manager can read and mutate only projects where `assignedProjectManagerId` matches the current user. Multi-PM membership tables are backlog unless a later decision changes MVP scope.
+
+An `inventory_viewer` can read all active projects and their materials/equipment regardless of `assignedProjectManagerId`. This role has no write access and cannot see draft, completed, or archived projects.
 
 ### Phase
 

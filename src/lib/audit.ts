@@ -17,13 +17,19 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   attic_gate_updated: "Attic gate updated",
   complete_project: "Project completed",
   create_client: "Client created",
+  delete_client: "Client deleted",
   create_deficiency: "Deficiency opened",
   create_project: "Project created",
+  delete_project: "Project deleted",
   create_subcontractor: "Subcontractor created",
   deleted: "Deleted",
   deficiency_opened: "Deficiency opened",
   fail_gate: "Gate failed",
+  hardware_updated: "Hardware updated",
   inspection_completed: "Inspection completed",
+  inventory_audit_requested: "Inventory audit requested",
+  inventory_picked_up: "Inventory picked up",
+  materials_updated: "Materials updated",
   pass_gate: "Gate passed",
   phase_ready_for_inspection: "Ready for inspection",
   photo_uploaded: "Photo uploaded",
@@ -50,15 +56,21 @@ export const AUDIT_ACTION_TONE: Record<string, BadgeTone> = {
   attic_gate_updated: "info",
   complete_project: "success",
   create_client: "success",
+  delete_client: "neutral",
   create_deficiency: "warning",
   create_phase: "success",
   create_project: "success",
+  delete_project: "neutral",
   create_subcontractor: "success",
   created: "success",
   deficiency_opened: "warning",
   deleted: "neutral",
   fail_gate: "danger",
+  hardware_updated: "info",
   inspection_completed: "success",
+  inventory_audit_requested: "warning",
+  inventory_picked_up: "success",
+  materials_updated: "info",
   pass_gate: "success",
   phase_ready_for_inspection: "ready",
   photo_uploaded: "accent",
@@ -90,6 +102,7 @@ export const AUDIT_ENTITY_LABEL: Record<string, string> = {
   phase: "Phase",
   photo_evidence: "Photo",
   project: "Project",
+  inventory_pickup: "Inventory pickup",
   subcontractor_contact: "Subcontractor",
   user: "User",
 };
@@ -173,14 +186,40 @@ function formatStatusText(event: AuditEvent) {
   return undefined;
 }
 
+function formatInventoryChanges(value: unknown) {
+  if (!Array.isArray(value)) return undefined;
+
+  const parts = value
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const change = item as { label?: unknown; previousQuantity?: unknown; quantity?: unknown };
+      if (
+        typeof change.label !== "string" ||
+        typeof change.previousQuantity !== "number" ||
+        typeof change.quantity !== "number"
+      ) {
+        return null;
+      }
+      return `${change.label}: ${change.previousQuantity} → ${change.quantity}`;
+    })
+    .filter((item): item is string => Boolean(item));
+
+  return parts.length > 0 ? parts.join(" · ") : undefined;
+}
+
 function formatMetadataText(metadata?: Record<string, unknown>) {
   if (!metadata) return undefined;
+
+  const inventoryChanges = formatInventoryChanges(metadata.inventoryChanges);
+  if (inventoryChanges) return inventoryChanges;
 
   const parts = Object.entries(metadata)
     .map(([key, value]) => {
       if (!value || key === "phaseId" || key.endsWith("Id")) return null;
       if (key === "inspectorName") return `Inspector: ${value}`;
       if (key === "notes") return `Notes: ${value}`;
+      if (key === "note") return `Note: ${value}`;
+      if (key === "summary") return `Picked up: ${value}`;
       if (key === "subcontractorName") return `Subcontractor: ${value}`;
       return null;
     })

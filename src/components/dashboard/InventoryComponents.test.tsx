@@ -34,6 +34,20 @@ describe("InventoryDisplayCard", () => {
 
     expect(screen.getByText("No equipment logged")).toBeInTheDocument();
   });
+
+  it("renders pickup summaries under inventory rows", () => {
+    render(
+      <InventoryDisplayCard
+        title="Equipment"
+        items={[{ label: "Drywall Lifts", quantity: 1 }]}
+        onManage={() => {}}
+        pickupSummaries={[{ id: "pickup-1", text: "Drywall Lifts ×1" }]}
+      />,
+    );
+
+    expect(screen.getByText("Picked up:")).toBeInTheDocument();
+    expect(screen.getByText("Drywall Lifts ×1")).toBeInTheDocument();
+  });
 });
 
 describe("QuantityStepperModal", () => {
@@ -58,13 +72,35 @@ describe("QuantityStepperModal", () => {
 
     const r20Row = screen.getByText("R-20 Batt").closest("li");
     expect(r20Row).not.toBeNull();
-    expect(within(r20Row!).getByText("3")).toBeInTheDocument();
+    expect(within(r20Row!).getByRole("spinbutton", { name: "Quantity for R-20 Batt" })).toHaveValue(3);
 
     fireEvent.click(screen.getByRole("button", { name: "Increase R-20 Batt" }));
     fireEvent.click(screen.getByRole("button", { name: "Decrease R-20 Batt" }));
 
     expect(onQuantityChange).toHaveBeenNthCalledWith(1, "r20_batt", 4);
     expect(onQuantityChange).toHaveBeenNthCalledWith(2, "r20_batt", 2);
+  });
+
+  it("emits typed keyboard quantities", () => {
+    const onQuantityChange = vi.fn();
+
+    render(
+      <QuantityStepperModal
+        open
+        onOpenChange={() => {}}
+        title="Manage Materials"
+        items={[
+          { itemKey: "drywall_board", label: "Drywall Boards", quantity: 0 },
+        ]}
+        onQuantityChange={onQuantityChange}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Quantity for Drywall Boards" }), {
+      target: { value: "121" },
+    });
+
+    expect(onQuantityChange).toHaveBeenCalledWith("drywall_board", 121);
   });
 
   it("clamps quantities at zero", () => {
@@ -87,8 +123,8 @@ describe("QuantityStepperModal", () => {
     const lightingRow = screen.getByText("Site Lighting").closest("li");
     expect(scaffoldRow).not.toBeNull();
     expect(lightingRow).not.toBeNull();
-    expect(within(scaffoldRow!).getByText("0")).toBeInTheDocument();
-    expect(within(lightingRow!).getByText("0")).toBeInTheDocument();
+    expect(within(scaffoldRow!).getByRole("spinbutton", { name: "Quantity for Baker Scaffold" })).toHaveValue(0);
+    expect(within(lightingRow!).getByRole("spinbutton", { name: "Quantity for Site Lighting" })).toHaveValue(0);
     expect(screen.getByRole("button", { name: "Decrease Baker Scaffold" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Decrease Site Lighting" })).toBeDisabled();
 

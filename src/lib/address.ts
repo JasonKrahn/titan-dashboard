@@ -127,3 +127,12 @@ export function formatAddressShort(address: string): string {
   
   return result.join(", ");
 }
+
+export function getGoogleMapsSearchUrl(address: string): string {
+  const params = new URLSearchParams({
+    api: "1",
+    query: address.trim(),
+  });
+
+  return `https://www.google.com/maps/search/?${params.toString()}`;
+}

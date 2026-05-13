@@ -1,5 +1,6 @@
 // Prototype API adapter. UI calls these via lib/api/index.ts.
 import type {
+  AppNotification,
   ApiResult,
   AuditEvent,
   ClientRecord,
@@ -10,6 +11,10 @@ import type {
   DeficiencySeverity,
   EquipmentLog,
   Gate,
+  InventoryAuditRequestType,
+  InventoryPickup,
+  InventoryPickupItem,
+  InventoryPickupNotificationKind,
   MaterialLog,
   Phase,
   PhaseDetail,
@@ -24,6 +29,7 @@ import type {
   User,
   UserRole,
 } from "@/lib/types";
+import { EQUIPMENT_ITEMS, PHASE_MATERIAL_CATALOGS } from "@/lib/inventoryCatalog";
 import { orderedSchedulePhases, parseScheduleDate, toScheduleDate } from "@/lib/schedule";
 
 import imgInsulationSiteCheck from "@/install-photos/jpeg-install-images/insulation/site-check-insulation.jpeg";
@@ -66,6 +72,7 @@ import {
   seedDeficiencies,
   seedEquipmentLogs,
   seedGates,
+  seedInventoryPickups,
   seedMaterialLogs,
   seedPhases,
   seedPhotos,
@@ -141,10 +148,40 @@ export interface UpdateProjectEquipmentInput {
   quantity: number;
 }
 
+export interface UpdatePhaseMaterialsInput {
+  phaseId: string;
+  projectId: string;
+  changes: Array<{
+    itemKey: string;
+    quantity: number;
+  }>;
+}
+
+export interface UpdateProjectEquipmentBatchInput {
+  projectId: string;
+  changes: Array<{
+    itemKey: string;
+    quantity: number;
+  }>;
+}
+
+export interface CreateInventoryPickupInput {
+  projectId: string;
+  items: InventoryPickupItem[];
+  note?: string;
+}
+
+export interface CreateInventoryAuditRequestInput {
+  projectId: string;
+  type: InventoryAuditRequestType;
+}
+
 const delay = <T,>(value: T): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(value), SIMULATED_LATENCY_MS));
 
 const ok = <T,>(data: T): ApiResult<T> => ({ ok: true, data });
+
+const seedNotifications: AppNotification[] = [];
 
 // Mutable "current user" for prototype role switching.
 let currentUserId = "user-admin";
@@ -331,10 +368,10 @@ export async function getClients(): Promise<ApiResult<ClientRecord[]>> {
         .filter((p) => p.assignedProjectManagerId === me.id)
         .map((p) => p.clientId),
     );
-    return delay(ok(seedClients.filter((client) => visibleClientIds.has(client.id))));
+    return delay(ok(seedClients.filter((client) => !client.archived && visibleClientIds.has(client.id))));
   }
 
-  return delay(ok(seedClients));
+  return delay(ok(seedClients.filter((client) => !client.archived)));
 }
 
 function projectHasBlockedWork(projectId: string): boolean {
@@ -386,6 +423,11 @@ export async function getProjects(filters?: ProjectFilters): Promise<ApiResult<P
   if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
 
   let result = [...seedProjects];
+
+  // inventory_viewer: cross-PM access, active projects only.
+  if (me.role === "inventory_viewer") {
+    return delay(ok(result.filter((p) => p.status === "active").sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))));
+  }
 
   // PM permission boundary: enforced inside adapter, not UI.
   if (me.role === "project_manager") {
@@ -486,6 +528,103 @@ export async function getAuditEvents(): Promise<ApiResult<AuditEvent[]>> {
   return delay(ok(seedAuditEvents));
 }
 
+function auditRequestText(type: InventoryAuditRequestType) {
+  if (type === "materials") return "materials audit";
+  if (type === "hardware") return "hardware audit";
+  return "materials and hardware audit";
+}
+
+function firstName(fullName: string) {
+  return fullName.trim().split(/\s+/)[0] || fullName;
+}
+
+function isOutstandingInventoryAuditRequest(notification: AppNotification) {
+  return notification.type === "inventory_audit_request" && !notification.readAt;
+}
+
+function notificationScheduleDate(value: string) {
+  return value.slice(0, 10);
+}
+
+function phaseTypeLabel(type: Phase["type"]) {
+  if (type === "insulation") return "Insulation";
+  if (type === "drywall") return "Drywall";
+  return "Finishing";
+}
+
+function ensurePhaseEndNotificationsForPm(pm: User) {
+  const today = toScheduleDate(Date.now());
+  for (const phase of seedPhases) {
+    if (!phase.scheduledEnd || notificationScheduleDate(phase.scheduledEnd) !== today || phase.status === "closed") continue;
+
+    const project = seedProjects.find((item) => item.id === phase.projectId);
+    if (!project || project.status !== "active" || project.assignedProjectManagerId !== pm.id) continue;
+
+    const exists = seedNotifications.some(
+      (notification) =>
+        notification.type === "phase_end_due" &&
+        notification.recipientUserId === pm.id &&
+        notification.metadata?.phaseId === phase.id &&
+        notification.metadata?.phaseEndDate === notificationScheduleDate(phase.scheduledEnd),
+    );
+    if (exists) continue;
+
+    seedNotifications.unshift({
+      id: `notification-phase-end-${phase.id}-${today}`,
+      recipientUserId: pm.id,
+      type: "phase_end_due",
+      projectId: project.id,
+      message: `${phaseTypeLabel(phase.type)} phase ends today for ${project.name}`,
+      metadata: {
+        phaseId: phase.id,
+        phaseType: phase.type,
+        phaseEndDate: today,
+      },
+      createdAt: new Date().toISOString(),
+    });
+  }
+}
+
+export async function getNotifications(): Promise<ApiResult<AppNotification[]>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+  if (me.role !== "project_manager") {
+    return delay(ok([]));
+  }
+
+  ensurePhaseEndNotificationsForPm(me);
+
+  return delay(ok(seedNotifications
+    .filter((notification) => notification.recipientUserId === me.id && !notification.readAt)
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))));
+}
+
+export async function getOutstandingInventoryAuditRequests(): Promise<ApiResult<AppNotification[]>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+  if (me.role !== "inventory_viewer" && me.role !== "admin") {
+    return delay({ ok: false, error: { code: "FORBIDDEN", message: "Inventory access required" } });
+  }
+
+  return delay(ok(seedNotifications
+    .filter(isOutstandingInventoryAuditRequest)
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))));
+}
+
+export async function markNotificationRead(notificationId: string): Promise<ApiResult<AppNotification>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+
+  const notification = seedNotifications.find((item) => item.id === notificationId);
+  if (!notification) return delay({ ok: false, error: { code: "NOT_FOUND", message: "Notification not found" } });
+  if (notification.recipientUserId !== me.id) {
+    return delay({ ok: false, error: { code: "FORBIDDEN", message: "Notification access denied" } });
+  }
+
+  notification.readAt = new Date().toISOString();
+  return delay(ok(notification));
+}
+
 export async function getPhase(phaseId: string): Promise<ApiResult<PhaseDetail>> {
   const me = seedUsers.find((u) => u.id === currentUserId);
   if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
@@ -535,6 +674,87 @@ function validateLogInput(itemKey: string, quantity: number): Record<string, str
   return fieldErrors;
 }
 
+function formatInventoryLabel(itemKey: string, labels: Map<string, string>) {
+  return labels.get(itemKey) ?? itemKey.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function updateMaterialLog(input: UpdatePhaseMaterialInput, nowIso: string) {
+  const itemKey = input.itemKey.trim();
+  const previousLog = seedMaterialLogs.find((item) => item.phaseId === input.phaseId && item.itemKey === itemKey);
+  const previousQuantity = previousLog?.quantity ?? 0;
+  let log = previousLog;
+
+  if (!log) {
+    log = {
+      id: `material-${input.phaseId}-${itemKey}`,
+      projectId: input.projectId,
+      phaseId: input.phaseId,
+      itemKey,
+      quantity: input.quantity,
+      updatedAt: nowIso,
+    };
+    seedMaterialLogs.push(log);
+  } else {
+    log.quantity = input.quantity;
+    log.updatedAt = nowIso;
+  }
+
+  return { log, previousQuantity };
+}
+
+function updateEquipmentLog(input: UpdateProjectEquipmentInput, nowIso: string) {
+  const itemKey = input.itemKey.trim();
+  const previousLog = seedEquipmentLogs.find((item) => item.projectId === input.projectId && item.itemKey === itemKey);
+  const previousQuantity = previousLog?.quantity ?? 0;
+  let log = previousLog;
+
+  if (!log) {
+    log = {
+      id: `equipment-${input.projectId}-${itemKey}`,
+      projectId: input.projectId,
+      itemKey,
+      quantity: input.quantity,
+      updatedAt: nowIso,
+    };
+    seedEquipmentLogs.push(log);
+  } else {
+    log.quantity = input.quantity;
+    log.updatedAt = nowIso;
+  }
+
+  return { log, previousQuantity };
+}
+
+function inventoryItemLabel(item: InventoryPickupItem, projectPhases: Phase[]) {
+  if (item.kind === "equipment") {
+    return EQUIPMENT_ITEMS.find((catalogItem) => catalogItem.itemKey === item.itemKey)?.label ?? item.itemKey;
+  }
+
+  for (const phase of projectPhases) {
+    const label = PHASE_MATERIAL_CATALOGS[phase.type].find((catalogItem) => catalogItem.itemKey === item.itemKey)?.label;
+    if (label) return label;
+  }
+
+  return item.itemKey;
+}
+
+function pickupSummary(items: InventoryPickupItem[], projectPhases: Phase[]) {
+  return items.map((item) => `${inventoryItemLabel(item, projectPhases)} ×${item.quantity}`).join(", ");
+}
+
+function pickupKinds(items: InventoryPickupItem[]): InventoryPickupNotificationKind[] {
+  const kinds: InventoryPickupNotificationKind[] = [];
+  if (items.some((item) => item.kind === "material")) kinds.push("materials");
+  if (items.some((item) => item.kind === "equipment")) kinds.push("hardware");
+  return kinds;
+}
+
+function pickupKindText(kinds: InventoryPickupNotificationKind[]) {
+  if (kinds.includes("materials") && kinds.includes("hardware")) return "materials and hardware";
+  if (kinds.includes("materials")) return "materials";
+  return "hardware";
+}
+
 export async function getPhaseMaterials(phaseId: string): Promise<ApiResult<MaterialLog[]>> {
   const me = seedUsers.find((u) => u.id === currentUserId);
   if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
@@ -548,6 +768,7 @@ export async function getPhaseMaterials(phaseId: string): Promise<ApiResult<Mate
   if (me.role === "project_manager" && project.assignedProjectManagerId !== me.id) {
     return delay({ ok: false, error: { code: "FORBIDDEN", message: "Access denied" } });
   }
+  // inventory_viewer: allowed to read materials for any phase
 
   return delay(ok(seedMaterialLogs.filter((log) => log.phaseId === phaseId)));
 }
@@ -577,24 +798,71 @@ export async function updatePhaseMaterial(input: UpdatePhaseMaterialInput): Prom
 
   const itemKey = input.itemKey.trim();
   const nowIso = new Date().toISOString();
-  let log = seedMaterialLogs.find((item) => item.phaseId === input.phaseId && item.itemKey === itemKey);
-
-  if (!log) {
-    log = {
-      id: `material-${input.phaseId}-${itemKey}`,
-      projectId: input.projectId,
-      phaseId: input.phaseId,
-      itemKey,
-      quantity: input.quantity,
-      updatedAt: nowIso,
-    };
-    seedMaterialLogs.push(log);
-  } else {
-    log.quantity = input.quantity;
-    log.updatedAt = nowIso;
-  }
+  const { log } = updateMaterialLog({ ...input, itemKey }, nowIso);
 
   return delay(ok(log));
+}
+
+export async function updatePhaseMaterials(input: UpdatePhaseMaterialsInput): Promise<ApiResult<MaterialLog[]>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+
+  const phase = seedPhases.find((p) => p.id === input.phaseId);
+  if (!phase) return delay({ ok: false, error: { code: "NOT_FOUND", message: "Phase not found" } });
+
+  const project = seedProjects.find((p) => p.id === input.projectId);
+  if (!project) return delay({ ok: false, error: { code: "NOT_FOUND", message: "Project not found" } });
+
+  if (phase.projectId !== input.projectId) {
+    return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Phase does not belong to project", fieldErrors: { projectId: "Project does not match phase" } } });
+  }
+
+  if (me.role === "project_manager" && project.assignedProjectManagerId !== me.id) {
+    return delay({ ok: false, error: { code: "FORBIDDEN", message: "Access denied" } });
+  }
+
+  const fieldErrors: Record<string, string> = {};
+  input.changes.forEach((change, index) => {
+    const errors = validateLogInput(change.itemKey, change.quantity);
+    Object.entries(errors).forEach(([key, value]) => {
+      fieldErrors[`changes.${index}.${key}`] = value;
+    });
+  });
+  if (Object.keys(fieldErrors).length) {
+    return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Invalid material log", fieldErrors } });
+  }
+
+  const nowIso = new Date().toISOString();
+  const labels = new Map(PHASE_MATERIAL_CATALOGS[phase.type].map((item) => [item.itemKey, item.label]));
+  const changedLogs = input.changes.map((change) => {
+    const itemKey = change.itemKey.trim();
+    const updated = updateMaterialLog({ phaseId: input.phaseId, projectId: input.projectId, itemKey, quantity: change.quantity }, nowIso);
+    return {
+      ...updated,
+      label: formatInventoryLabel(itemKey, labels),
+    };
+  });
+
+  if (changedLogs.length > 0) {
+    seedAuditEvents.unshift({
+      id: `audit-${Date.now()}`,
+      entityType: "phase",
+      entityId: input.phaseId,
+      action: "materials_updated",
+      actorUserId: me.id,
+      metadata: {
+        inventoryChanges: changedLogs.map(({ log, previousQuantity, label }) => ({
+          itemKey: log.itemKey,
+          label,
+          previousQuantity,
+          quantity: log.quantity,
+        })),
+      },
+      createdAt: nowIso,
+    });
+  }
+
+  return delay(ok(changedLogs.map(({ log }) => log)));
 }
 
 export async function getProjectEquipment(projectId: string): Promise<ApiResult<EquipmentLog[]>> {
@@ -607,6 +875,7 @@ export async function getProjectEquipment(projectId: string): Promise<ApiResult<
   if (me.role === "project_manager" && project.assignedProjectManagerId !== me.id) {
     return delay({ ok: false, error: { code: "FORBIDDEN", message: "Access denied" } });
   }
+  // inventory_viewer: allowed to read equipment for any project
 
   return delay(ok(seedEquipmentLogs.filter((log) => log.projectId === projectId)));
 }
@@ -629,23 +898,274 @@ export async function updateProjectEquipment(input: UpdateProjectEquipmentInput)
 
   const itemKey = input.itemKey.trim();
   const nowIso = new Date().toISOString();
-  let log = seedEquipmentLogs.find((item) => item.projectId === input.projectId && item.itemKey === itemKey);
-
-  if (!log) {
-    log = {
-      id: `equipment-${input.projectId}-${itemKey}`,
-      projectId: input.projectId,
-      itemKey,
-      quantity: input.quantity,
-      updatedAt: nowIso,
-    };
-    seedEquipmentLogs.push(log);
-  } else {
-    log.quantity = input.quantity;
-    log.updatedAt = nowIso;
-  }
+  const { log } = updateEquipmentLog({ ...input, itemKey }, nowIso);
 
   return delay(ok(log));
+}
+
+export async function updateProjectEquipmentBatch(input: UpdateProjectEquipmentBatchInput): Promise<ApiResult<EquipmentLog[]>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+
+  const project = seedProjects.find((p) => p.id === input.projectId);
+  if (!project) return delay({ ok: false, error: { code: "NOT_FOUND", message: "Project not found" } });
+
+  if (me.role === "project_manager" && project.assignedProjectManagerId !== me.id) {
+    return delay({ ok: false, error: { code: "FORBIDDEN", message: "Access denied" } });
+  }
+
+  const fieldErrors: Record<string, string> = {};
+  input.changes.forEach((change, index) => {
+    const errors = validateLogInput(change.itemKey, change.quantity);
+    Object.entries(errors).forEach(([key, value]) => {
+      fieldErrors[`changes.${index}.${key}`] = value;
+    });
+  });
+  if (Object.keys(fieldErrors).length) {
+    return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Invalid equipment log", fieldErrors } });
+  }
+
+  const nowIso = new Date().toISOString();
+  const labels = new Map(EQUIPMENT_ITEMS.map((item) => [item.itemKey, item.label]));
+  const changedLogs = input.changes.map((change) => {
+    const itemKey = change.itemKey.trim();
+    const updated = updateEquipmentLog({ projectId: input.projectId, itemKey, quantity: change.quantity }, nowIso);
+    return {
+      ...updated,
+      label: formatInventoryLabel(itemKey, labels),
+    };
+  });
+
+  if (changedLogs.length > 0) {
+    seedAuditEvents.unshift({
+      id: `audit-${Date.now()}`,
+      entityType: "project",
+      entityId: input.projectId,
+      action: "hardware_updated",
+      actorUserId: me.id,
+      metadata: {
+        inventoryChanges: changedLogs.map(({ log, previousQuantity, label }) => ({
+          itemKey: log.itemKey,
+          label,
+          previousQuantity,
+          quantity: log.quantity,
+        })),
+      },
+      createdAt: nowIso,
+    });
+  }
+
+  return delay(ok(changedLogs.map(({ log }) => log)));
+}
+
+export async function getProjectInventoryPickups(projectId: string): Promise<ApiResult<InventoryPickup[]>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+
+  const project = seedProjects.find((p) => p.id === projectId);
+  if (!project) return delay({ ok: false, error: { code: "NOT_FOUND", message: "Project not found" } });
+
+  if (me.role === "project_manager" && project.assignedProjectManagerId !== me.id) {
+    return delay({ ok: false, error: { code: "FORBIDDEN", message: "Access denied" } });
+  }
+
+  return delay(ok(seedInventoryPickups.filter((pickup) => pickup.projectId === projectId)));
+}
+
+export async function createInventoryAuditRequest(input: CreateInventoryAuditRequestInput): Promise<ApiResult<AppNotification>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+  if (me.role !== "inventory_viewer" && me.role !== "admin") {
+    return delay({ ok: false, error: { code: "FORBIDDEN", message: "Inventory access required" } });
+  }
+
+  const project = seedProjects.find((p) => p.id === input.projectId);
+  if (!project) return delay({ ok: false, error: { code: "NOT_FOUND", message: "Project not found" } });
+  if (project.status !== "active") {
+    return delay({ ok: false, error: { code: "STATE_VIOLATION", message: "Audit requests are only available for active projects" } });
+  }
+  if (!project.assignedProjectManagerId) {
+    return delay({ ok: false, error: { code: "STATE_VIOLATION", message: "Project has no assigned project manager" } });
+  }
+  if (input.type !== "materials" && input.type !== "hardware" && input.type !== "both") {
+    return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Invalid audit request type" } });
+  }
+  const duplicate = seedNotifications.find(
+    (notification) =>
+      isOutstandingInventoryAuditRequest(notification) &&
+      notification.projectId === project.id &&
+      notification.recipientUserId === project.assignedProjectManagerId &&
+      notification.metadata?.auditRequestType === input.type,
+  );
+  if (duplicate) {
+    return delay({ ok: false, error: { code: "CONFLICT", message: `${auditRequestText(input.type)} already requested for ${project.name}` } });
+  }
+
+  const nowIso = new Date().toISOString();
+  const notification: AppNotification = {
+    id: `notification-${Date.now()}`,
+    recipientUserId: project.assignedProjectManagerId,
+    type: "inventory_audit_request",
+    projectId: project.id,
+    message: `${firstName(me.fullName)} requested ${auditRequestText(input.type)} for ${project.name}`,
+    metadata: {
+      auditRequestType: input.type,
+      requesterUserId: me.id,
+    },
+    createdAt: nowIso,
+  };
+  seedNotifications.unshift(notification);
+
+  seedAuditEvents.unshift({
+    id: `audit-${Date.now()}`,
+    entityType: "project",
+    entityId: project.id,
+    action: "inventory_audit_requested",
+    actorUserId: me.id,
+    metadata: {
+      auditRequestType: input.type,
+      recipientUserId: project.assignedProjectManagerId,
+      notificationId: notification.id,
+    },
+    createdAt: nowIso,
+  });
+
+  return delay(ok(notification));
+}
+
+export async function createInventoryPickup(input: CreateInventoryPickupInput): Promise<ApiResult<InventoryPickup>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+  if (me.role !== "inventory_viewer" && me.role !== "admin") {
+    return delay({ ok: false, error: { code: "FORBIDDEN", message: "Inventory access required" } });
+  }
+
+  const project = seedProjects.find((p) => p.id === input.projectId);
+  if (!project) return delay({ ok: false, error: { code: "NOT_FOUND", message: "Project not found" } });
+  if (project.status !== "active") {
+    return delay({ ok: false, error: { code: "STATE_VIOLATION", message: "Pickups are only available for active projects" } });
+  }
+
+  const note = input.note?.trim();
+  if (note && note.length > 500) {
+    return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Pickup note is too long", fieldErrors: { note: "Must be 500 characters or less" } } });
+  }
+
+  const items = input.items
+    .map((item) => ({ ...item, itemKey: item.itemKey.trim() }))
+    .filter((item) => item.quantity > 0);
+  if (items.length === 0) {
+    return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Select at least one item to pick up", fieldErrors: { items: "Required" } } });
+  }
+
+  const projectPhases = seedPhases.filter((phase) => phase.projectId === input.projectId);
+  const fieldErrors: Record<string, string> = {};
+
+  for (const item of items) {
+    if (item.kind !== "material" && item.kind !== "equipment") {
+      fieldErrors.items = "Invalid item type";
+    }
+    if (!item.itemKey) {
+      fieldErrors.items = "Item is required";
+    }
+    if (!Number.isFinite(item.quantity) || item.quantity <= 0) {
+      fieldErrors.items = "Quantities must be greater than zero";
+    }
+    if (item.kind === "equipment") {
+      const available = seedEquipmentLogs
+        .filter((log) => log.projectId === input.projectId && log.itemKey === item.itemKey)
+        .reduce((total, log) => total + log.quantity, 0);
+      if (item.quantity > available) {
+        fieldErrors[item.itemKey] = "Cannot pick up more than is on site";
+      }
+    } else {
+      const phaseIds = new Set(projectPhases.map((phase) => phase.id));
+      const available = seedMaterialLogs
+        .filter((log) => phaseIds.has(log.phaseId) && log.itemKey === item.itemKey)
+        .reduce((total, log) => total + log.quantity, 0);
+      if (item.quantity > available) {
+        fieldErrors[item.itemKey] = "Cannot pick up more than is on site";
+      }
+    }
+  }
+
+  if (Object.keys(fieldErrors).length) {
+    return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Invalid pickup", fieldErrors } });
+  }
+
+  const nowIso = new Date().toISOString();
+
+  for (const item of items) {
+    let remaining = item.quantity;
+    if (item.kind === "equipment") {
+      for (const log of seedEquipmentLogs.filter((entry) => entry.projectId === input.projectId && entry.itemKey === item.itemKey)) {
+        const picked = Math.min(log.quantity, remaining);
+        log.quantity -= picked;
+        log.updatedAt = nowIso;
+        remaining -= picked;
+        if (remaining === 0) break;
+      }
+    } else {
+      const phaseOrder = new Map(projectPhases.map((phase, index) => [phase.id, index]));
+      const logs = seedMaterialLogs
+        .filter((entry) => entry.projectId === input.projectId && entry.itemKey === item.itemKey)
+        .sort((a, b) => (phaseOrder.get(a.phaseId) ?? 0) - (phaseOrder.get(b.phaseId) ?? 0));
+      for (const log of logs) {
+        const picked = Math.min(log.quantity, remaining);
+        log.quantity -= picked;
+        log.updatedAt = nowIso;
+        remaining -= picked;
+        if (remaining === 0) break;
+      }
+    }
+  }
+
+  const pickup: InventoryPickup = {
+    id: `pickup-${Date.now()}`,
+    projectId: input.projectId,
+    pickedUpByUserId: me.id,
+    items,
+    note: note || undefined,
+    createdAt: nowIso,
+  };
+  seedInventoryPickups.unshift(pickup);
+
+  const summary = pickupSummary(items, projectPhases);
+  const kinds = pickupKinds(items);
+  const notification: AppNotification | undefined = project.assignedProjectManagerId
+    ? {
+        id: `notification-${Date.now()}`,
+        recipientUserId: project.assignedProjectManagerId,
+        type: "inventory_pickup",
+        projectId: project.id,
+        message: `${firstName(me.fullName)} picked up ${pickupKindText(kinds)} from ${project.name}`,
+        metadata: {
+          pickupId: pickup.id,
+          pickupKinds: kinds,
+          requesterUserId: me.id,
+          summary,
+        },
+        createdAt: nowIso,
+      }
+    : undefined;
+  if (notification) seedNotifications.unshift(notification);
+
+  seedAuditEvents.unshift({
+    id: `audit-${Date.now()}`,
+    entityType: "project",
+    entityId: project.id,
+    action: "inventory_picked_up",
+    actorUserId: me.id,
+    metadata: {
+      pickupId: pickup.id,
+      notificationId: notification?.id,
+      summary,
+      note: note || undefined,
+    },
+    createdAt: nowIso,
+  });
+
+  return delay(ok(pickup));
 }
 
 export interface CreateClientInput {
@@ -721,6 +1241,52 @@ export async function updateClient(id: string, input: CreateClientInput): Promis
     entityType: "client_record",
     entityId: client.id,
     action: "updated",
+    actorUserId: me.id,
+    createdAt: nowIso,
+  });
+
+  return delay(ok(client));
+}
+
+export async function deleteClient(id: string): Promise<ApiResult<ClientRecord>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+  if (me.role !== "admin" && me.role !== "project_manager") {
+    return delay({ ok: false, error: { code: "FORBIDDEN", message: "Admins or project managers only" } });
+  }
+
+  const client = seedClients.find((c) => c.id === id);
+  if (!client) return delay({ ok: false, error: { code: "NOT_FOUND", message: "Client not found" } });
+  if (client.archived) return delay({ ok: false, error: { code: "STATE_VIOLATION", message: "Client already deleted" } });
+
+  const clientProjects = seedProjects.filter((project) => project.clientId === id);
+  if (me.role === "project_manager") {
+    const isVisible = clientProjects.some((project) => project.assignedProjectManagerId === me.id);
+    if (!isVisible) return delay({ ok: false, error: { code: "FORBIDDEN", message: "Access denied" } });
+    const openProjects = clientProjects.filter((project) => project.status !== "archived");
+    if (openProjects.length > 0) {
+      return delay({ ok: false, error: { code: "STATE_VIOLATION", message: "Delete this client's projects before deleting the client" } });
+    }
+  }
+
+  const nowIso = new Date().toISOString();
+  client.archived = true;
+  client.updatedAt = nowIso;
+
+  if (me.role === "admin") {
+    clientProjects.forEach((project) => {
+      if (project.status !== "archived") {
+        project.status = "archived";
+        project.updatedAt = nowIso;
+      }
+    });
+  }
+
+  seedAuditEvents.unshift({
+    id: `audit-${Date.now()}`,
+    entityType: "client_record",
+    entityId: client.id,
+    action: "delete_client",
     actorUserId: me.id,
     createdAt: nowIso,
   });
@@ -1958,6 +2524,42 @@ export async function archiveProject(projectId: string): Promise<ApiResult<Proje
     action: "archive_project",
     actorUserId: me.id,
     previousValue: "completed",
+    nextValue: "archived",
+    createdAt: nowIso,
+  });
+
+  return delay(ok(project));
+}
+
+export async function deleteProject(projectId: string): Promise<ApiResult<Project>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+  if (me.role !== "admin" && me.role !== "project_manager") {
+    return delay({ ok: false, error: { code: "FORBIDDEN", message: "Admins or project managers only" } });
+  }
+
+  const project = seedProjects.find((p) => p.id === projectId);
+  if (!project) return delay({ ok: false, error: { code: "NOT_FOUND", message: "Project not found" } });
+
+  if (me.role === "project_manager" && project.assignedProjectManagerId !== me.id) {
+    return delay({ ok: false, error: { code: "FORBIDDEN", message: "Access denied" } });
+  }
+  if (project.status === "archived") {
+    return delay({ ok: false, error: { code: "STATE_VIOLATION", message: "Project already deleted" } });
+  }
+
+  const nowIso = new Date().toISOString();
+  const previousValue = project.status;
+  project.status = "archived";
+  project.updatedAt = nowIso;
+
+  seedAuditEvents.unshift({
+    id: `audit-${Date.now()}`,
+    entityType: "project",
+    entityId: projectId,
+    action: "delete_project",
+    actorUserId: me.id,
+    previousValue,
     nextValue: "archived",
     createdAt: nowIso,
   });

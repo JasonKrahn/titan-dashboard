@@ -48,6 +48,7 @@ const DashboardPage = () => {
   const [archiveTarget, setArchiveTarget] = useState<{ id: string; name: string } | null>(null);
   const [newProjectClientId, setNewProjectClientId] = useState<string | undefined>();
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [defaultedUserId, setDefaultedUserId] = useState<string | undefined>();
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 200);
@@ -56,6 +57,22 @@ const DashboardPage = () => {
 
   const meQ = useQuery({ queryKey: ["me"], queryFn: getCurrentUser });
   const usersQ = useQuery({ queryKey: ["users"], queryFn: getUsers });
+
+  useEffect(() => {
+    if (!meQ.data?.ok) return;
+
+    const user = meQ.data.data;
+    if (user.role === "inventory_viewer") {
+      navigate("/inventory");
+      return;
+    }
+    if (defaultedUserId === user.id) return;
+
+    setDefaultedUserId(user.id);
+    if (user.role === "project_manager") {
+      setActiveView("dashboard");
+    }
+  }, [defaultedUserId, meQ.data, navigate]);
   const clientsQ = useQuery({ queryKey: ["clients"], queryFn: getClients });
   const phasesQ = useQuery({ queryKey: ["phases"], queryFn: getAllPhases });
   const gatesQ = useQuery({ queryKey: ["gates"], queryFn: getAllGates });
@@ -116,15 +133,17 @@ const DashboardPage = () => {
   useEffect(() => {
     const state = location.state as DashboardRouteState;
     if (state?.clientId) {
+      if (me?.id) setDefaultedUserId(me.id);
       handleOpenClient(state.clientId);
       window.history.replaceState({}, "");
       return;
     }
     if (state?.view) {
+      if (me?.id) setDefaultedUserId(me.id);
       handleSelectDashboardView(state.view);
       window.history.replaceState({}, "");
     }
-  }, [location.state]);
+  }, [location.state, me?.id]);
 
   const handleEditClient = (id: string) => {
     setEditClientId(id);
@@ -386,6 +405,13 @@ const DashboardPage = () => {
         onUpdated={() => {
           setEditClientId(undefined);
         }}
+        onDeleted={(id) => {
+          setEditClientId(undefined);
+          if (selectedClientId === id) {
+            setSelectedClientId(undefined);
+            setActiveView("clients");
+          }
+        }}
       />
       <NewProjectDialog
         open={newProjectOpen}
@@ -399,6 +425,7 @@ const DashboardPage = () => {
         currentUser={me}
         project={projects.find(p => p.id === editProjectId)}
         onUpdated={() => setEditProjectId(undefined)}
+        onDeleted={() => setEditProjectId(undefined)}
       />
       {archiveTarget && (
         <ArchiveProjectDialog

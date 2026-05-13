@@ -111,4 +111,61 @@ describe("ProjectScheduleTimeline", () => {
     expect(onScheduleChange).not.toHaveBeenCalled();
     expect(screen.getByText(/project deadline/i)).toBeInTheDocument();
   });
+
+  it("opens a mobile phase editor and persists the selected phase schedule", () => {
+    const onScheduleChange = vi.fn();
+    render(
+      <ProjectScheduleTimeline
+        project={project({ scheduledStart: "2026-05-01T00:00:00.000Z", scheduledEnd: "2026-05-31T00:00:00.000Z" })}
+        phases={[
+          phase("phase-insulation", "insulation", "2026-05-01T00:00:00.000Z", "2026-05-06T00:00:00.000Z"),
+          phase("phase-drywall", "drywall", "2026-05-07", "2026-05-12"),
+        ]}
+        onScheduleChange={onScheduleChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Schedule 2 phases/i }));
+    const insulationCard = screen
+      .getAllByRole("button", { name: /Insulation/i })
+      .find((button) => !button.getAttribute("aria-label")?.startsWith("Resize"));
+    expect(insulationCard).toBeDefined();
+    fireEvent.click(insulationCard!);
+
+    expect(screen.getByLabelText("Start date")).toHaveValue("2026-05-01");
+    expect(screen.getByLabelText("End date")).toHaveValue("2026-05-06");
+    fireEvent.change(screen.getByLabelText("Start date"), { target: { value: "2026-05-02" } });
+    fireEvent.change(screen.getByLabelText("End date"), { target: { value: "2026-05-08" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onScheduleChange).toHaveBeenCalledWith([
+      { phaseId: "phase-insulation", scheduledStart: "2026-05-02", scheduledEnd: "2026-05-08" },
+    ]);
+  });
+
+  it("blocks mobile schedule edits outside project bounds", () => {
+    const onScheduleChange = vi.fn();
+    render(
+      <ProjectScheduleTimeline
+        project={project()}
+        phases={[
+          phase("phase-insulation", "insulation", "2026-05-01", "2026-05-06"),
+        ]}
+        onScheduleChange={onScheduleChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Schedule 1 phases/i }));
+    const insulationCard = screen
+      .getAllByRole("button", { name: /Insulation/i })
+      .find((button) => !button.getAttribute("aria-label")?.startsWith("Resize"));
+    expect(insulationCard).toBeDefined();
+    fireEvent.click(insulationCard!);
+
+    fireEvent.change(screen.getByLabelText("End date"), { target: { value: "2026-06-01" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onScheduleChange).not.toHaveBeenCalled();
+    expect(screen.getByText(/on or before the project end date/i)).toBeInTheDocument();
+  });
 });
