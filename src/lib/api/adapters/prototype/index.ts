@@ -8,7 +8,9 @@ import type {
   CreateSubcontractorInput,
   Deficiency,
   DeficiencySeverity,
+  EquipmentLog,
   Gate,
+  MaterialLog,
   Phase,
   PhaseDetail,
   PhotoEvidence,
@@ -62,7 +64,9 @@ import {
   seedAuditEvents,
   seedClients,
   seedDeficiencies,
+  seedEquipmentLogs,
   seedGates,
+  seedMaterialLogs,
   seedPhases,
   seedPhotos,
   seedProjects,
@@ -122,6 +126,19 @@ export interface UploadPhotoEvidenceInput {
 export interface MarkPhaseReadyForInspectionInput {
   phaseId: string;
   projectId: string;
+}
+
+export interface UpdatePhaseMaterialInput {
+  phaseId: string;
+  projectId: string;
+  itemKey: string;
+  quantity: number;
+}
+
+export interface UpdateProjectEquipmentInput {
+  projectId: string;
+  itemKey: string;
+  quantity: number;
 }
 
 const delay = <T,>(value: T): Promise<T> =>
@@ -507,6 +524,128 @@ export async function getPhase(phaseId: string): Promise<ApiResult<PhaseDetail>>
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
   };
   return delay(ok(detail));
+}
+
+function validateLogInput(itemKey: string, quantity: number): Record<string, string> {
+  const fieldErrors: Record<string, string> = {};
+  if (!itemKey.trim()) fieldErrors.itemKey = "Required";
+  if (typeof quantity !== "number" || !Number.isFinite(quantity) || quantity < 0) {
+    fieldErrors.quantity = "Must be a non-negative finite number";
+  }
+  return fieldErrors;
+}
+
+export async function getPhaseMaterials(phaseId: string): Promise<ApiResult<MaterialLog[]>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+
+  const phase = seedPhases.find((p) => p.id === phaseId);
+  if (!phase) return delay({ ok: false, error: { code: "NOT_FOUND", message: "Phase not found" } });
+
+  const project = seedProjects.find((p) => p.id === phase.projectId);
+  if (!project) return delay({ ok: false, error: { code: "NOT_FOUND", message: "Project not found" } });
+
+  if (me.role === "project_manager" && project.assignedProjectManagerId !== me.id) {
+    return delay({ ok: false, error: { code: "FORBIDDEN", message: "Access denied" } });
+  }
+
+  return delay(ok(seedMaterialLogs.filter((log) => log.phaseId === phaseId)));
+}
+
+export async function updatePhaseMaterial(input: UpdatePhaseMaterialInput): Promise<ApiResult<MaterialLog>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+
+  const phase = seedPhases.find((p) => p.id === input.phaseId);
+  if (!phase) return delay({ ok: false, error: { code: "NOT_FOUND", message: "Phase not found" } });
+
+  const project = seedProjects.find((p) => p.id === input.projectId);
+  if (!project) return delay({ ok: false, error: { code: "NOT_FOUND", message: "Project not found" } });
+
+  if (phase.projectId !== input.projectId) {
+    return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Phase does not belong to project", fieldErrors: { projectId: "Project does not match phase" } } });
+  }
+
+  if (me.role === "project_manager" && project.assignedProjectManagerId !== me.id) {
+    return delay({ ok: false, error: { code: "FORBIDDEN", message: "Access denied" } });
+  }
+
+  const fieldErrors = validateLogInput(input.itemKey, input.quantity);
+  if (Object.keys(fieldErrors).length) {
+    return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Invalid material log", fieldErrors } });
+  }
+
+  const itemKey = input.itemKey.trim();
+  const nowIso = new Date().toISOString();
+  let log = seedMaterialLogs.find((item) => item.phaseId === input.phaseId && item.itemKey === itemKey);
+
+  if (!log) {
+    log = {
+      id: `material-${input.phaseId}-${itemKey}`,
+      projectId: input.projectId,
+      phaseId: input.phaseId,
+      itemKey,
+      quantity: input.quantity,
+      updatedAt: nowIso,
+    };
+    seedMaterialLogs.push(log);
+  } else {
+    log.quantity = input.quantity;
+    log.updatedAt = nowIso;
+  }
+
+  return delay(ok(log));
+}
+
+export async function getProjectEquipment(projectId: string): Promise<ApiResult<EquipmentLog[]>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+
+  const project = seedProjects.find((p) => p.id === projectId);
+  if (!project) return delay({ ok: false, error: { code: "NOT_FOUND", message: "Project not found" } });
+
+  if (me.role === "project_manager" && project.assignedProjectManagerId !== me.id) {
+    return delay({ ok: false, error: { code: "FORBIDDEN", message: "Access denied" } });
+  }
+
+  return delay(ok(seedEquipmentLogs.filter((log) => log.projectId === projectId)));
+}
+
+export async function updateProjectEquipment(input: UpdateProjectEquipmentInput): Promise<ApiResult<EquipmentLog>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+
+  const project = seedProjects.find((p) => p.id === input.projectId);
+  if (!project) return delay({ ok: false, error: { code: "NOT_FOUND", message: "Project not found" } });
+
+  if (me.role === "project_manager" && project.assignedProjectManagerId !== me.id) {
+    return delay({ ok: false, error: { code: "FORBIDDEN", message: "Access denied" } });
+  }
+
+  const fieldErrors = validateLogInput(input.itemKey, input.quantity);
+  if (Object.keys(fieldErrors).length) {
+    return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Invalid equipment log", fieldErrors } });
+  }
+
+  const itemKey = input.itemKey.trim();
+  const nowIso = new Date().toISOString();
+  let log = seedEquipmentLogs.find((item) => item.projectId === input.projectId && item.itemKey === itemKey);
+
+  if (!log) {
+    log = {
+      id: `equipment-${input.projectId}-${itemKey}`,
+      projectId: input.projectId,
+      itemKey,
+      quantity: input.quantity,
+      updatedAt: nowIso,
+    };
+    seedEquipmentLogs.push(log);
+  } else {
+    log.quantity = input.quantity;
+    log.updatedAt = nowIso;
+  }
+
+  return delay(ok(log));
 }
 
 export interface CreateClientInput {

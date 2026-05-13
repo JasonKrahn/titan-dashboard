@@ -57,13 +57,16 @@ import { ArchiveProjectDialog } from "@/components/dashboard/ArchiveProjectDialo
 import { NewProjectDialog } from "@/components/dashboard/NewProjectDialog";
 import { ProjectNotes } from "@/components/dashboard/ProjectNotes";
 import { ProjectScheduleTimeline } from "@/components/dashboard/ProjectScheduleTimeline";
-import { PhotoViewerDialog } from "@/components/dashboard/PhotoViewerDialog";
+import { PhotoViewerDialog, type PhotoViewerItem } from "@/components/dashboard/PhotoViewerDialog";
 import { DeficiencyDialog } from "@/components/dashboard/DeficiencyDialog";
 import { PhotoUploadDialog } from "@/components/dashboard/PhotoUploadDialog";
-import { getProject, updateAtticGate, getPhotoViewUrl, updatePhaseSchedules } from "@/lib/api";
+import { InventoryDisplayCard, type InventoryDisplayItem } from "@/components/dashboard/InventoryDisplayCard";
+import { QuantityStepperModal } from "@/components/dashboard/QuantityStepperModal";
+import { getProject, getProjectEquipment, updateProjectEquipment, updateAtticGate, getPhotoViewUrl, updatePhaseSchedules } from "@/lib/api";
 import { exportProjectZip } from "@/lib/projectExport";
 import { formatDateWithOptions, type PhaseScheduleChange } from "@/lib/schedule";
-import type { Gate, Phase, PhotoEvidence } from "@/lib/types";
+import type { EquipmentLog, Gate, Phase, PhotoEvidence } from "@/lib/types";
+import { EQUIPMENT_ITEMS } from "@/lib/inventoryCatalog";
 import {
   PHASE_LABEL,
   PHASE_ORDER,
@@ -102,6 +105,12 @@ export default function ProjectDetailPage() {
   const detail = projectQ.data?.ok ? projectQ.data.data : undefined;
   const error = projectQ.data?.ok === false ? projectQ.data.error : undefined;
 
+  const equipmentQ = useQuery({
+    queryKey: ["project-equipment", detail?.project.id],
+    queryFn: () => getProjectEquipment(detail!.project.id),
+    enabled: !!detail?.project.id,
+  });
+
   const [siteCheckTarget, setSiteCheckTarget] = useState<{
     gateId: string;
     phaseId: string;
@@ -129,6 +138,9 @@ export default function ProjectDetailPage() {
   const [exporting, setExporting] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [equipmentOpen, setEquipmentOpen] = useState(false);
+  const [equipmentDraft, setEquipmentDraft] = useState<Record<string, number>>({});
+  const [equipmentSaveError, setEquipmentSaveError] = useState<string | null>(null);
   const scheduleMutation = useMutation({
     mutationFn: (changes: PhaseScheduleChange[]) => updatePhaseSchedules({ projectId: id!, changes }),
     onSuccess: (res) => {
@@ -139,6 +151,35 @@ export default function ProjectDetailPage() {
       setScheduleError(null);
       qc.invalidateQueries({ queryKey: ["project", id] });
       qc.invalidateQueries({ queryKey: ["phases"] });
+    },
+  });
+  const saveEquipmentMutation = useMutation({
+    mutationFn: async ({
+      projectId,
+      changes,
+    }: {
+      projectId: string;
+      changes: { itemKey: string; quantity: number }[];
+    }) =>
+      Promise.all(
+        changes.map((change) =>
+          updateProjectEquipment({
+            projectId,
+            itemKey: change.itemKey,
+            quantity: change.quantity,
+          }),
+        ),
+      ),
+    onSuccess: async (results, variables) => {
+      const failed = results.find((result) => result.ok === false);
+      if (failed && failed.ok === false) {
+        setEquipmentSaveError(failed.error.message);
+        return;
+      }
+      await qc.invalidateQueries({ queryKey: ["project-equipment", variables.projectId] });
+      setEquipmentOpen(false);
+      setEquipmentDraft({});
+      setEquipmentSaveError(null);
     },
   });
 
@@ -179,6 +220,28 @@ export default function ProjectDetailPage() {
     () => detail?.photoEvidence.some((p) => p.purpose === "attic_check" && p.status === "confirmed") ?? false,
     [detail],
   );
+  const projectPhotos = useMemo(() => detail?.photoEvidence.filter((p) => p.phaseId) ?? [], [detail]);
+  const photoViewerItems = useMemo<PhotoViewerItem[]>(() => {
+    if (!detail) return [];
+
+    return projectPhotos.map((photo) => {
+      const phase = detail.phases.find((p) => p.id === photo.phaseId);
+      const gate = detail.gates.find((g) => g.id === photo.gateId);
+      const deficiency = detail.deficiencies.find((d) => d.id === photo.deficiencyId);
+      const purposeLabel = PURPOSE_LABEL[photo.purpose] ?? photo.purpose;
+
+      if (deficiency && phase) {
+        return { photo, caption: `Deficiency: ${deficiency.title}, ${purposeLabel}` };
+      }
+      if (gate && phase) {
+        return { photo, caption: `${GATE_LABEL[gate.type] ?? gate.type} · ${PHASE_LABEL[phase.type]}, ${purposeLabel}` };
+      }
+      if (phase) {
+        return { photo, caption: `${PHASE_LABEL[phase.type]}, ${purposeLabel}` };
+      }
+      return { photo, caption: purposeLabel };
+    });
+  }, [detail, projectPhotos]);
   const insulationPhase = useMemo(() => detail?.phases.find((ph) => ph.type === "insulation"), [detail]);
   const insulationClosed = useMemo(() => insulationPhase?.status === "closed", [insulationPhase]);
   const drywallPhase = useMemo(() => detail?.phases.find((ph) => ph.type === "drywall"), [detail]);
@@ -262,6 +325,47 @@ export default function ProjectDetailPage() {
   }
 
   const p = detail.project;
+  const equipmentLogs: EquipmentLog[] = equipmentQ.data?.ok ? equipmentQ.data.data : [];
+  const equipmentLabelByKey = new Map(EQUIPMENT_ITEMS.map((item) => [item.itemKey, item.label]));
+  const equipmentQuantityByKey = new Map(equipmentLogs.map((log) => [log.itemKey, log.quantity]));
+  const equipmentItems: InventoryDisplayItem[] = equipmentLogs
+    .filter((log) => log.quantity > 0)
+    .map((log) => ({
+      label: equipmentLabelByKey.get(log.itemKey) ?? log.itemKey,
+      quantity: log.quantity,
+    }));
+  const equipmentModalItems = EQUIPMENT_ITEMS.map((item) => ({
+    ...item,
+    quantity: equipmentDraft[item.itemKey] ?? equipmentQuantityByKey.get(item.itemKey) ?? 0,
+  }));
+  const openEquipmentModal = () => {
+    setEquipmentDraft(
+      Object.fromEntries(
+        EQUIPMENT_ITEMS.map((item) => [item.itemKey, equipmentQuantityByKey.get(item.itemKey) ?? 0]),
+      ),
+    );
+    setEquipmentSaveError(null);
+    setEquipmentOpen(true);
+  };
+  const saveEquipmentDraft = () => {
+    const changes = EQUIPMENT_ITEMS
+      .map((item) => ({
+        itemKey: item.itemKey,
+        quantity: equipmentDraft[item.itemKey] ?? 0,
+        currentQuantity: equipmentQuantityByKey.get(item.itemKey) ?? 0,
+      }))
+      .filter((item) => item.quantity !== item.currentQuantity)
+      .map(({ itemKey, quantity }) => ({ itemKey, quantity }));
+
+    if (changes.length === 0) {
+      setEquipmentOpen(false);
+      setEquipmentDraft({});
+      setEquipmentSaveError(null);
+      return;
+    }
+
+    saveEquipmentMutation.mutate({ projectId: p.id, changes });
+  };
   const phaseActionGates = phaseActionsTarget
     ? detail.gates.filter((g) => g.phaseId === phaseActionsTarget.id)
     : [];
@@ -915,11 +1019,20 @@ export default function ProjectDetailPage() {
           </div>
         )}
 
+        <section className={mobileTab === "overview" ? "" : "hidden md:block"}>
+          <InventoryDisplayCard
+            title="Equipment"
+            items={equipmentItems}
+            onManage={openEquipmentModal}
+            emptyText="No equipment logged"
+          />
+        </section>
+
         {/* Project Photos */}
         {detail && (
           <section className={mobileTab === "photos" ? "" : "hidden md:block"}>
             <SectionHeading as="h3" className="mb-3">Project Photos</SectionHeading>
-            {detail.photoEvidence.filter(p => p.phaseId).length === 0 ? (
+            {projectPhotos.length === 0 ? (
               <>
                 <EmptyInline text="No photos in this project yet" icon={<ImageIcon className="h-3.5 w-3.5" />} className="md:hidden" />
                 <Card className="hidden md:block border-border bg-card p-8 text-center text-sm text-muted-foreground shadow-card">
@@ -931,7 +1044,7 @@ export default function ProjectDetailPage() {
               </>
             ) : (
               <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 scrollbar-hide snap-x md:mx-0 md:grid md:grid-cols-4 md:gap-3 md:overflow-visible md:px-0">
-                {detail.photoEvidence.filter(p => p.phaseId).map((photo) => (
+                {projectPhotos.map((photo) => (
                   <div key={photo.id} className="w-24 shrink-0 snap-start md:w-auto">
                     <ProjectPhotoCard
                       photo={photo}
@@ -1082,7 +1195,30 @@ export default function ProjectDetailPage() {
         <PhotoViewerDialog
           open={photoViewerOpen}
           onOpenChange={setPhotoViewerOpen}
-          photo={selectedPhoto}
+          items={photoViewerItems}
+          initialPhotoId={selectedPhoto.id}
+        />
+      )}
+      {detail && (
+        <QuantityStepperModal
+          open={equipmentOpen}
+          onOpenChange={(open) => {
+            setEquipmentOpen(open);
+            if (!open) {
+              setEquipmentDraft({});
+              setEquipmentSaveError(null);
+            }
+          }}
+          title="Manage Equipment"
+          description={equipmentSaveError ?? "Update project equipment quantities."}
+          items={equipmentModalItems}
+          onQuantityChange={(itemKey, quantity) => {
+            setEquipmentDraft((current) => ({ ...current, [itemKey]: quantity }));
+            setEquipmentSaveError(null);
+          }}
+          confirmLabel="Save"
+          onConfirm={saveEquipmentDraft}
+          isConfirming={saveEquipmentMutation.isPending}
         />
       )}
       {detail && (

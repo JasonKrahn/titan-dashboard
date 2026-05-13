@@ -71,6 +71,23 @@ export interface Phase {
   updatedAt: string;
 }
 
+export interface MaterialLog {
+  id: string;
+  projectId: string;
+  phaseId: string;
+  itemKey: string;
+  quantity: number;
+  updatedAt: string;
+}
+
+export interface EquipmentLog {
+  id: string;
+  projectId: string;
+  itemKey: string;
+  quantity: number;
+  updatedAt: string;
+}
+
 export type GateType = "site_check" | "inspection" | "attic_check";
 
 export interface Gate {

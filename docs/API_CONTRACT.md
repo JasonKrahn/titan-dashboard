@@ -52,6 +52,8 @@ async function getClient(id: string): Promise<ApiResult<ClientRecord>>;
 async function getProjects(filters?: ProjectFilters): Promise<ApiResult<Project[]>>;
 async function getProject(id: string): Promise<ApiResult<ProjectDetail>>;
 async function getPhase(id: string): Promise<ApiResult<PhaseDetail>>;
+async function getPhaseMaterials(phaseId: string): Promise<ApiResult<MaterialLog[]>>;
+async function getProjectEquipment(projectId: string): Promise<ApiResult<EquipmentLog[]>>;
 async function getAuditEvents(input: { entityType?: AuditEntityType; entityId?: string; projectId?: string }): Promise<ApiResult<AuditEvent[]>>;
 async function getSubcontractorContacts(): Promise<ApiResult<SubcontractorContact[]>>;
 async function getPhotoViewUrl(photoId: string): Promise<ApiResult<{ url: string; expiresAt: string }>>;
@@ -73,6 +75,8 @@ async function updateClient(id: string, input: UpdateClientInput): Promise<ApiRe
 async function createProject(input: CreateProjectInput): Promise<ApiResult<Project>>;
 async function updateProject(id: string, input: UpdateProjectInput): Promise<ApiResult<Project>>;
 async function updatePhase(id: string, input: UpdatePhaseInput): Promise<ApiResult<Phase>>;
+async function updatePhaseMaterial(input: { phaseId: string; projectId: string; itemKey: string; quantity: number }): Promise<ApiResult<MaterialLog>>;
+async function updateProjectEquipment(input: { projectId: string; itemKey: string; quantity: number }): Promise<ApiResult<EquipmentLog>>;
 async function updatePhaseGate(input: UpdateGateInput): Promise<ApiResult<Gate>>;
 async function completeInspection(input: CompleteInspectionInput): Promise<ApiResult<Gate>>;
 async function completeAtticCheck(input: CompleteAtticCheckInput): Promise<ApiResult<Project>>;

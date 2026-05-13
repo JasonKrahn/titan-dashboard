@@ -9,13 +9,17 @@ import {
   getAllGates,
   getAllPhases,
   getAllPhotos,
+  getPhaseMaterials,
   getClients,
+  getProjectEquipment,
   getProject,
   getProjects,
   getUsers,
   markPhaseReadyForInspection,
   setCurrentUser,
   updateAtticGate,
+  updatePhaseMaterial,
+  updateProjectEquipment,
   updatePhaseSchedules,
   updateUser,
 } from "./index";
@@ -279,6 +283,128 @@ describe("prototype seed data", () => {
     expect(pmTwoProjects.data.every((project) => project.assignedProjectManagerId === "user-pm-2")).toBe(true);
 
     setCurrentUser("user-admin");
+  });
+
+  it("reads and updates phase material logs through the prototype adapter", async () => {
+    setCurrentUser("user-admin");
+
+    const initial = await getPhaseMaterials("proj-active-insulation-phase-insulation");
+    expect(initial.ok).toBe(true);
+    if (!initial.ok) return;
+    expect(initial.data.some((log) => log.itemKey === "r20_batt")).toBe(true);
+
+    const updated = await updatePhaseMaterial({
+      phaseId: "proj-active-insulation-phase-insulation",
+      projectId: "proj-active-insulation",
+      itemKey: "r20_batt",
+      quantity: 42.5,
+    });
+
+    expect(updated.ok).toBe(true);
+    if (!updated.ok) return;
+    expect(updated.data).toMatchObject({
+      phaseId: "proj-active-insulation-phase-insulation",
+      projectId: "proj-active-insulation",
+      itemKey: "r20_batt",
+      quantity: 42.5,
+    });
+    expect(Number.isNaN(Date.parse(updated.data.updatedAt))).toBe(false);
+
+    const created = await updatePhaseMaterial({
+      phaseId: "proj-active-insulation-phase-insulation",
+      projectId: "proj-active-insulation",
+      itemKey: "red_tuck_tape",
+      quantity: 6,
+    });
+
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    expect(created.data.id).toBe("material-proj-active-insulation-phase-insulation-red_tuck_tape");
+    expect(created.data.quantity).toBe(6);
+  });
+
+  it("reads and updates project equipment logs through the prototype adapter", async () => {
+    setCurrentUser("user-admin");
+
+    const initial = await getProjectEquipment("proj-active-insulation");
+    expect(initial.ok).toBe(true);
+    if (!initial.ok) return;
+    expect(initial.data.some((log) => log.itemKey === "baker_scaffold")).toBe(true);
+
+    const updated = await updateProjectEquipment({
+      projectId: "proj-active-insulation",
+      itemKey: "drywall_lift",
+      quantity: 1,
+    });
+
+    expect(updated.ok).toBe(true);
+    if (!updated.ok) return;
+    expect(updated.data).toMatchObject({
+      projectId: "proj-active-insulation",
+      itemKey: "drywall_lift",
+      quantity: 1,
+    });
+    expect(Number.isNaN(Date.parse(updated.data.updatedAt))).toBe(false);
+  });
+
+  it("enforces project manager visibility for material and equipment logs", async () => {
+    setCurrentUser("user-pm-1");
+
+    const materials = await getPhaseMaterials("proj-active-insulation-phase-insulation");
+    const materialUpdate = await updatePhaseMaterial({
+      phaseId: "proj-active-insulation-phase-insulation",
+      projectId: "proj-active-insulation",
+      itemKey: "r20_batt",
+      quantity: 12,
+    });
+    const equipment = await getProjectEquipment("proj-active-insulation");
+    const equipmentUpdate = await updateProjectEquipment({
+      projectId: "proj-active-insulation",
+      itemKey: "baker_scaffold",
+      quantity: 2,
+    });
+
+    expect(materials.ok).toBe(false);
+    expect(materialUpdate.ok).toBe(false);
+    expect(equipment.ok).toBe(false);
+    expect(equipmentUpdate.ok).toBe(false);
+    if (materials.ok || materialUpdate.ok || equipment.ok || equipmentUpdate.ok) return;
+    expect(materials.error.code).toBe("FORBIDDEN");
+    expect(materialUpdate.error.code).toBe("FORBIDDEN");
+    expect(equipment.error.code).toBe("FORBIDDEN");
+    expect(equipmentUpdate.error.code).toBe("FORBIDDEN");
+
+    setCurrentUser("user-admin");
+  });
+
+  it("validates material and equipment log updates", async () => {
+    setCurrentUser("user-admin");
+
+    const mismatchedProject = await updatePhaseMaterial({
+      phaseId: "proj-active-insulation-phase-insulation",
+      projectId: "proj-ready-inspection",
+      itemKey: "r20_batt",
+      quantity: 1,
+    });
+    const blankMaterial = await updatePhaseMaterial({
+      phaseId: "proj-active-insulation-phase-insulation",
+      projectId: "proj-active-insulation",
+      itemKey: " ",
+      quantity: 1,
+    });
+    const invalidEquipment = await updateProjectEquipment({
+      projectId: "proj-active-insulation",
+      itemKey: "baker_scaffold",
+      quantity: Number.POSITIVE_INFINITY,
+    });
+
+    expect(mismatchedProject.ok).toBe(false);
+    expect(blankMaterial.ok).toBe(false);
+    expect(invalidEquipment.ok).toBe(false);
+    if (mismatchedProject.ok || blankMaterial.ok || invalidEquipment.ok) return;
+    expect(mismatchedProject.error.code).toBe("VALIDATION_ERROR");
+    expect(blankMaterial.error.fieldErrors?.itemKey).toBe("Required");
+    expect(invalidEquipment.error.fieldErrors?.quantity).toBe("Must be a non-negative finite number");
   });
 
   it("blocks unsafe user deactivation scenarios", async () => {
