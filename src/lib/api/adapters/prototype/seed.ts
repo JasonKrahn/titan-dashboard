@@ -5,7 +5,9 @@ import type {
   AuditEvent,
   ClientRecord,
   Deficiency,
+  EquipmentLog,
   Gate,
+  MaterialLog,
   Phase,
   PhotoEvidence,
   Project,
@@ -811,6 +813,81 @@ export const seedPhases: Phase[] = seedProjects.flatMap((project) => {
     };
   });
 });
+
+export const seedMaterialLogs: MaterialLog[] = [
+  {
+    id: "material-proj-active-insulation-insulation-r20-batt",
+    projectId: "proj-active-insulation",
+    phaseId: "proj-active-insulation-phase-insulation",
+    itemKey: "r20_batt",
+    quantity: 32,
+    updatedAt: iso(-days(2)),
+  },
+  {
+    id: "material-proj-active-insulation-insulation-r22-batt",
+    projectId: "proj-active-insulation",
+    phaseId: "proj-active-insulation-phase-insulation",
+    itemKey: "r22_batt",
+    quantity: 18,
+    updatedAt: iso(-days(2)),
+  },
+  {
+    id: "material-proj-ready-inspection-drywall-half-inch-regular-board",
+    projectId: "proj-ready-inspection",
+    phaseId: "proj-ready-inspection-phase-drywall",
+    itemKey: "half_inch_regular_board",
+    quantity: 96,
+    updatedAt: iso(-days(3)),
+  },
+  {
+    id: "material-proj-ready-inspection-drywall-type-x-board",
+    projectId: "proj-ready-inspection",
+    phaseId: "proj-ready-inspection-phase-drywall",
+    itemKey: "type_x_board",
+    quantity: 24,
+    updatedAt: iso(-days(3)),
+  },
+  {
+    id: "material-proj-finishing-active-finishing-all-purpose-mud",
+    projectId: "proj-finishing-active",
+    phaseId: "proj-finishing-active-phase-finishing",
+    itemKey: "all_purpose_mud",
+    quantity: 14,
+    updatedAt: iso(-days(1)),
+  },
+  {
+    id: "material-proj-finishing-active-finishing-outside-corner-bead",
+    projectId: "proj-finishing-active",
+    phaseId: "proj-finishing-active-phase-finishing",
+    itemKey: "outside_corner_bead",
+    quantity: 40,
+    updatedAt: iso(-days(1)),
+  },
+];
+
+export const seedEquipmentLogs: EquipmentLog[] = [
+  {
+    id: "equipment-proj-active-insulation-baker-scaffold",
+    projectId: "proj-active-insulation",
+    itemKey: "baker_scaffold",
+    quantity: 1,
+    updatedAt: iso(-days(2)),
+  },
+  {
+    id: "equipment-proj-ready-inspection-drywall-lift",
+    projectId: "proj-ready-inspection",
+    itemKey: "drywall_lift",
+    quantity: 1,
+    updatedAt: iso(-days(3)),
+  },
+  {
+    id: "equipment-proj-finishing-active-site-lighting",
+    projectId: "proj-finishing-active",
+    itemKey: "site_lighting",
+    quantity: 4,
+    updatedAt: iso(-days(1)),
+  },
+];
 
 function gateSeed(projectId: string, key: string): GateSeed {
   return scenarioFor(projectId).gates?.[key] ?? {};

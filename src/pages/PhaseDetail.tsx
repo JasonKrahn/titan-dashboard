@@ -42,13 +42,15 @@ import { SiteBlockDialog } from "@/components/dashboard/SiteBlockDialog";
 import { SiteUnblockDialog } from "@/components/dashboard/SiteUnblockDialog";
 import { InspectionResultDialog } from "@/components/dashboard/InspectionResultDialog";
 import { DeficiencyDialog } from "@/components/dashboard/DeficiencyDialog";
-import { PhotoViewerDialog } from "@/components/dashboard/PhotoViewerDialog";
+import { InventoryDisplayCard, type InventoryDisplayItem } from "@/components/dashboard/InventoryDisplayCard";
+import { PhotoViewerDialog, type PhotoViewerItem } from "@/components/dashboard/PhotoViewerDialog";
 import { PhotoUploadDialog } from "@/components/dashboard/PhotoUploadDialog";
+import { QuantityStepperModal } from "@/components/dashboard/QuantityStepperModal";
 import { DatePicker } from "@/components/ui/date-picker";
-import { assignSubcontractorToPhase, getPhase, getPhotoViewUrl, markPhaseReadyForInspection, updatePhase } from "@/lib/api";
+import { assignSubcontractorToPhase, getPhase, getPhaseMaterials, getPhotoViewUrl, markPhaseReadyForInspection, updatePhase, updatePhaseMaterial } from "@/lib/api";
 import { formatDateWithOptions } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
-import type { Deficiency, Gate, PhaseStatus, PhotoEvidence } from "@/lib/types";
+import type { Deficiency, Gate, MaterialLog, PhaseStatus, PhotoEvidence } from "@/lib/types";
 import {
   GATE_LABEL,
   PHASE_LABEL,
@@ -59,6 +61,7 @@ import {
   phaseStatusTone,
   relativeTime,
 } from "@/lib/derived";
+import { PHASE_MATERIAL_CATALOGS } from "@/lib/inventoryCatalog";
 
 const GATE_BADGE_CLASS: Record<StatusTone, string> = {
   "not-started": "bg-status-not-started/15 text-status-not-started",
@@ -83,6 +86,12 @@ export default function PhaseDetailPage() {
   const detail = phaseQ.data?.ok ? phaseQ.data.data : undefined;
   const error = phaseQ.data?.ok === false ? phaseQ.data.error : undefined;
   const qc = useQueryClient();
+
+  const materialsQ = useQuery({
+    queryKey: ["phase-materials", detail?.phase.id],
+    queryFn: () => getPhaseMaterials(detail!.phase.id),
+    enabled: !!detail?.phase.id,
+  });
 
   const readyMutation = useMutation({
     mutationFn: ({ phaseId, projectId }: { phaseId: string; projectId: string }) =>
@@ -128,6 +137,42 @@ export default function PhaseDetailPage() {
   const [dateValidationError, setDateValidationError] = useState<string | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
+  const [materialsOpen, setMaterialsOpen] = useState(false);
+  const [materialDraft, setMaterialDraft] = useState<Record<string, number>>({});
+  const [materialSaveError, setMaterialSaveError] = useState<string | null>(null);
+
+  const saveMaterialsMutation = useMutation({
+    mutationFn: async ({
+      phaseId,
+      projectId,
+      changes,
+    }: {
+      phaseId: string;
+      projectId: string;
+      changes: { itemKey: string; quantity: number }[];
+    }) =>
+      Promise.all(
+        changes.map((change) =>
+          updatePhaseMaterial({
+            phaseId,
+            projectId,
+            itemKey: change.itemKey,
+            quantity: change.quantity,
+          }),
+        ),
+      ),
+    onSuccess: async (results, variables) => {
+      const failed = results.find((result) => !result.ok);
+      if (failed && !failed.ok) {
+        setMaterialSaveError(failed.error.message);
+        return;
+      }
+      await qc.invalidateQueries({ queryKey: ["phase-materials", variables.phaseId] });
+      setMaterialsOpen(false);
+      setMaterialDraft({});
+      setMaterialSaveError(null);
+    },
+  });
 
   // Task checklist state
   interface Task {
@@ -174,6 +219,23 @@ export default function PhaseDetailPage() {
     if (!detail) return undefined;
     return computePhaseHealth(detail.phase, detail.gates, detail.deficiencies);
   }, [detail]);
+  const photoViewerItems = useMemo<PhotoViewerItem[]>(() => {
+    if (!detail) return [];
+
+    return detail.photoEvidence.map((photo) => {
+      const gate = detail.gates.find((g) => g.id === photo.gateId);
+      const deficiency = detail.deficiencies.find((d) => d.id === photo.deficiencyId);
+      const purposeLabel = PURPOSE_LABEL[photo.purpose] ?? photo.purpose;
+
+      if (deficiency) {
+        return { photo, caption: `Deficiency: ${deficiency.title}, ${purposeLabel}` };
+      }
+      if (gate) {
+        return { photo, caption: `${GATE_LABEL[gate.type] ?? gate.type} · ${PHASE_LABEL[detail.phase.type]}, ${purposeLabel}` };
+      }
+      return { photo, caption: `${PHASE_LABEL[detail.phase.type]}, ${purposeLabel}` };
+    });
+  }, [detail]);
 
   if (phaseQ.isLoading) {
     return (
@@ -215,6 +277,48 @@ export default function PhaseDetailPage() {
   const activeDefs = deficiencies.filter((d) => d.status === "open" || d.status === "in_progress");
   const siteGate = gates.find((g) => g.type === "site_check");
   const inspectionGate = gates.find((g) => g.type === "inspection");
+  const materialCatalog = PHASE_MATERIAL_CATALOGS[phase.type];
+  const materialLogs: MaterialLog[] = materialsQ.data?.ok ? materialsQ.data.data : [];
+  const materialLabelByKey = new Map(materialCatalog.map((item) => [item.itemKey, item.label]));
+  const materialQuantityByKey = new Map(materialLogs.map((log) => [log.itemKey, log.quantity]));
+  const materialItems: InventoryDisplayItem[] = materialLogs
+    .filter((log) => log.quantity > 0)
+    .map((log) => ({
+      label: materialLabelByKey.get(log.itemKey) ?? log.itemKey,
+      quantity: log.quantity,
+    }));
+  const materialModalItems = materialCatalog.map((item) => ({
+    ...item,
+    quantity: materialDraft[item.itemKey] ?? materialQuantityByKey.get(item.itemKey) ?? 0,
+  }));
+  const openMaterialsModal = () => {
+    setMaterialDraft(
+      Object.fromEntries(
+        materialCatalog.map((item) => [item.itemKey, materialQuantityByKey.get(item.itemKey) ?? 0]),
+      ),
+    );
+    setMaterialSaveError(null);
+    setMaterialsOpen(true);
+  };
+  const saveMaterialDraft = () => {
+    const changes = materialCatalog
+      .map((item) => ({
+        itemKey: item.itemKey,
+        quantity: materialDraft[item.itemKey] ?? 0,
+        currentQuantity: materialQuantityByKey.get(item.itemKey) ?? 0,
+      }))
+      .filter((item) => item.quantity !== item.currentQuantity)
+      .map(({ itemKey, quantity }) => ({ itemKey, quantity }));
+
+    if (changes.length === 0) {
+      setMaterialsOpen(false);
+      setMaterialDraft({});
+      setMaterialSaveError(null);
+      return;
+    }
+
+    saveMaterialsMutation.mutate({ phaseId: phase.id, projectId: project.id, changes });
+  };
   const showReadyButton =
     !!inspectionGate &&
     (phase.status === "in_progress" || (phase.status === "blocked" && inspectionGate.status === "failed")) &&
@@ -779,6 +883,13 @@ export default function PhaseDetailPage() {
                     </div>
                   )}
                 </Card>
+
+                <InventoryDisplayCard
+                  title="Materials"
+                  items={materialItems}
+                  onManage={openMaterialsModal}
+                  emptyText="No materials logged"
+                />
               </div>
 
               <div className="space-y-4">
@@ -1001,6 +1112,15 @@ export default function PhaseDetailPage() {
               </div>
             </Card>
 
+            <div className="md:hidden">
+              <InventoryDisplayCard
+                title="Materials"
+                items={materialItems}
+                onManage={openMaterialsModal}
+                emptyText="No materials logged"
+              />
+            </div>
+
             {/* Activity (mobile only — desktop has its own tab) */}
             <section className="md:hidden">
               <SectionHeading as="h3" className="mb-3">Activity</SectionHeading>
@@ -1222,10 +1342,33 @@ export default function PhaseDetailPage() {
           deficiency={deficiencies.find((d) => d.id === selectedDeficiencyId)}
         />
       )}
+      {detail && (
+        <QuantityStepperModal
+          open={materialsOpen}
+          onOpenChange={(open) => {
+            setMaterialsOpen(open);
+            if (!open) {
+              setMaterialDraft({});
+              setMaterialSaveError(null);
+            }
+          }}
+          title="Manage Materials"
+          description={materialSaveError ?? `Update ${PHASE_LABEL[phase.type].toLowerCase()} material quantities.`}
+          items={materialModalItems}
+          onQuantityChange={(itemKey, quantity) => {
+            setMaterialDraft((current) => ({ ...current, [itemKey]: quantity }));
+            setMaterialSaveError(null);
+          }}
+          confirmLabel="Save"
+          onConfirm={saveMaterialDraft}
+          isConfirming={saveMaterialsMutation.isPending}
+        />
+      )}
       <PhotoViewerDialog
         open={photoViewerOpen}
         onOpenChange={setPhotoViewerOpen}
-        photo={selectedPhoto}
+        items={photoViewerItems}
+        initialPhotoId={selectedPhoto?.id ?? null}
       />
       {detail && (
         <PhotoUploadDialog

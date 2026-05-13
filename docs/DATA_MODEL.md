@@ -92,6 +92,35 @@ interface Phase {
 }
 ```
 
+### MaterialLog
+
+```ts
+interface MaterialLog {
+  id: string;
+  projectId: string;
+  phaseId: string;
+  itemKey: string;
+  quantity: number;
+  updatedAt: string;
+}
+```
+
+Material logs track phase-scoped material quantities by stable catalog-style `itemKey` values.
+
+### EquipmentLog
+
+```ts
+interface EquipmentLog {
+  id: string;
+  projectId: string;
+  itemKey: string;
+  quantity: number;
+  updatedAt: string;
+}
+```
+
+Equipment logs track project-scoped equipment quantities by stable catalog-style `itemKey` values.
+
 ### Gate
 
 ```ts
@@ -204,9 +233,11 @@ interface AuditEvent {
 
 - ClientRecord has many Projects.
 - Project has three Phases.
+- Project has many EquipmentLog records.
 - Project has one Attic Check Gate.
 - Phase has one Site Check Gate.
 - Phase has one Inspection Gate.
+- Phase has many MaterialLog records.
 - Phase has many Deficiencies.
 - Project and Phase can have many PhotoEvidence records.
 - Gate and Deficiency photo relationships are represented by PhotoEvidence records.
