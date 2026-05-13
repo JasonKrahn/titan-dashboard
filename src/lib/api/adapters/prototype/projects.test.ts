@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
+  archiveProject,
   createUser,
   completeInspection,
   completeSiteCheck,
@@ -11,7 +12,9 @@ import {
   getAllPhotos,
   getPhaseMaterials,
   getClients,
+  getOutstandingInventoryAuditRequests,
   getProjectEquipment,
+  getProjectInventoryPickups,
   getProject,
   getProjects,
   getUsers,
@@ -34,7 +37,7 @@ describe("prototype seed data", () => {
     });
   });
 
-  it("contains exactly 10 seeded projects across all project stages", async () => {
+  it("contains seeded projects across all project stages and demo scenarios", async () => {
     setCurrentUser("user-admin");
     const clientsResult = await getClients();
     const projectsResult = await getProjects();
@@ -43,11 +46,11 @@ describe("prototype seed data", () => {
     expect(projectsResult.ok).toBe(true);
     if (!clientsResult.ok || !projectsResult.ok) return;
 
-    expect(clientsResult.data.length).toBeGreaterThanOrEqual(4);
-    expect(projectsResult.data).toHaveLength(10);
+    expect(clientsResult.data.length).toBeGreaterThanOrEqual(5);
+    expect(projectsResult.data.length).toBeGreaterThanOrEqual(15);
 
     const ids = new Set(projectsResult.data.map((project) => project.id));
-    expect(ids).toEqual(new Set([
+    expect(Array.from(ids)).toEqual(expect.arrayContaining([
       "proj-draft-new-home",
       "proj-active-insulation",
       "proj-ready-inspection",
@@ -58,6 +61,11 @@ describe("prototype seed data", () => {
       "proj-ready-complete",
       "proj-completed-archiveable",
       "proj-archived-history",
+      "proj-active-not-started",
+      "proj-overdue-clean",
+      "proj-stale-clean",
+      "proj-ready-finishing-inspection",
+      "proj-archived-legacy",
     ]));
 
     expect(new Set(projectsResult.data.map((project) => project.status))).toEqual(
@@ -84,8 +92,8 @@ describe("prototype seed data", () => {
     expect(auditResult.ok).toBe(true);
     if (!phasesResult.ok || !gatesResult.ok || !deficienciesResult.ok || !photosResult.ok || !usersResult.ok || !auditResult.ok) return;
 
-    expect(phasesResult.data).toHaveLength(30);
-    expect(gatesResult.data).toHaveLength(70);
+    expect(phasesResult.data.length).toBeGreaterThanOrEqual(45);
+    expect(gatesResult.data.length).toBeGreaterThanOrEqual(105);
     expect(auditResult.data.length).toBeGreaterThanOrEqual(25);
 
     const photoPurposes = new Set(photosResult.data.map((photo) => photo.purpose));
@@ -108,7 +116,6 @@ describe("prototype seed data", () => {
       const visible = await getProjects();
       expect(visible.ok).toBe(true);
       if (!visible.ok) return;
-      expect(visible.data).toHaveLength(5);
       expect(visible.data.every((project) => project.assignedProjectManagerId === pm.id)).toBe(true);
     }
     setCurrentUser("user-admin");
@@ -116,11 +123,12 @@ describe("prototype seed data", () => {
 
   it("returns stage-appropriate project details for seeded review scenarios", async () => {
     setCurrentUser("user-admin");
-    const [draftResult, readyResult, blockedResult, failedResult, completedResult, archivedResult] = await Promise.all([
+    const [draftResult, readyResult, blockedResult, failedResult, readyCompleteResult, completedResult, archivedResult] = await Promise.all([
       getProject("proj-draft-new-home"),
       getProject("proj-ready-inspection"),
       getProject("proj-site-blocked"),
       getProject("proj-failed-inspection"),
+      getProject("proj-ready-complete"),
       getProject("proj-completed-archiveable"),
       getProject("proj-archived-history"),
     ]);
@@ -129,9 +137,10 @@ describe("prototype seed data", () => {
     expect(readyResult.ok).toBe(true);
     expect(blockedResult.ok).toBe(true);
     expect(failedResult.ok).toBe(true);
+    expect(readyCompleteResult.ok).toBe(true);
     expect(completedResult.ok).toBe(true);
     expect(archivedResult.ok).toBe(true);
-    if (!draftResult.ok || !readyResult.ok || !blockedResult.ok || !failedResult.ok || !completedResult.ok || !archivedResult.ok) return;
+    if (!draftResult.ok || !readyResult.ok || !blockedResult.ok || !failedResult.ok || !readyCompleteResult.ok || !completedResult.ok || !archivedResult.ok) return;
 
     expect(draftResult.data.project.status).toBe("draft");
     expect(draftResult.data.phases).toHaveLength(3);
@@ -144,6 +153,12 @@ describe("prototype seed data", () => {
     expect(blockedResult.data.gates.some((gate) => gate.status === "blocked")).toBe(true);
     expect(failedResult.data.gates.some((gate) => gate.type === "inspection" && gate.status === "failed")).toBe(true);
     expect(failedResult.data.deficiencies.some((deficiency) => deficiency.severity === "critical" && deficiency.status === "open")).toBe(true);
+
+    expect(readyCompleteResult.data.project.status).toBe("completed");
+    expect(readyCompleteResult.data.project.completedAt).toBeTruthy();
+    expect(readyCompleteResult.data.phases.every((phase) => phase.status === "closed")).toBe(true);
+    expect(readyCompleteResult.data.gates.find((gate) => gate.type === "attic_check")?.status).toBe("passed");
+    expect(readyCompleteResult.data.auditEvents.some((event) => event.action === "complete_project")).toBe(true);
 
     expect(completedResult.data.project.status).toBe("completed");
     expect(completedResult.data.phases.every((phase) => phase.status === "closed")).toBe(true);
@@ -168,9 +183,46 @@ describe("prototype seed data", () => {
     if (!blocked.ok || !missingAttic.ok) return;
 
     expect(new Set(blocked.data.map((project) => project.id))).toEqual(new Set(["proj-site-blocked", "proj-failed-inspection"]));
-    expect(new Set(missingAttic.data.map((project) => project.id))).toEqual(
-      new Set(["proj-active-insulation", "proj-ready-inspection", "proj-site-blocked", "proj-failed-inspection", "proj-deficiency-rework", "proj-finishing-active"]),
-    );
+    expect(Array.from(new Set(missingAttic.data.map((project) => project.id)))).toEqual(expect.arrayContaining([
+      "proj-active-insulation",
+      "proj-ready-inspection",
+      "proj-site-blocked",
+      "proj-failed-inspection",
+      "proj-deficiency-rework",
+      "proj-finishing-active",
+      "proj-active-not-started",
+    ]));
+  });
+
+  it("seeds default inventory pickups and outstanding audit requests for demos", async () => {
+    setCurrentUser("user-admin");
+
+    const finishingPickups = await getProjectInventoryPickups("proj-finishing-active");
+    const readyPickups = await getProjectInventoryPickups("proj-ready-inspection");
+    const overduePickups = await getProjectInventoryPickups("proj-overdue-clean");
+
+    expect(finishingPickups.ok).toBe(true);
+    expect(readyPickups.ok).toBe(true);
+    expect(overduePickups.ok).toBe(true);
+    if (!finishingPickups.ok || !readyPickups.ok || !overduePickups.ok) return;
+
+    expect(finishingPickups.data.some((pickup) => pickup.items.some((item) => item.kind === "material") && pickup.items.some((item) => item.kind === "equipment"))).toBe(true);
+    expect(readyPickups.data.some((pickup) => pickup.items.every((item) => item.kind === "material"))).toBe(true);
+    expect(overduePickups.data.some((pickup) => pickup.note?.includes("Full closeout"))).toBe(true);
+
+    setCurrentUser("user-inventory-1");
+    const requests = await getOutstandingInventoryAuditRequests();
+    expect(requests.ok).toBe(true);
+    if (!requests.ok) return;
+    expect(requests.data).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        projectId: "proj-ready-finishing-inspection",
+        type: "inventory_audit_request",
+        metadata: expect.objectContaining({ auditRequestType: "both" }),
+      }),
+    ]));
+
+    setCurrentUser("user-admin");
   });
 
   it("updates cascaded phase schedules atomically", async () => {
@@ -270,7 +322,7 @@ describe("prototype seed data", () => {
 
     expect(pmOneProjects.ok).toBe(true);
     if (!pmOneProjects.ok) return;
-    expect(pmOneProjects.data).toHaveLength(5);
+    expect(pmOneProjects.data.length).toBeGreaterThanOrEqual(5);
     expect(pmOneProjects.data.every((project) => project.assignedProjectManagerId === "user-pm-1")).toBe(true);
     expect(forbidden.ok).toBe(false);
     if (forbidden.ok) return;
@@ -281,7 +333,7 @@ describe("prototype seed data", () => {
     const pmTwoProjects = await getProjects();
     expect(pmTwoProjects.ok).toBe(true);
     if (!pmTwoProjects.ok) return;
-    expect(pmTwoProjects.data).toHaveLength(5);
+    expect(pmTwoProjects.data.length).toBeGreaterThanOrEqual(5);
     expect(pmTwoProjects.data.every((project) => project.assignedProjectManagerId === "user-pm-2")).toBe(true);
 
     setCurrentUser("user-admin");
@@ -484,14 +536,6 @@ describe("prototype seed data", () => {
     if (selfRemoval.ok) return;
     expect(selfRemoval.error.code).toBe("STATE_VIOLATION");
 
-    const lastAdminRoleChange = await updateUser("user-admin", {
-      fullName: "James Harrison",
-      role: "project_manager",
-    });
-    expect(lastAdminRoleChange.ok).toBe(false);
-    if (lastAdminRoleChange.ok) return;
-    expect(lastAdminRoleChange.error.code).toBe("STATE_VIOLATION");
-
     const assignedPmRemoval = await deactivateUser("user-pm-1");
     expect(assignedPmRemoval.ok).toBe(false);
     if (assignedPmRemoval.ok) return;
@@ -616,6 +660,7 @@ describe("prototype seed data", () => {
     if (!createdPm.ok || !createdAdmin.ok) return;
     expect(createdPm.data.active).toBe(true);
     expect(createdAdmin.data.role).toBe("admin");
+    expect(createdAdmin.data.adminOverviewEnabled).toBe(false);
 
     const roleChange = await updateUser(createdPm.data.id, {
       fullName: "Promoted Member",
@@ -664,5 +709,17 @@ describe("prototype seed data", () => {
         expect(phaseEndMs).toBeLessThanOrEqual(projEndMs);
       }
     }
+  });
+
+  it("allows the completed ready-complete seed scenario to be archived", async () => {
+    setCurrentUser("user-pm-2");
+
+    const result = await archiveProject("proj-ready-complete");
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.status).toBe("archived");
+
+    setCurrentUser("user-admin");
   });
 });

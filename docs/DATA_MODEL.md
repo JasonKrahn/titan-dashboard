@@ -301,16 +301,22 @@ Photo evidence transitions:
 
 Prototype seed data must include:
 
-- At least 4 client records.
-- At least 10 projects across draft, active, completed, and archived.
+- At least 5 active client records plus an archived client for history review.
+- At least 15 projects across draft, active, completed, and archived.
 - Projects with all three phase types.
 - At least one blocked phase.
 - At least one failed inspection.
 - At least one project blocked by missing Attic Check photo evidence.
 - At least one project ready to complete.
 - At least one project assigned to a Project Manager.
+- At least one unassigned active or draft project.
+- At least one clean overdue project and one clean stale project for command-center demos.
+- At least two ready-for-inspection phases to demonstrate bottleneck insights.
+- At least one seeded inventory pickup, one outstanding inventory audit request, and one default PM notification.
+- Active and inactive users across Admin, Project Manager, and Inventory Viewer roles.
+- Photo evidence across confirmed and non-confirmed upload statuses where UI can display them.
 - At least one PM-restricted view where Admin-only controls are hidden.
-- At least 20 audit events.
+- At least 30 audit events, including inventory, materials/hardware, user, and client lifecycle actions.
 
 ## Old-Project Fields To Avoid In MVP
 
