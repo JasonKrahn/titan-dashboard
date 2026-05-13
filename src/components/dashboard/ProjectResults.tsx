@@ -341,7 +341,7 @@ export function ProjectResults({
                       PM
                     </SortButton>
                   </TableHead>
-                  {onArchiveProject && <TableHead className="w-[3%]" />}
+                  {onArchiveProject && <TableHead className="w-28 px-2" />}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -426,12 +426,12 @@ export function ProjectResults({
                       )}
                     </TableCell>
                     {onArchiveProject && (
-                      <TableCell>
+                      <TableCell className="px-2 text-right">
                         {row.project.status === "completed" && (
                           <button
                             type="button"
                             title="Archive project"
-                            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-border bg-muted/30 px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             onClick={() => onArchiveProject(row.project.id, row.project.name)}
                           >
                             <Archive className="h-3.5 w-3.5" />

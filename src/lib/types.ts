@@ -8,6 +8,7 @@ export interface User {
   fullName: string;
   email: string;
   phone?: string;
+  adminOverviewEnabled?: boolean;
   active: boolean;
   createdAt: string;
   updatedAt: string;

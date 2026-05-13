@@ -50,7 +50,9 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, 
   const notifications = notificationsQ.data?.ok ? notificationsQ.data.data : [];
 
   const section = activeSection ?? sectionFromPath(location.pathname);
-  const adminToolsActive = section === "command" || section === "activity" || section === "organization" || section === "inventory";
+  const isAdmin = resolvedUser?.role === "admin";
+  const showAdminOverview = resolvedUser?.adminOverviewEnabled === true;
+  const adminToolsActive = (showAdminOverview && section === "command") || section === "activity" || section === "organization" || section === "inventory";
 
   const goToDashboardView = (view: DashboardViewTarget) => {
     if (location.pathname === "/" && onSelectDashboardView) {
@@ -128,7 +130,7 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, 
                 </Link>
               </SegmentedControl>
             )}
-            {me?.role === "admin" && (
+            {isAdmin && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button type="button" className={topNavClass(adminToolsActive)}>
@@ -155,12 +157,14 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, 
                       Activity
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild className={adminToolsMenuItemClass}>
-                    <Link to="/command">
-                      <Radar className="h-4 w-4" />
-                      Admin Overview
-                    </Link>
-                  </DropdownMenuItem>
+                  {showAdminOverview && (
+                    <DropdownMenuItem asChild className={adminToolsMenuItemClass}>
+                      <Link to="/command">
+                        <Radar className="h-4 w-4" />
+                        Admin Overview
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
@@ -268,7 +272,7 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, 
                 </Link>
               </>
             )}
-            {me?.role === "admin" && (
+            {isAdmin && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button type="button" className={mobileTopNavClass(adminToolsActive)}>
@@ -295,12 +299,14 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, 
                       Activity
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild className={adminToolsMenuItemClass}>
-                    <Link to="/command">
-                      <Radar className="h-4 w-4" />
-                      Admin Overview
-                    </Link>
-                  </DropdownMenuItem>
+                  {showAdminOverview && (
+                    <DropdownMenuItem asChild className={adminToolsMenuItemClass}>
+                      <Link to="/command">
+                        <Radar className="h-4 w-4" />
+                        Admin Overview
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             )}

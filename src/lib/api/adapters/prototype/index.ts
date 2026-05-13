@@ -74,6 +74,7 @@ import {
   seedGates,
   seedInventoryPickups,
   seedMaterialLogs,
+  seedNotifications,
   seedPhases,
   seedPhotos,
   seedProjects,
@@ -118,6 +119,9 @@ export const photoBlobUrls = new Map<string, string>([
   ["photo-ready-complete-framing-3055", imgFraming3055],
   ["photo-ready-complete-framing-3186", imgFraming3186],
   ["photo-completed-4458", imgRoot4458],
+  ["photo-pending-active-insulation-poly", imgInsulation3480],
+  ["photo-uploaded-ready-finishing", imgFinishingSiteCheck],
+  ["photo-failed-site-blocked-delivery", imgBoardingPhoto9075],
 ]);
 
 export interface UploadPhotoEvidenceInput {
@@ -181,8 +185,6 @@ const delay = <T,>(value: T): Promise<T> =>
 
 const ok = <T,>(data: T): ApiResult<T> => ({ ok: true, data });
 
-const seedNotifications: AppNotification[] = [];
-
 // Mutable "current user" for prototype role switching.
 let currentUserId = "user-admin";
 
@@ -238,7 +240,13 @@ export async function updateUser(userId: string, input: UpdateUserInput): Promis
 
   const nowIso = new Date().toISOString();
   const previousRole = user.role;
-  const previousValue = { fullName: user.fullName, email: user.email, phone: user.phone, role: user.role };
+  const previousValue = {
+    fullName: user.fullName,
+    email: user.email,
+    phone: user.phone,
+    role: user.role,
+    adminOverviewEnabled: user.adminOverviewEnabled === true,
+  };
   if (user.role === "admin" && user.active && input.role !== undefined && input.role !== "admin") {
     const activeAdmins = seedUsers.filter((u) => u.role === "admin" && u.active);
     if (activeAdmins.length <= 1) {
@@ -249,6 +257,9 @@ export async function updateUser(userId: string, input: UpdateUserInput): Promis
   if (input.phone !== undefined) user.phone = input.phone?.trim() || undefined;
   if (input.email !== undefined) user.email = input.email.trim();
   if (me.role === "admin" && input.role !== undefined) user.role = input.role;
+  if (user.role === "admin" && input.adminOverviewEnabled !== undefined) {
+    user.adminOverviewEnabled = input.adminOverviewEnabled;
+  }
   user.updatedAt = nowIso;
 
   seedAuditEvents.unshift({
@@ -258,7 +269,13 @@ export async function updateUser(userId: string, input: UpdateUserInput): Promis
     action: previousRole !== user.role ? "role_changed" : "updated",
     actorUserId: me.id,
     previousValue,
-    nextValue: { fullName: user.fullName, email: user.email, phone: user.phone, role: user.role },
+    nextValue: {
+      fullName: user.fullName,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      adminOverviewEnabled: user.adminOverviewEnabled === true,
+    },
     createdAt: nowIso,
   });
 
@@ -289,6 +306,7 @@ export async function createUser(input: CreateUserInput): Promise<ApiResult<User
     fullName: input.fullName.trim(),
     email: input.email.trim(),
     phone: input.phone?.trim() || undefined,
+    adminOverviewEnabled: input.role === "admin" ? false : undefined,
     active: true,
     createdAt: nowIso,
     updatedAt: nowIso,
@@ -1182,6 +1200,7 @@ export interface UpdateUserInput {
   phone?: string;
   email?: string;
   role?: UserRole;
+  adminOverviewEnabled?: boolean;
 }
 
 export async function createClient(input: CreateClientInput): Promise<ApiResult<ClientRecord>> {

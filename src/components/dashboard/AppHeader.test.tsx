@@ -111,6 +111,24 @@ describe("AppHeader admin tools", () => {
     expect(await screen.findByRole("link", { name: /Organization Members/i })).toBeInTheDocument();
   });
 
+  it("shows activity but hides admin overview from admin tools by default", async () => {
+    renderHeader({ currentUser: admin });
+
+    expect(await screen.findAllByRole("button", { name: /Admin Tools/i })).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "Activity" })).toHaveLength(2);
+    expect(screen.queryByRole("link", { name: "Admin Overview" })).not.toBeInTheDocument();
+  });
+
+  it("shows admin overview in admin tools when the admin setting is enabled", async () => {
+    renderHeader({ currentUser: { ...admin, adminOverviewEnabled: true } });
+
+    const adminOverviewLinks = await screen.findAllByRole("link", { name: "Admin Overview" });
+    expect(adminOverviewLinks).toHaveLength(2);
+    for (const link of adminOverviewLinks) {
+      expect(link).toHaveAttribute("href", "/command");
+    }
+  });
+
   it("hides admin tools for project managers", async () => {
     renderHeader({ currentUser: pm });
 
