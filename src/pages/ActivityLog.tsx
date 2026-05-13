@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Clock, FileText, Search } from "lucide-react";
+import { Clock, FileText, Image as ImageIcon, Search } from "lucide-react";
 import { AppHeader } from "@/components/dashboard/AppHeader";
+import { PhotoViewerDialog, type PhotoViewerItem } from "@/components/dashboard/PhotoViewerDialog";
 import { Card } from "@/components/ui/card";
 import { IconWell } from "@/components/ui/icon-well";
 import { Input } from "@/components/ui/input";
@@ -10,13 +11,24 @@ import { SectionHeading } from "@/components/ui/section-heading";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ActionBadge } from "@/components/ui/action-badge";
-import { getAuditEvents, getProjects, getAllPhases, getUsers, getAllGates, getAllDeficiencies, getClients, getAllPhotos } from "@/lib/api";
+import { getAuditEvents, getProjects, getAllPhases, getUsers, getAllGates, getAllDeficiencies, getClients, getAllPhotos, getPhotoViewUrl } from "@/lib/api";
 import { formatAuditEvent, getAuditActionLabel, resolveProjectId } from "@/lib/audit";
+import { GATE_LABEL, PHASE_LABEL } from "@/lib/derived";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { AuditEvent } from "@/lib/types";
+import type { AuditEvent, Deficiency, Gate, Phase, PhotoEvidence } from "@/lib/types";
 
 const GROUP_ORDER = ["Today", "Yesterday", "This Week", "Earlier"] as const;
 type DateGroup = (typeof GROUP_ORDER)[number];
+const ACTIVITY_THUMBNAIL_LIMIT = 4;
+
+const PURPOSE_LABEL: Record<PhotoEvidence["purpose"], string> = {
+  attic_check: "Attic Check",
+  deficiency_after: "After",
+  deficiency_before: "Before",
+  general: "General",
+  inspection: "Inspection",
+  site_check: "Site Check",
+};
 
 function dateGroup(iso: string): DateGroup {
   const today = new Date();
@@ -33,12 +45,166 @@ function dateGroup(iso: string): DateGroup {
   return "Earlier";
 }
 
+function sortPhotosNewestFirst(items: PhotoEvidence[]) {
+  return items.slice().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
+function uniquePhotos(items: PhotoEvidence[]) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
+}
+
+function relatedPhotosForEvent(
+  event: AuditEvent,
+  photos: PhotoEvidence[],
+) {
+  switch (event.entityType) {
+    case "photo_evidence":
+      return photos.filter((photo) => photo.id === event.entityId);
+    case "deficiency":
+      return photos.filter((photo) => photo.deficiencyId === event.entityId);
+    case "gate":
+      return photos.filter((photo) => photo.gateId === event.entityId);
+    default:
+      return [];
+  }
+}
+
+function photoCaption(
+  photo: PhotoEvidence,
+  phases: Phase[],
+  gates: Gate[],
+  deficiencies: Deficiency[],
+) {
+  const phase = photo.phaseId ? phases.find((item) => item.id === photo.phaseId) : undefined;
+  const gate = photo.gateId ? gates.find((item) => item.id === photo.gateId) : undefined;
+  const deficiency = photo.deficiencyId ? deficiencies.find((item) => item.id === photo.deficiencyId) : undefined;
+  const purposeLabel = PURPOSE_LABEL[photo.purpose] ?? photo.purpose;
+
+  if (deficiency && phase) {
+    return `Deficiency: ${deficiency.title}, ${purposeLabel}`;
+  }
+  if (gate && phase) {
+    return `${GATE_LABEL[gate.type] ?? gate.type} · ${PHASE_LABEL[phase.type] ?? phase.type}, ${purposeLabel}`;
+  }
+  if (gate) {
+    return `${GATE_LABEL[gate.type] ?? gate.type}, ${purposeLabel}`;
+  }
+  if (phase) {
+    return `${PHASE_LABEL[phase.type] ?? phase.type}, ${purposeLabel}`;
+  }
+  return purposeLabel;
+}
+
+function buildRelatedPhotoItems(
+  event: AuditEvent,
+  photos: PhotoEvidence[],
+  phases: Phase[],
+  gates: Gate[],
+  deficiencies: Deficiency[],
+): PhotoViewerItem[] {
+  return sortPhotosNewestFirst(uniquePhotos(relatedPhotosForEvent(event, photos))).map((photo) => ({
+    photo,
+    caption: photoCaption(photo, phases, gates, deficiencies),
+  }));
+}
+
+function ActivityPhotoThumbnail({
+  item,
+  onOpen,
+}: {
+  item: PhotoViewerItem;
+  onOpen: () => void;
+}) {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setImageUrl(null);
+    getPhotoViewUrl(item.photo.id).then((res) => {
+      if (!cancelled && res.ok && res.data.url) {
+        setImageUrl(res.data.url);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [item.photo.id]);
+
+  return (
+    <button
+      type="button"
+      aria-label={`Open related photo: ${item.caption}`}
+      onClick={onOpen}
+      className="group relative h-14 w-14 overflow-hidden rounded-md border border-border bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt={item.caption}
+          className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+        />
+      ) : (
+        <span className="flex h-full w-full items-center justify-center text-muted-foreground">
+          <ImageIcon className="h-5 w-5" />
+        </span>
+      )}
+    </button>
+  );
+}
+
+function ActivityPhotoStrip({
+  items,
+  context,
+  onOpen,
+}: {
+  items: PhotoViewerItem[];
+  context: string;
+  onOpen: (photoId: string) => void;
+}) {
+  if (items.length === 0) return null;
+
+  const visibleItems = items.slice(0, ACTIVITY_THUMBNAIL_LIMIT);
+  const remainingCount = items.length - visibleItems.length;
+
+  return (
+    <div className="mt-3 border-t border-border/60 pt-3">
+      <p className="mb-2 text-xs font-medium text-muted-foreground">
+        {items.length} related {items.length === 1 ? "photo" : "photos"}
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        {visibleItems.map((item) => (
+          <ActivityPhotoThumbnail
+            key={item.photo.id}
+            item={item}
+            onOpen={() => onOpen(item.photo.id)}
+          />
+        ))}
+        {remainingCount > 0 && (
+          <button
+            type="button"
+            aria-label={`Open ${remainingCount} more related photos for ${context}`}
+            onClick={() => onOpen(items[ACTIVITY_THUMBNAIL_LIMIT]?.photo.id ?? items[0].photo.id)}
+            className="flex h-14 w-14 items-center justify-center rounded-md border border-dashed border-border bg-muted/30 text-xs font-semibold text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-muted/60"
+          >
+            +{remainingCount}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ActivityLogPage() {
   const [search, setSearch] = useState("");
   const [actionFilter, setActionFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [pmFilter, setPmFilter] = useState<string>("all");
   const [projectFilter, setProjectFilter] = useState<string>("all");
+  const [photoViewerItems, setPhotoViewerItems] = useState<PhotoViewerItem[]>([]);
+  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
 
   const auditQ = useQuery({ queryKey: ["audit-events"], queryFn: getAuditEvents });
   const projectsQ = useQuery({ queryKey: ["projects", "all"], queryFn: () => getProjects() });
@@ -131,6 +297,7 @@ export default function ActivityLogPage() {
           users,
           photoEvidence: photos,
         }),
+        photoItems: buildRelatedPhotoItems(event, photos, phases, gates, deficiencies),
       })),
     [deficiencies, gates, nonArchivedEvents, phases, photos, projects, users],
   );
@@ -166,7 +333,10 @@ export default function ActivityLogPage() {
     }
     const q = search.trim().toLowerCase();
     if (q) {
-      result = result.filter(({ display }) => display.searchText.includes(q));
+      result = result.filter(({ display, photoItems }) => {
+        const photoSearchText = photoItems.map((item) => item.caption).join(" ").toLowerCase();
+        return display.searchText.includes(q) || photoSearchText.includes(q);
+      });
     }
     return result;
   }, [actionFilter, clientFilter, deficiencies, displayRows, gates, phases, pmFilter, projectFilter, projects, search]);
@@ -194,6 +364,11 @@ export default function ActivityLogPage() {
   }, [activeProjects, users]);
 
   const dropdownProjects = useMemo(() => activeProjects, [activeProjects]);
+
+  function openPhotoViewer(items: PhotoViewerItem[], photoId: string) {
+    setPhotoViewerItems(items);
+    setSelectedPhotoId(photoId);
+  }
 
   if (
     auditQ.isLoading ||
@@ -320,13 +495,9 @@ export default function ActivityLogPage() {
                   {group}
                 </SectionHeading>
                 <div className="space-y-2">
-                  {grouped[group]!.map(({ event, display }) => {
-                    const card = (
-                      <Card
-                        key={event.id}
-                        surface="default"
-                        className={`p-4 shadow-card ${display.priorityBorderClass ?? ""} ${display.linkUrl ? "cursor-pointer hover:shadow-lg hover:border-primary/50 transition-shadow" : ""}`}
-                      >
+                  {grouped[group]!.map(({ event, display, photoItems }) => {
+                    const mainContent = (
+                      <div>
                         <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
                           <div className="flex items-center gap-2">
                             <ActionBadge action={event.action} size="sm" />
@@ -356,16 +527,32 @@ export default function ActivityLogPage() {
                             {display.metadataText}
                           </div>
                         )}
+                      </div>
+                    );
+
+                    return (
+                      <Card
+                        key={event.id}
+                        surface="default"
+                        className={`p-4 shadow-card ${display.priorityBorderClass ?? ""} ${display.linkUrl ? "hover:shadow-lg hover:border-primary/50 transition-shadow" : ""}`}
+                      >
+                        {display.linkUrl ? (
+                          <Link
+                            to={display.linkUrl}
+                            className="block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            {mainContent}
+                          </Link>
+                        ) : (
+                          mainContent
+                        )}
+                        <ActivityPhotoStrip
+                          items={photoItems}
+                          context={display.context}
+                          onOpen={(photoId) => openPhotoViewer(photoItems, photoId)}
+                        />
                       </Card>
                     );
-                    if (display.linkUrl) {
-                      return (
-                        <Link key={event.id} to={display.linkUrl} className="block">
-                          {card}
-                        </Link>
-                      );
-                    }
-                    return card;
                   })}
                 </div>
               </div>
@@ -377,6 +564,17 @@ export default function ActivityLogPage() {
           Prototype data · Backend swap-in via lib/api adapters
         </p>
       </main>
+      <PhotoViewerDialog
+        open={photoViewerItems.length > 0 && selectedPhotoId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedPhotoId(null);
+            setPhotoViewerItems([]);
+          }
+        }}
+        items={photoViewerItems}
+        initialPhotoId={selectedPhotoId}
+      />
     </div>
   );
 }

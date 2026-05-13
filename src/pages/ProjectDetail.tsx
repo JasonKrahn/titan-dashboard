@@ -62,10 +62,10 @@ import { DeficiencyDialog } from "@/components/dashboard/DeficiencyDialog";
 import { PhotoUploadDialog } from "@/components/dashboard/PhotoUploadDialog";
 import { InventoryDisplayCard, type InventoryDisplayItem, type InventoryPickupSummaryItem } from "@/components/dashboard/InventoryDisplayCard";
 import { QuantityStepperModal } from "@/components/dashboard/QuantityStepperModal";
-import { getCurrentUser, getProject, getProjectEquipment, getProjectInventoryPickups, updateProjectEquipmentBatch, updateAtticGate, getPhotoViewUrl, updatePhaseSchedules } from "@/lib/api";
+import { getCurrentUser, getProject, getProjectEquipment, getPhaseMaterials, getProjectInventoryPickups, updateProjectEquipmentBatch, updateAtticGate, getPhotoViewUrl, updatePhaseSchedules } from "@/lib/api";
 import { exportProjectZip } from "@/lib/projectExport";
 import { formatDateWithOptions, type PhaseScheduleChange } from "@/lib/schedule";
-import type { EquipmentLog, Gate, InventoryPickup, Phase, PhotoEvidence } from "@/lib/types";
+import type { EquipmentLog, Gate, InventoryPickup, MaterialLog, Phase, PhotoEvidence } from "@/lib/types";
 import { EQUIPMENT_ITEMS } from "@/lib/inventoryCatalog";
 import {
   PHASE_LABEL,
@@ -81,6 +81,7 @@ import {
 } from "@/lib/derived";
 import { ActionBadge } from "@/components/ui/action-badge";
 import { SeverityBadge } from "@/components/ui/severity-badge";
+import { useToast } from "@/hooks/use-toast";
 
 const ENTITY_LABEL: Record<string, string> = {
   project: "Project",
@@ -142,6 +143,7 @@ function formatEquipmentPickupSummary(pickup: InventoryPickup, labelByKey: Map<s
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const meQ = useQuery({ queryKey: ["me"], queryFn: getCurrentUser });
   useEffect(() => {
@@ -248,7 +250,48 @@ export default function ProjectDetailPage() {
     if (!detail) return;
     setExporting(true);
     try {
-      await exportProjectZip(detail, detail.client, detail.assignedProjectManager);
+      const [equipmentResult, pickupsResult, materialResults] = await Promise.all([
+        getProjectEquipment(detail.project.id),
+        getProjectInventoryPickups(detail.project.id),
+        Promise.all(detail.phases.map((phase) => getPhaseMaterials(phase.id))),
+      ]);
+      const failedMaterialResult = materialResults.find((result) => result.ok === false);
+      if (failedMaterialResult?.ok === false) {
+        toast({
+          title: "Export failed",
+          description: failedMaterialResult.error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+      if (equipmentResult.ok === false) {
+        toast({
+          title: "Export failed",
+          description: equipmentResult.error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+      if (pickupsResult.ok === false) {
+        toast({
+          title: "Export failed",
+          description: pickupsResult.error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+      const materialLogs: MaterialLog[] = materialResults.flatMap((result) => (result.ok ? result.data : []));
+      await exportProjectZip(detail, detail.client, detail.assignedProjectManager, {
+        equipmentLogs: equipmentResult.data,
+        inventoryPickups: pickupsResult.data,
+        materialLogs,
+      });
+    } catch (error) {
+      toast({
+        title: "Export failed",
+        description: error instanceof Error ? error.message : "Unable to create the project export.",
+        variant: "destructive",
+      });
     } finally {
       setExporting(false);
     }
