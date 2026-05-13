@@ -20,7 +20,7 @@ interface RoleSwitcherProps {
 export function RoleSwitcher({ current, users, onSwitch }: RoleSwitcherProps) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-2.5 py-1.5 transition-colors hover:bg-accent">
+      <DropdownMenuTrigger className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-2.5 py-1.5 transition-colors hover:bg-accent lg:min-h-10">
         <IconWell tone="primary" size="sm" shape="pill" className="text-xs font-semibold">
           {initials(current.fullName)}
         </IconWell>

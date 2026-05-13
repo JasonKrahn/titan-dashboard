@@ -5,7 +5,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import PhaseDetailPage from "./PhaseDetail";
 import type { InventoryPickup, MaterialLog, PhaseDetail } from "@/lib/types";
 
-const { getPhase, getCurrentUser, getPhotoViewUrl, getUsers, setCurrentUser, updatePhase, getPhaseMaterials, getProjectInventoryPickups, updatePhaseMaterials } = vi.hoisted(() => ({
+const { getPhase, getCurrentUser, getPhotoViewUrl, getUsers, setCurrentUser, updatePhase, getPhaseMaterials, getProjectInventoryPickups, updatePhaseMaterials, createPhaseChecklistItem, updatePhaseChecklistItem, deletePhaseChecklistItem } = vi.hoisted(() => ({
   getPhase: vi.fn(),
   getCurrentUser: vi.fn(),
   getPhotoViewUrl: vi.fn(),
@@ -15,6 +15,9 @@ const { getPhase, getCurrentUser, getPhotoViewUrl, getUsers, setCurrentUser, upd
   getPhaseMaterials: vi.fn(),
   getProjectInventoryPickups: vi.fn(),
   updatePhaseMaterials: vi.fn(),
+  createPhaseChecklistItem: vi.fn(),
+  updatePhaseChecklistItem: vi.fn(),
+  deletePhaseChecklistItem: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -29,6 +32,9 @@ vi.mock("@/lib/api", async () => {
     getPhaseMaterials,
     getProjectInventoryPickups,
     updatePhaseMaterials,
+    createPhaseChecklistItem,
+    updatePhaseChecklistItem,
+    deletePhaseChecklistItem,
     markPhaseReadyForInspection: vi.fn(),
     updatePhase,
     assignSubcontractorToPhase: vi.fn(),
@@ -158,6 +164,26 @@ const detail: PhaseDetail = {
     },
   ],
   auditEvents: [],
+  checklistItems: [
+    {
+      id: "task-1",
+      projectId: "proj-1",
+      phaseId: "phase-1",
+      text: "Confirm attic baffles are installed",
+      completed: false,
+      createdAt: "2026-05-08T10:00:00.000Z",
+      updatedAt: "2026-05-08T10:00:00.000Z",
+    },
+    {
+      id: "task-2",
+      projectId: "proj-1",
+      phaseId: "phase-1",
+      text: "Verify vapor barrier lap seals",
+      completed: true,
+      createdAt: "2026-05-08T10:00:00.000Z",
+      updatedAt: "2026-05-09T10:00:00.000Z",
+    },
+  ],
 };
 
 function renderPage() {
@@ -203,7 +229,7 @@ describe("PhaseDetailPage desktop status rail", () => {
 
     await screen.findByRole("heading", { name: "Insulation" });
 
-    fireEvent.click(screen.getByRole("button", { name: /open deficiencies summary/i }));
+    fireEvent.click(screen.getByRole("button", { name: /open deficiencies: 1/i }));
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /add deficiency/i })).toBeInTheDocument();
@@ -215,7 +241,7 @@ describe("PhaseDetailPage desktop status rail", () => {
 
     await screen.findByRole("heading", { name: "Insulation" });
 
-    fireEvent.click(screen.getByRole("button", { name: /site check summary/i }));
+    fireEvent.click(screen.getByRole("button", { name: /site check: passed/i }));
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Site check" })).toHaveFocus();
@@ -263,6 +289,71 @@ describe("PhaseDetailPage mobile and tablet overview order", () => {
     expect(gates).toHaveTextContent("Site check");
     expect(gates).toHaveTextContent("Inspection");
     expect(photoButton.parentElement?.closest("button")).toBeNull();
+  });
+});
+
+describe("PhaseDetailPage task checklist", () => {
+  beforeEach(() => {
+    getPhase.mockResolvedValue({ ok: true, data: detail });
+    getCurrentUser.mockResolvedValue({ ok: false, error: { message: "No current user" } });
+    getPhotoViewUrl.mockResolvedValue({ ok: true, data: { url: "https://example.com/photo.jpg" } });
+    getUsers.mockResolvedValue({ ok: true, data: [detail.assignedProjectManager] });
+    updatePhase.mockResolvedValue({ ok: true, data: detail.phase });
+    getPhaseMaterials.mockResolvedValue({ ok: true, data: insulationMaterials });
+    getProjectInventoryPickups.mockResolvedValue({ ok: true, data: [] });
+    updatePhaseMaterials.mockResolvedValue({ ok: true, data: insulationMaterials });
+    createPhaseChecklistItem.mockResolvedValue({
+      ok: true,
+      data: {
+        id: "task-created",
+        projectId: "proj-1",
+        phaseId: "phase-1",
+        text: "Stage attic card for inspection",
+        completed: false,
+        createdAt: "2026-05-10T10:00:00.000Z",
+        updatedAt: "2026-05-10T10:00:00.000Z",
+      },
+    });
+    updatePhaseChecklistItem.mockResolvedValue({ ok: true, data: { ...detail.checklistItems[0], completed: true } });
+    deletePhaseChecklistItem.mockResolvedValue({ ok: true, data: detail.checklistItems[0] });
+  });
+
+  it("renders seeded checklist items from phase detail data", async () => {
+    renderPage();
+
+    await screen.findByRole("heading", { name: "Insulation" });
+
+    expect(screen.getAllByText("Confirm attic baffles are installed").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Verify vapor barrier lap seals").length).toBeGreaterThan(0);
+  });
+
+  it("creates checklist items through the phase checklist API", async () => {
+    renderPage();
+
+    await screen.findByRole("heading", { name: "Insulation" });
+    fireEvent.change(screen.getAllByLabelText("Add phase task")[0], { target: { value: "Stage attic card for inspection" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add Item" }));
+
+    await waitFor(() => {
+      expect(createPhaseChecklistItem).toHaveBeenCalledWith({
+        projectId: "proj-1",
+        phaseId: "phase-1",
+        text: "Stage attic card for inspection",
+      });
+    });
+  });
+
+  it("updates and deletes checklist items through the phase checklist API", async () => {
+    renderPage();
+
+    await screen.findByRole("heading", { name: "Insulation" });
+    fireEvent.click(screen.getAllByLabelText("Confirm attic baffles are installed")[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Delete Confirm attic baffles are installed" })[0]);
+
+    await waitFor(() => {
+      expect(updatePhaseChecklistItem).toHaveBeenCalledWith({ itemId: "task-1", completed: true });
+      expect(deletePhaseChecklistItem).toHaveBeenCalledWith("task-1");
+    });
   });
 });
 

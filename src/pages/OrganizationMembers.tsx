@@ -7,7 +7,7 @@ import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { IconWell } from "@/components/ui/icon-well";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -273,6 +273,9 @@ export default function OrganizationMembersPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
+                id="organization-member-search"
+                name="organizationMemberSearch"
+                aria-label="Search organization members"
                 placeholder="Search name, email, or phone..."
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
@@ -280,6 +283,8 @@ export default function OrganizationMembersPage() {
               />
             </div>
             <select
+              id="organization-role-filter"
+              name="organizationRoleFilter"
               aria-label="Filter by role"
               value={roleFilter}
               onChange={(event) => setRoleFilter(event.target.value as RoleFilter)}
@@ -328,24 +333,24 @@ export default function OrganizationMembersPage() {
                   </div>
                   <div className="hidden shrink-0 items-center gap-1 md:flex">
                     {user.phone && (
-                      <Button asChild variant="ghost" size="icon" className="h-8 w-8">
+                      <Button asChild variant="ghost" size="icon" className="h-9 w-9">
                         <a href={`tel:${user.phone}`} aria-label={`Call ${user.fullName}`}>
                           <Phone className="h-4 w-4" />
                         </a>
                       </Button>
                     )}
-                    <Button asChild variant="ghost" size="icon" className="h-8 w-8">
+                    <Button asChild variant="ghost" size="icon" className="h-9 w-9">
                       <a href={`mailto:${user.email}`} aria-label={`Email ${user.fullName}`}>
                         <Mail className="h-4 w-4" />
                       </a>
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Edit ${user.fullName}`} onClick={() => openEdit(user)}>
+                    <Button variant="ghost" size="icon" className="h-9 w-9" aria-label={`Edit ${user.fullName}`} onClick={() => openEdit(user)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      className="h-9 w-9 text-destructive hover:text-destructive"
                       aria-label={`Remove ${user.fullName}`}
                       title={removalReason(user)}
                       disabled={!canRemove(user)}
@@ -357,7 +362,7 @@ export default function OrganizationMembersPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 shrink-0 md:hidden"
+                    className="h-11 w-11 shrink-0 md:hidden"
                     aria-label={`Actions for ${user.fullName}`}
                     onClick={() => setMobileActionUserId(user.id)}
                   >
@@ -430,6 +435,9 @@ export default function OrganizationMembersPage() {
         <DialogContent className="md:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Remove Member</DialogTitle>
+            <DialogDescription>
+              Deactivate this member while keeping their audit history intact.
+            </DialogDescription>
           </DialogHeader>
           {removeTarget && (
             <div className="space-y-3 py-2">
@@ -484,12 +492,16 @@ function MemberDialog({
       <DialogContent className="md:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
+            Add or update a Titan team member's profile and access role.
+          </DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={onSubmit}>
           <div className="grid gap-2">
             <Label htmlFor="member-full-name">Full name *</Label>
             <Input
               id="member-full-name"
+              name="fullName"
               value={form.fullName}
               onChange={(event) => onChange({ ...form, fullName: event.target.value })}
               placeholder="e.g. Morgan Lee"
@@ -500,6 +512,7 @@ function MemberDialog({
             <Label htmlFor="member-email">Email *</Label>
             <Input
               id="member-email"
+              name="email"
               type="email"
               value={form.email}
               onChange={(event) => onChange({ ...form, email: event.target.value })}
@@ -512,6 +525,7 @@ function MemberDialog({
               <Label htmlFor="member-phone">Phone</Label>
               <Input
                 id="member-phone"
+                name="phone"
                 value={form.phone}
                 onChange={(event) => onChange({ ...form, phone: event.target.value })}
                 placeholder="555-0100"
@@ -521,6 +535,7 @@ function MemberDialog({
               <Label htmlFor="member-role">Role *</Label>
               <select
                 id="member-role"
+                name="role"
                 value={form.role}
                 onChange={(event) => onChange({ ...form, role: event.target.value as UserRole })}
                 className="h-10 rounded-md border border-input bg-background px-3 text-base md:text-sm"

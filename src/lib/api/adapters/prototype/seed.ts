@@ -11,6 +11,7 @@ import type {
   InventoryPickup,
   MaterialLog,
   Phase,
+  PhaseChecklistItem,
   PhotoEvidence,
   Project,
   SubcontractorContact,
@@ -1101,6 +1102,90 @@ export const seedPhases: Phase[] = seedProjects.flatMap((project) => {
     };
   });
 });
+
+export const seedChecklistItems: PhaseChecklistItem[] = [
+  {
+    id: "checklist-proj-active-insulation-insulation-baffles",
+    projectId: "proj-active-insulation",
+    phaseId: "proj-active-insulation-phase-insulation",
+    text: "Confirm attic baffles are installed at all eaves",
+    completed: true,
+    createdAt: iso(-days(15)),
+    updatedAt: iso(-days(14)),
+  },
+  {
+    id: "checklist-proj-active-insulation-insulation-vapor-barrier",
+    projectId: "proj-active-insulation",
+    phaseId: "proj-active-insulation-phase-insulation",
+    text: "Verify vapor barrier lap seals at exterior corners",
+    completed: false,
+    createdAt: iso(-days(14)),
+    updatedAt: iso(-days(2)),
+  },
+  {
+    id: "checklist-proj-ready-inspection-drywall-screw-pattern",
+    projectId: "proj-ready-inspection",
+    phaseId: "proj-ready-inspection-phase-drywall",
+    text: "Confirm screw pattern photos are uploaded",
+    completed: true,
+    createdAt: iso(-days(11)),
+    updatedAt: iso(-days(6)),
+  },
+  {
+    id: "checklist-proj-ready-inspection-drywall-call-inspector",
+    projectId: "proj-ready-inspection",
+    phaseId: "proj-ready-inspection-phase-drywall",
+    text: "Call inspector with board count and access notes",
+    completed: false,
+    createdAt: iso(-days(6)),
+    updatedAt: iso(-days(5)),
+  },
+  {
+    id: "checklist-proj-site-blocked-drywall-delivery-access",
+    projectId: "proj-site-blocked",
+    phaseId: "proj-site-blocked-phase-drywall",
+    text: "Reconfirm delivery access after service lane dries",
+    completed: false,
+    createdAt: iso(-days(7)),
+    updatedAt: iso(-days(1)),
+  },
+  {
+    id: "checklist-proj-finishing-active-finishing-mask-cabinets",
+    projectId: "proj-finishing-active",
+    phaseId: "proj-finishing-active-phase-finishing",
+    text: "Mask completed cabinet boxes before final skim",
+    completed: true,
+    createdAt: iso(-days(13)),
+    updatedAt: iso(-days(12)),
+  },
+  {
+    id: "checklist-proj-finishing-active-finishing-walkthrough",
+    projectId: "proj-finishing-active",
+    phaseId: "proj-finishing-active-phase-finishing",
+    text: "Walk level-five touch-up list with client representative",
+    completed: false,
+    createdAt: iso(-days(4)),
+    updatedAt: iso(-days(3)),
+  },
+  {
+    id: "checklist-proj-overdue-clean-finishing-sanding",
+    projectId: "proj-overdue-clean",
+    phaseId: "proj-overdue-clean-phase-finishing",
+    text: "Confirm final sanding areas are dust free",
+    completed: false,
+    createdAt: iso(-days(5)),
+    updatedAt: iso(-days(1)),
+  },
+  {
+    id: "checklist-proj-stale-clean-insulation-poly",
+    projectId: "proj-stale-clean",
+    phaseId: "proj-stale-clean-phase-insulation",
+    text: "Recheck poly seal at rim joist transitions",
+    completed: false,
+    createdAt: iso(-days(22)),
+    updatedAt: iso(-days(20)),
+  },
+];
 
 export const seedMaterialLogs: MaterialLog[] = [
   {

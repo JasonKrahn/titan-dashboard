@@ -149,6 +149,9 @@ export function ClientDirectory({
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             ref={searchInputRef}
+            id="client-search"
+            name="clientSearch"
+            aria-label="Search clients"
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder="Search clients, contacts, email..."

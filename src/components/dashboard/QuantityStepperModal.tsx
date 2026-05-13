@@ -78,7 +78,7 @@ export function QuantityStepperModal({
                       type="button"
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-11 w-11 md:h-8 md:w-8"
                       aria-label={`Decrease ${item.label}`}
                       disabled={quantity === 0}
                       onClick={() => onQuantityChange(item.itemKey, Math.max(0, quantity - 1))}
@@ -93,13 +93,13 @@ export function QuantityStepperModal({
                       aria-label={`Quantity for ${item.label}`}
                       value={quantity}
                       onChange={(event) => onQuantityChange(item.itemKey, parseQuantityInput(event.target.value))}
-                      className="h-8 w-16 px-2 text-center text-sm font-semibold tabular-nums"
+                      className="h-11 w-16 px-2 text-center text-base font-semibold tabular-nums md:h-8 md:text-sm"
                     />
                     <Button
                       type="button"
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-11 w-11 md:h-8 md:w-8"
                       aria-label={`Increase ${item.label}`}
                       onClick={() => onQuantityChange(item.itemKey, quantity + 1)}
                     >

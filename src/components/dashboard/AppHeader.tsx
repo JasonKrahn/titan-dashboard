@@ -89,7 +89,7 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, 
           <button
             type="button"
             onClick={() => me?.role === "inventory_viewer" ? navigate("/inventory") : (me?.role === "project_manager" ? goToDashboardView("dashboard") : goToDashboardView("clients"))}
-            className="flex shrink-0 cursor-pointer items-center gap-3 transition-opacity hover:opacity-80"
+            className="flex min-h-11 shrink-0 cursor-pointer items-center gap-3 transition-opacity hover:opacity-80 lg:min-h-9"
           >
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-primary shadow-glow">
               <span className="text-lg font-bold leading-none text-primary-foreground">T</span>
@@ -175,7 +175,7 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, 
               <Link
                 to="/subs"
                 className={cn(
-                  "inline-flex h-10 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-medium text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground",
+                  "inline-flex h-11 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-medium text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground lg:h-10",
                   section === "subs" && "border-primary/60 bg-primary text-primary-foreground shadow-glow"
                 )}
               >
@@ -188,7 +188,7 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, 
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="relative inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground"
+                    className="relative inline-flex h-11 w-11 items-center justify-center rounded-md border border-border bg-card text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground lg:h-9 lg:w-9"
                     aria-label="Notifications"
                   >
                     <Bell className="h-4 w-4" />
@@ -229,7 +229,7 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, 
               type="button"
               onClick={() => setSettingsOpen(true)}
               disabled={!resolvedUser}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-border bg-card text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-border bg-card text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50 lg:h-10 lg:w-10"
               aria-label="Settings"
             >
               <Settings className="h-4 w-4" />
@@ -237,7 +237,7 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, 
           </div>
         </div>
 
-        <nav className="overflow-hidden border-t border-border/60 py-2 lg:hidden">
+        <nav className="overflow-hidden border-t border-border/60 py-1.5 lg:hidden">
           <div className="-mx-3 flex max-w-[calc(100%+1.5rem)] items-center gap-1.5 overflow-x-auto px-3 pb-1 scrollbar-hide snap-x">
             {me?.role === "inventory_viewer" ? (
               <Link
@@ -314,7 +314,7 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, 
               <Link
                 to="/subs"
                 className={cn(
-                  "inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-medium text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground",
+                  "inline-flex h-11 shrink-0 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-medium text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground",
                   section === "subs" && "border-primary/60 bg-primary text-primary-foreground shadow-glow"
                 )}
               >
@@ -369,7 +369,7 @@ function topNavClass(active: boolean) {
 
 function mobileDashboardNavClass(active: boolean) {
   return cn(
-    "inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-md border px-3 text-sm font-medium transition-colors",
+    "inline-flex h-11 shrink-0 items-center whitespace-nowrap rounded-md border px-3 text-sm font-medium transition-colors",
     active
       ? "border-primary/60 bg-primary text-primary-foreground shadow-glow"
       : "border-border bg-card text-muted-foreground shadow-card hover:bg-accent hover:text-foreground",
@@ -378,7 +378,7 @@ function mobileDashboardNavClass(active: boolean) {
 
 function mobileTopNavClass(active: boolean) {
   return cn(
-    "inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-md border px-3 text-sm font-medium transition-colors",
+    "inline-flex h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-md border px-3 text-sm font-medium transition-colors",
     active
       ? "border-primary/60 bg-primary text-primary-foreground shadow-glow"
       : "border-border bg-card text-muted-foreground shadow-card hover:bg-accent hover:text-foreground",

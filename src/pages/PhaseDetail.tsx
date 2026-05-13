@@ -47,10 +47,10 @@ import { PhotoViewerDialog, type PhotoViewerItem } from "@/components/dashboard/
 import { PhotoUploadDialog } from "@/components/dashboard/PhotoUploadDialog";
 import { QuantityStepperModal } from "@/components/dashboard/QuantityStepperModal";
 import { DatePicker } from "@/components/ui/date-picker";
-import { assignSubcontractorToPhase, getCurrentUser, getPhase, getPhaseMaterials, getPhotoViewUrl, getProjectInventoryPickups, markPhaseReadyForInspection, updatePhase, updatePhaseMaterials } from "@/lib/api";
+import { assignSubcontractorToPhase, createPhaseChecklistItem, deletePhaseChecklistItem, getCurrentUser, getPhase, getPhaseMaterials, getPhotoViewUrl, getProjectInventoryPickups, markPhaseReadyForInspection, updatePhase, updatePhaseChecklistItem, updatePhaseMaterials } from "@/lib/api";
 import { formatDateWithOptions } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
-import type { Deficiency, Gate, InventoryPickup, MaterialLog, PhaseStatus, PhotoEvidence } from "@/lib/types";
+import type { Deficiency, Gate, InventoryPickup, MaterialLog, PhaseChecklistItem, PhaseStatus, PhotoEvidence } from "@/lib/types";
 import {
   GATE_LABEL,
   PHASE_LABEL,
@@ -167,6 +167,7 @@ export default function PhaseDetailPage() {
   const [materialsOpen, setMaterialsOpen] = useState(false);
   const [materialDraft, setMaterialDraft] = useState<Record<string, number>>({});
   const [materialSaveError, setMaterialSaveError] = useState<string | null>(null);
+  const [newTaskText, setNewTaskText] = useState("");
 
   const saveMaterialsMutation = useMutation({
     mutationFn: async ({
@@ -191,35 +192,45 @@ export default function PhaseDetailPage() {
     },
   });
 
-  // Task checklist state
-  interface Task {
-    id: string;
-    text: string;
-    completed: boolean;
-    createdAt: string;
-  }
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [newTaskText, setNewTaskText] = useState("");
+  const createChecklistItemMutation = useMutation({
+    mutationFn: ({ projectId, phaseId, text }: { projectId: string; phaseId: string; text: string }) =>
+      createPhaseChecklistItem({ projectId, phaseId, text }),
+    onSuccess: async (result, variables) => {
+      if (result.ok === false) return;
+      await qc.invalidateQueries({ queryKey: ["phase", variables.phaseId] });
+      setNewTaskText("");
+    },
+  });
+
+  const updateChecklistItemMutation = useMutation({
+    mutationFn: ({ itemId, completed }: { itemId: string; completed: boolean; phaseId: string }) =>
+      updatePhaseChecklistItem({ itemId, completed }),
+    onSuccess: async (result, variables) => {
+      if (result.ok === false) return;
+      await qc.invalidateQueries({ queryKey: ["phase", variables.phaseId] });
+    },
+  });
+
+  const deleteChecklistItemMutation = useMutation({
+    mutationFn: ({ itemId }: { itemId: string; phaseId: string }) => deletePhaseChecklistItem(itemId),
+    onSuccess: async (result, variables) => {
+      if (result.ok === false) return;
+      await qc.invalidateQueries({ queryKey: ["phase", variables.phaseId] });
+    },
+  });
 
   const addTask = () => {
     const trimmed = newTaskText.trim();
-    if (!trimmed) return;
-    const task: Task = {
-      id: crypto.randomUUID(),
-      text: trimmed,
-      completed: false,
-      createdAt: new Date().toISOString(),
-    };
-    setTasks((prev) => [...prev, task]);
-    setNewTaskText("");
+    if (!trimmed || !detail) return;
+    createChecklistItemMutation.mutate({ projectId: detail.project.id, phaseId: detail.phase.id, text: trimmed });
   };
 
-  const toggleTask = (id: string) => {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t)));
+  const toggleTask = (task: PhaseChecklistItem) => {
+    updateChecklistItemMutation.mutate({ itemId: task.id, completed: !task.completed, phaseId: task.phaseId });
   };
 
-  const deleteTask = (id: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+  const deleteTask = (task: PhaseChecklistItem) => {
+    deleteChecklistItemMutation.mutate({ itemId: task.id, phaseId: task.phaseId });
   };
 
   useEffect(() => {
@@ -290,7 +301,7 @@ export default function PhaseDetailPage() {
     );
   }
 
-  const { phase, project, gates, deficiencies, photoEvidence, auditEvents, subcontractors } = detail;
+  const { phase, project, gates, deficiencies, photoEvidence, auditEvents, subcontractors, checklistItems } = detail;
   const activeDefs = deficiencies.filter((d) => d.status === "open" || d.status === "in_progress");
   const siteGate = gates.find((g) => g.type === "site_check");
   const inspectionGate = gates.find((g) => g.type === "inspection");
@@ -542,14 +553,14 @@ export default function PhaseDetailPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <div className="hidden md:grid md:grid-cols-4 md:gap-3">
             <DesktopSummaryButton
-              ariaLabel="Open deficiencies summary"
+              ariaLabel={`Open deficiencies: ${activeDefs.length}`}
               label="Open deficiencies"
               value={String(activeDefs.length)}
               tone={activeDefs.length > 0 ? "danger" : "success"}
               onClick={() => jumpToSection({ tab: "deficiencies" })}
             />
             <DesktopSummaryButton
-              ariaLabel="Photos summary"
+              ariaLabel={`Photos: ${photoEvidence.length}`}
               label="Photos"
               value={String(photoEvidence.length)}
               tone={photoEvidence.length > 0 ? "accent" : "neutral"}
@@ -557,7 +568,7 @@ export default function PhaseDetailPage() {
             />
             {siteGate ? (
               <DesktopSummaryButton
-                ariaLabel="Site check summary"
+                ariaLabel={`Site check: ${STATUS_LABEL[siteGate.status]}`}
                 label="Site check"
                 value={STATUS_LABEL[siteGate.status]}
                 tone={statusToTone(gateStatusTone(siteGate.status))}
@@ -568,7 +579,7 @@ export default function PhaseDetailPage() {
             )}
             {inspectionGate ? (
               <DesktopSummaryButton
-                ariaLabel="Inspection summary"
+                ariaLabel={`Inspection: ${STATUS_LABEL[inspectionGate.status]}`}
                 label="Inspection"
                 value={STATUS_LABEL[inspectionGate.status]}
                 tone={statusToTone(gateStatusTone(inspectionGate.status))}
@@ -736,9 +747,9 @@ export default function PhaseDetailPage() {
                     return (
                       <Card key={g.id} className="p-5 shadow-card">
                         <div className="mb-3 flex items-center justify-between gap-3">
-                          <h3 ref={headingRef} tabIndex={-1} className="font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                          <h2 ref={headingRef} tabIndex={-1} className="font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                             {GATE_LABEL[g.type]}
-                          </h3>
+                          </h2>
                           <StatusBadge tone={tone} label={STATUS_LABEL[g.status]} size="sm" />
                         </div>
                         <div className="space-y-2 text-xs text-muted-foreground">
@@ -824,7 +835,7 @@ export default function PhaseDetailPage() {
                 {activeDefs.length > 0 && (
                   <Card className="p-5 shadow-card">
                     <div className="mb-3 flex items-center justify-between gap-2">
-                      <SectionHeading as="h3">Open Deficiencies</SectionHeading>
+                      <SectionHeading as="h2">Open Deficiencies</SectionHeading>
                       <Button size="sm" variant="ghost" onClick={() => setActiveTab("deficiencies")}>
                         View all
                       </Button>
@@ -854,7 +865,7 @@ export default function PhaseDetailPage() {
                 {/* Task Checklist */}
                 <Card className="p-5 shadow-card">
                   <div className="mb-3 flex items-center justify-between gap-2">
-                    <SectionHeading as="h3">Task Checklist</SectionHeading>
+                    <SectionHeading as="h2">Task Checklist</SectionHeading>
                     <Button
                       size="sm"
                       variant="outline"
@@ -867,6 +878,9 @@ export default function PhaseDetailPage() {
                   </div>
                   <div className="mb-3 flex gap-2">
                     <Input
+                      id="phase-task-input-desktop"
+                      name="phaseTaskDesktop"
+                      aria-label="Add phase task"
                       value={newTaskText}
                       onChange={(e) => setNewTaskText(e.target.value)}
                       onKeyDown={(e) => {
@@ -879,18 +893,18 @@ export default function PhaseDetailPage() {
                       className="flex-1"
                     />
                   </div>
-                  {tasks.length === 0 ? (
+                  {checklistItems.length === 0 ? (
                     <div className="text-sm text-muted-foreground">No tasks yet</div>
                   ) : (
                     <div className="space-y-2">
-                      {tasks.map((task) => (
+                      {checklistItems.map((task) => (
                         <div
                           key={task.id}
                           className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2"
                         >
                           <Checkbox
                             checked={task.completed}
-                            onCheckedChange={() => toggleTask(task.id)}
+                            onCheckedChange={() => toggleTask(task)}
                             id={`task-${task.id}`}
                           />
                           <label
@@ -906,7 +920,8 @@ export default function PhaseDetailPage() {
                             size="icon"
                             variant="ghost"
                             className="h-7 w-7 shrink-0"
-                            onClick={() => deleteTask(task.id)}
+                            aria-label={`Delete ${task.text}`}
+                            onClick={() => deleteTask(task)}
                           >
                             <X className="h-4 w-4" />
                           </Button>
@@ -928,7 +943,7 @@ export default function PhaseDetailPage() {
 
               <div className="space-y-4">
                 <Card className="p-5 shadow-card">
-                  <SectionHeading as="h3">Schedule</SectionHeading>
+                  <SectionHeading as="h2">Schedule</SectionHeading>
                   <div className="mt-3 space-y-3">
                     <div>
                       <div className="text-xs text-muted-foreground">Scheduled start</div>
@@ -976,7 +991,7 @@ export default function PhaseDetailPage() {
                 </Card>
 
                 <Card className="p-5 shadow-card">
-                  <SectionHeading as="h3">Personnel</SectionHeading>
+                  <SectionHeading as="h2">Personnel</SectionHeading>
                   <div className="mt-3 space-y-3">
                     <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-4 py-3 text-sm">
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
@@ -995,7 +1010,7 @@ export default function PhaseDetailPage() {
                             });
                           }}
                         >
-                          <SelectTrigger className="mt-1 h-8 border border-input bg-background px-3 py-2 text-base md:text-xs font-medium">
+                          <SelectTrigger id="phase-subcontractor-select" name="phaseSubcontractor" aria-label="Assign subcontractor" className="mt-1 h-8 border border-input bg-background px-3 py-2 text-base md:text-xs font-medium">
                             <SelectValue placeholder="Select subcontractor" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1030,12 +1045,15 @@ export default function PhaseDetailPage() {
             {/* Task Checklist (mobile) */}
             <Card data-testid="phase-narrow-task-checklist" className="border-border bg-card p-0 shadow-card lg:hidden">
               <div className="p-4 pb-2">
-                <SectionHeading as="h4" size="sm">Task Checklist</SectionHeading>
+                <SectionHeading as="h2" size="sm">Task Checklist</SectionHeading>
               </div>
               <div className="px-4 pb-4">
                 <div className="mb-3 flex gap-2">
                   <Input
                     ref={taskChecklistInputRef}
+                    id="phase-task-input-mobile"
+                    name="phaseTaskMobile"
+                    aria-label="Add phase task"
                     value={newTaskText}
                     onChange={(e) => setNewTaskText(e.target.value)}
                     onKeyDown={(e) => {
@@ -1056,18 +1074,18 @@ export default function PhaseDetailPage() {
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
-                {tasks.length === 0 ? (
+                {checklistItems.length === 0 ? (
                   <div className="text-sm text-muted-foreground">No tasks yet</div>
                 ) : (
                   <div className="space-y-2">
-                    {tasks.map((task) => (
+                    {checklistItems.map((task) => (
                       <div
                         key={task.id}
                         className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2"
                       >
                         <Checkbox
                           checked={task.completed}
-                          onCheckedChange={() => toggleTask(task.id)}
+                          onCheckedChange={() => toggleTask(task)}
                           id={`mobile-task-${task.id}`}
                         />
                         <label
@@ -1083,7 +1101,8 @@ export default function PhaseDetailPage() {
                           size="icon"
                           variant="ghost"
                           className="h-7 w-7 shrink-0"
-                          onClick={() => deleteTask(task.id)}
+                          aria-label={`Delete ${task.text}`}
+                          onClick={() => deleteTask(task)}
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -1096,7 +1115,7 @@ export default function PhaseDetailPage() {
 
             <Card data-testid="phase-narrow-personnel" className="border-border bg-card p-0 shadow-card lg:hidden md:p-5">
               <div className="p-4 pb-2 md:p-0">
-                <SectionHeading as="h4" size="sm">Personnel</SectionHeading>
+                <SectionHeading as="h2" size="sm">Personnel</SectionHeading>
               </div>
               <div className="grid gap-3 md:mt-3 md:grid-cols-2">
                 <div className="flex items-center gap-3 px-4 pb-4 pt-2 text-sm md:rounded-md md:border md:border-border md:bg-muted/30 md:p-3">
@@ -1116,7 +1135,7 @@ export default function PhaseDetailPage() {
                         });
                       }}
                     >
-                      <SelectTrigger className="mt-0.5 h-auto border-0 bg-transparent p-0 text-base md:text-xs font-semibold shadow-none ring-offset-0 focus:ring-0 focus:ring-offset-0 md:h-7 md:border md:border-input md:bg-background md:px-3 md:py-2 md:font-normal md:focus:ring-2 md:focus:ring-ring md:focus:ring-offset-2">
+                      <SelectTrigger id="phase-subcontractor-select-mobile" name="phaseSubcontractorMobile" aria-label="Assign subcontractor" className="mt-0.5 h-auto border-0 bg-transparent p-0 text-base md:text-xs font-semibold shadow-none ring-offset-0 focus:ring-0 focus:ring-offset-0 md:h-7 md:border md:border-input md:bg-background md:px-3 md:py-2 md:font-normal md:focus:ring-2 md:focus:ring-ring md:focus:ring-offset-2">
                         <SelectValue placeholder="Select subcontractor" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1159,7 +1178,7 @@ export default function PhaseDetailPage() {
 
             {/* Activity (mobile only — desktop has its own tab) */}
             <section className="md:hidden">
-              <SectionHeading as="h3" className="mb-3">Activity</SectionHeading>
+              <SectionHeading as="h2" className="mb-3">Activity</SectionHeading>
               {auditEvents.length === 0 ? (
                 <EmptyCard icon={<FileText className="h-5 w-5" />} text="No activity recorded for this phase yet." />
               ) : (
@@ -1308,16 +1327,14 @@ export default function PhaseDetailPage() {
         </Tabs>
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur lg:hidden">
-        <Button
-          type="button"
-          className="h-12 w-full rounded-full text-sm font-semibold shadow-glow"
-          onClick={() => setMobileActionsOpen(true)}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Phase actions
-        </Button>
-      </div>
+      <button
+        type="button"
+        aria-label="Phase actions"
+        className="fixed right-4 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-glow transition active:scale-95 bottom-[max(1rem,env(safe-area-inset-bottom))] lg:hidden"
+        onClick={() => setMobileActionsOpen(true)}
+      >
+        <Plus className="h-6 w-6" />
+      </button>
       <MobileActionSheet
         open={mobileActionsOpen}
         onOpenChange={setMobileActionsOpen}

@@ -40,6 +40,9 @@ export function FilterBar({ filters, search, onSearchChange, onChange, clients, 
         <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
+            id="project-filter-search"
+            name="projectFilterSearch"
+            aria-label="Search projects"
             placeholder="Search projects, numbers, addresses…"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
@@ -56,7 +59,7 @@ export function FilterBar({ filters, search, onSearchChange, onChange, clients, 
             })
           }
         >
-          <SelectTrigger className="w-full bg-background/60 md:w-[180px]">
+          <SelectTrigger id="project-filter-client" name="projectFilterClient" aria-label="Filter projects by client" className="w-full bg-background/60 md:w-[180px]">
             <SelectValue placeholder="Client" />
           </SelectTrigger>
           <SelectContent>
@@ -79,7 +82,7 @@ export function FilterBar({ filters, search, onSearchChange, onChange, clients, 
               })
             }
           >
-            <SelectTrigger className="w-full bg-background/60 md:w-[150px]">
+            <SelectTrigger id="project-filter-status" name="projectFilterStatus" aria-label="Filter projects by status" className="w-full bg-background/60 md:w-[150px]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -98,7 +101,7 @@ export function FilterBar({ filters, search, onSearchChange, onChange, clients, 
             value={pmValue}
             onValueChange={(v) => onChange({ ...filters, assignedProjectManagerId: v === "all" ? undefined : v })}
           >
-            <SelectTrigger className="w-full bg-background/60 md:w-[180px]">
+            <SelectTrigger id="project-filter-pm" name="projectFilterProjectManager" aria-label="Filter projects by project manager" className="w-full bg-background/60 md:w-[180px]">
               <SelectValue placeholder="Project manager" />
             </SelectTrigger>
             <SelectContent>
