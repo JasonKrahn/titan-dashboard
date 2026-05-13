@@ -419,6 +419,9 @@ export default function ActivityLogPage() {
           <div className="relative w-full md:max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
+              id="activity-search"
+              name="activitySearch"
+              aria-label="Search activity events"
               placeholder="Search events..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -430,7 +433,7 @@ export default function ActivityLogPage() {
         {/* Filter dropdowns */}
         <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
           <Select value={actionFilter} onValueChange={setActionFilter}>
-            <SelectTrigger className="w-full md:w-[180px]">
+            <SelectTrigger id="activity-action-filter" name="activityActionFilter" aria-label="Filter activity by action type" className="w-full md:w-[180px]">
               <SelectValue placeholder="All action types" />
             </SelectTrigger>
             <SelectContent>
@@ -444,7 +447,7 @@ export default function ActivityLogPage() {
           </Select>
 
           <Select value={clientFilter} onValueChange={setClientFilter}>
-            <SelectTrigger className="w-full md:w-[180px]">
+            <SelectTrigger id="activity-client-filter" name="activityClientFilter" aria-label="Filter activity by client" className="w-full md:w-[180px]">
               <SelectValue placeholder="All clients" />
             </SelectTrigger>
             <SelectContent>
@@ -456,7 +459,7 @@ export default function ActivityLogPage() {
           </Select>
 
           <Select value={pmFilter} onValueChange={setPmFilter}>
-            <SelectTrigger className="w-full md:w-[180px]">
+            <SelectTrigger id="activity-pm-filter" name="activityProjectManagerFilter" aria-label="Filter activity by project manager" className="w-full md:w-[180px]">
               <SelectValue placeholder="All project managers" />
             </SelectTrigger>
             <SelectContent>
@@ -468,7 +471,7 @@ export default function ActivityLogPage() {
           </Select>
 
           <Select value={projectFilter} onValueChange={setProjectFilter}>
-            <SelectTrigger className="w-full md:w-[180px]">
+            <SelectTrigger id="activity-project-filter" name="activityProjectFilter" aria-label="Filter activity by project" className="w-full md:w-[180px]">
               <SelectValue placeholder="All projects" />
             </SelectTrigger>
             <SelectContent>

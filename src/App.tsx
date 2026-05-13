@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ReportBugButton } from "@/components/dashboard/ReportBugButton";
 import Index from "./pages/Index.tsx";
 import ProjectDetail from "./pages/ProjectDetail.tsx";
 import PhaseDetail from "./pages/PhaseDetail.tsx";
@@ -35,6 +36,7 @@ const App = () => (
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+        <ReportBugButton />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

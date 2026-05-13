@@ -81,6 +81,16 @@ export interface MaterialLog {
   updatedAt: string;
 }
 
+export interface PhaseChecklistItem {
+  id: string;
+  projectId: string;
+  phaseId: string;
+  text: string;
+  completed: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface EquipmentLog {
   id: string;
   projectId: string;
@@ -272,6 +282,7 @@ export interface PhaseDetail {
   photoEvidence: PhotoEvidence[];
   subcontractors: SubcontractorContact[];
   auditEvents: AuditEvent[];
+  checklistItems: PhaseChecklistItem[];
 }
 
 export interface ProjectFilters {

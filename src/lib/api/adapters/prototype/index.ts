@@ -17,6 +17,7 @@ import type {
   InventoryPickupNotificationKind,
   MaterialLog,
   Phase,
+  PhaseChecklistItem,
   PhaseDetail,
   PhotoEvidence,
   Project,
@@ -68,6 +69,7 @@ import imgFraming3186 from "@/install-photos/jpeg-install-images/framing/IMG_318
 import imgRoot4458 from "@/install-photos/jpeg-install-images/IMG_4458.jpeg";
 import {
   seedAuditEvents,
+  seedChecklistItems,
   seedClients,
   seedDeficiencies,
   seedEquipmentLogs,
@@ -180,10 +182,42 @@ export interface CreateInventoryAuditRequestInput {
   type: InventoryAuditRequestType;
 }
 
+export interface CreatePhaseChecklistItemInput {
+  projectId: string;
+  phaseId: string;
+  text: string;
+}
+
+export interface UpdatePhaseChecklistItemInput {
+  itemId: string;
+  completed: boolean;
+}
+
 const delay = <T,>(value: T): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(value), SIMULATED_LATENCY_MS));
 
 const ok = <T,>(data: T): ApiResult<T> => ({ ok: true, data });
+
+function getPhaseWriteContext(phaseId: string, projectId?: string): ApiResult<{ me: User; phase: Phase; project: Project }> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return { ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } };
+
+  const phase = seedPhases.find((p) => p.id === phaseId);
+  if (!phase) return { ok: false, error: { code: "NOT_FOUND", message: "Phase not found" } };
+
+  const project = seedProjects.find((p) => p.id === phase.projectId);
+  if (!project) return { ok: false, error: { code: "NOT_FOUND", message: "Project not found" } };
+
+  if (projectId && phase.projectId !== projectId) {
+    return { ok: false, error: { code: "VALIDATION_ERROR", message: "Phase does not belong to project", fieldErrors: { projectId: "Project does not match phase" } } };
+  }
+
+  if (me.role !== "admin" && (me.role !== "project_manager" || project.assignedProjectManagerId !== me.id)) {
+    return { ok: false, error: { code: "FORBIDDEN", message: "Access denied" } };
+  }
+
+  return ok({ me, phase, project });
+}
 
 // Mutable "current user" for prototype role switching.
 let currentUserId = "user-admin";
@@ -679,8 +713,59 @@ export async function getPhase(phaseId: string): Promise<ApiResult<PhaseDetail>>
         return false;
       })
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
+    checklistItems: seedChecklistItems.filter((item) => item.phaseId === phaseId),
   };
   return delay(ok(detail));
+}
+
+export async function createPhaseChecklistItem(input: CreatePhaseChecklistItemInput): Promise<ApiResult<PhaseChecklistItem>> {
+  const context = getPhaseWriteContext(input.phaseId, input.projectId);
+  if (context.ok === false) return delay({ ok: false, error: context.error });
+
+  const text = input.text.trim();
+  if (!text) {
+    return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Checklist item text is required", fieldErrors: { text: "Required" } } });
+  }
+
+  const nowIso = new Date().toISOString();
+  const item: PhaseChecklistItem = {
+    id: `checklist-${Date.now()}-${seedChecklistItems.length + 1}`,
+    projectId: context.data.phase.projectId,
+    phaseId: context.data.phase.id,
+    text,
+    completed: false,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  };
+  seedChecklistItems.push(item);
+
+  return delay(ok(item));
+}
+
+export async function updatePhaseChecklistItem(input: UpdatePhaseChecklistItemInput): Promise<ApiResult<PhaseChecklistItem>> {
+  const item = seedChecklistItems.find((entry) => entry.id === input.itemId);
+  if (!item) return delay({ ok: false, error: { code: "NOT_FOUND", message: "Checklist item not found" } });
+
+  const context = getPhaseWriteContext(item.phaseId, item.projectId);
+  if (context.ok === false) return delay({ ok: false, error: context.error });
+
+  item.completed = input.completed;
+  item.updatedAt = new Date().toISOString();
+
+  return delay(ok(item));
+}
+
+export async function deletePhaseChecklistItem(itemId: string): Promise<ApiResult<PhaseChecklistItem>> {
+  const index = seedChecklistItems.findIndex((entry) => entry.id === itemId);
+  if (index < 0) return delay({ ok: false, error: { code: "NOT_FOUND", message: "Checklist item not found" } });
+
+  const item = seedChecklistItems[index];
+  const context = getPhaseWriteContext(item.phaseId, item.projectId);
+  if (context.ok === false) return delay({ ok: false, error: context.error });
+
+  seedChecklistItems.splice(index, 1);
+
+  return delay(ok(item));
 }
 
 function validateLogInput(itemKey: string, quantity: number): Record<string, string> {

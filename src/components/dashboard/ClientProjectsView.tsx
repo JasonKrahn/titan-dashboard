@@ -127,6 +127,9 @@ export function ClientProjectsView({
         <div className="relative w-full md:max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
+            id="client-project-search"
+            name="clientProjectSearch"
+            aria-label="Search client projects"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search projects..."
@@ -135,7 +138,7 @@ export function ClientProjectsView({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Select value={filter} onValueChange={onFilterChange}>
-            <SelectTrigger className="w-full md:w-[180px]">
+            <SelectTrigger id="client-project-filter" name="clientProjectFilter" aria-label="Filter client projects" className="w-full md:w-[180px]">
               <SelectValue placeholder="Filter" />
             </SelectTrigger>
             <SelectContent>

@@ -1,15 +1,18 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   archiveProject,
+  createPhaseChecklistItem,
   createUser,
   completeInspection,
   completeSiteCheck,
+  deletePhaseChecklistItem,
   deactivateUser,
   getAuditEvents,
   getAllDeficiencies,
   getAllGates,
   getAllPhases,
   getAllPhotos,
+  getPhase,
   getPhaseMaterials,
   getClients,
   getOutstandingInventoryAuditRequests,
@@ -21,6 +24,7 @@ import {
   markPhaseReadyForInspection,
   setCurrentUser,
   updateAtticGate,
+  updatePhaseChecklistItem,
   updatePhaseMaterial,
   updatePhaseMaterials,
   updateProjectEquipment,
@@ -677,6 +681,46 @@ describe("prototype seed data", () => {
     expect(auditResult.ok).toBe(true);
     if (!auditResult.ok) return;
     expect(auditResult.data.some((event) => event.action === "role_changed")).toBe(true);
+  });
+
+  it("returns seeded phase checklist items and persists checklist mutations", async () => {
+    setCurrentUser("user-pm-2");
+
+    const detail = await getPhase("proj-active-insulation-phase-insulation");
+    expect(detail.ok).toBe(true);
+    if (!detail.ok) return;
+    expect(detail.data.checklistItems.map((item) => item.text)).toEqual(expect.arrayContaining([
+      "Confirm attic baffles are installed at all eaves",
+      "Verify vapor barrier lap seals at exterior corners",
+    ]));
+
+    const created = await createPhaseChecklistItem({
+      projectId: "proj-active-insulation",
+      phaseId: "proj-active-insulation-phase-insulation",
+      text: "Stage attic card for inspection",
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    const updated = await updatePhaseChecklistItem({ itemId: created.data.id, completed: true });
+    expect(updated.ok).toBe(true);
+    if (!updated.ok) return;
+    expect(updated.data.completed).toBe(true);
+
+    const afterUpdate = await getPhase("proj-active-insulation-phase-insulation");
+    expect(afterUpdate.ok).toBe(true);
+    if (!afterUpdate.ok) return;
+    expect(afterUpdate.data.checklistItems.find((item) => item.id === created.data.id)?.completed).toBe(true);
+
+    const deleted = await deletePhaseChecklistItem(created.data.id);
+    expect(deleted.ok).toBe(true);
+
+    const afterDelete = await getPhase("proj-active-insulation-phase-insulation");
+    expect(afterDelete.ok).toBe(true);
+    if (!afterDelete.ok) return;
+    expect(afterDelete.data.checklistItems.some((item) => item.id === created.data.id)).toBe(false);
+
+    setCurrentUser("user-admin");
   });
 
   it("has valid seed phase schedules within project bounds", async () => {

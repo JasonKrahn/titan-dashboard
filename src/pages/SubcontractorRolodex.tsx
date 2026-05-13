@@ -449,24 +449,28 @@ export default function SubcontractorRolodexPage() {
     deleteMutation.mutate(deletingSubcontractor.id);
   };
 
-  const renderContactActions = (sub: SubcontractorContact, compact = false) => (
-    <div className="flex items-center gap-1">
-      {sub.phone && (
-        <Button asChild variant="ghost" size="icon" className={compact ? "h-8 w-8" : "h-9 w-9"}>
-          <a href={`tel:${sub.phone}`} aria-label={`Call ${sub.displayName}`}>
-            <Phone className="h-4 w-4" />
-          </a>
-        </Button>
-      )}
-      {sub.email && (
-        <Button asChild variant="ghost" size="icon" className={compact ? "h-8 w-8" : "h-9 w-9"}>
-          <a href={`mailto:${sub.email}`} aria-label={`Email ${sub.displayName}`}>
-            <Mail className="h-4 w-4" />
-          </a>
-        </Button>
-      )}
-    </div>
-  );
+  const renderContactActions = (sub: SubcontractorContact, compact = false) => {
+    const actionSize = compact ? "h-9 w-9" : "h-9 w-9";
+
+    return (
+      <div className="flex items-center gap-1">
+        {sub.phone && (
+          <Button asChild variant="ghost" size="icon" className={actionSize}>
+            <a href={`tel:${sub.phone}`} aria-label={`Call ${sub.displayName}`}>
+              <Phone className="h-4 w-4" />
+            </a>
+          </Button>
+        )}
+        {sub.email && (
+          <Button asChild variant="ghost" size="icon" className={actionSize}>
+            <a href={`mailto:${sub.email}`} aria-label={`Email ${sub.displayName}`}>
+              <Mail className="h-4 w-4" />
+            </a>
+          </Button>
+        )}
+      </div>
+    );
+  };
 
   const renderAssignmentPreview = (sub: SubcontractorContact) => {
     const assignments = subAssignments.get(sub.id) || [];
@@ -594,6 +598,9 @@ export default function SubcontractorRolodexPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
+                id="subcontractor-search"
+                name="subcontractorSearch"
+                aria-label="Search subcontractors"
                 placeholder="Search name, company, trade, phone, or email..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -601,7 +608,7 @@ export default function SubcontractorRolodexPage() {
               />
             </div>
             <Select value={filters.trade} onValueChange={(value) => handleFilterChange("trade", value as SubcontractorTradeFilter)}>
-              <SelectTrigger aria-label="Filter by trade">
+              <SelectTrigger id="subcontractor-trade-filter" name="subcontractorTradeFilter" aria-label="Filter by trade">
                 <SelectValue placeholder="Trade" />
               </SelectTrigger>
               <SelectContent>
@@ -612,7 +619,7 @@ export default function SubcontractorRolodexPage() {
               </SelectContent>
             </Select>
             <Select value={filters.status} onValueChange={(value) => handleFilterChange("status", value as SubcontractorStatusFilter)}>
-              <SelectTrigger aria-label="Filter by status">
+              <SelectTrigger id="subcontractor-status-filter" name="subcontractorStatusFilter" aria-label="Filter by status">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -622,7 +629,7 @@ export default function SubcontractorRolodexPage() {
               </SelectContent>
             </Select>
             <Select value={filters.assignment} onValueChange={(value) => handleFilterChange("assignment", value as SubcontractorAssignmentFilter)}>
-              <SelectTrigger aria-label="Filter by assignment">
+              <SelectTrigger id="subcontractor-assignment-filter" name="subcontractorAssignmentFilter" aria-label="Filter by assignment">
                 <SelectValue placeholder="Assignment" />
               </SelectTrigger>
               <SelectContent>
@@ -632,7 +639,7 @@ export default function SubcontractorRolodexPage() {
               </SelectContent>
             </Select>
             <Select value={sortOption} onValueChange={(value) => setSortOption(value as SortOption)}>
-              <SelectTrigger aria-label="Sort subcontractors">
+              <SelectTrigger id="subcontractor-sort" name="subcontractorSort" aria-label="Sort subcontractors">
                 <SelectValue placeholder="Sort" />
               </SelectTrigger>
               <SelectContent>
@@ -851,13 +858,13 @@ export default function SubcontractorRolodexPage() {
                           <TableCell>
                             <div className="flex justify-end gap-1">
                               {renderContactActions(s, true)}
-                              <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Edit ${s.displayName}`} onClick={() => handleEdit(s)}>
+                              <Button variant="ghost" size="icon" className="h-9 w-9" aria-label={`Edit ${s.displayName}`} onClick={() => handleEdit(s)}>
                                 <Pencil className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                className="h-9 w-9 text-destructive hover:text-destructive"
                                 aria-label={`Delete ${s.displayName}`}
                                 onClick={() => handleDelete(s)}
                               >

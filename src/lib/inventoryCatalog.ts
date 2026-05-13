@@ -48,6 +48,7 @@ export const DRYWALL_MATERIALS: InventoryCatalogItem[] = [
 export const FINISHING_MATERIALS: InventoryCatalogItem[] = [
   { itemKey: "yellow_mud_box", label: "Yellow Mud Box" },
   { itemKey: "green_mud_box", label: "Green Mud Box" },
+  { itemKey: "all_purpose_mud", label: "All-Purpose Mud" },
   { itemKey: "setting_type_compound_90_min", label: "Setting-type Compound (90 min)" },
   { itemKey: "setting_type_compound_45_min", label: "Setting-type Compound (45 min)" },
   { itemKey: "setting_type_compound_20_min", label: "Setting-type Compound (20 min)" },
