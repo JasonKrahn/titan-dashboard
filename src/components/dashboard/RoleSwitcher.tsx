@@ -27,7 +27,7 @@ export function RoleSwitcher({ current, users, onSwitch }: RoleSwitcherProps) {
         <div className="min-w-0 text-left hidden lg:block">
           <div className="max-w-[140px] truncate text-xs font-medium leading-tight">{current.fullName}</div>
           <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
-            {current.role === "admin" ? "Admin" : "Project Manager"}
+            {current.role === "admin" ? "Admin" : current.role === "inventory_viewer" ? "Inventory Viewer" : "Project Manager"}
           </div>
         </div>
         <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />

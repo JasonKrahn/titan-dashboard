@@ -4,13 +4,24 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format, parse, differenceInDays, isValid } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { AddressAutocomplete } from "@/components/ui/address-autocomplete";
-import { createProject, updateProject, getClients, getProjects, getUsers, type CreateProjectInput, type UpdateProjectInput } from "@/lib/api";
+import { createProject, deleteProject, updateProject, getClients, getProjects, getUsers, type CreateProjectInput, type UpdateProjectInput } from "@/lib/api";
 import type { User, Project } from "@/lib/types";
 
 interface NewProjectDialogProps {
@@ -21,6 +32,7 @@ interface NewProjectDialogProps {
   project?: Project;
   onCreated?: (projectId: string) => void;
   onUpdated?: (projectId: string) => void;
+  onDeleted?: (projectId: string) => void;
 }
 
 type FormState = {
@@ -34,7 +46,13 @@ type FormState = {
   finishLevel: 1 | 2 | 3 | 4 | 5 | undefined;
 };
 
-export function NewProjectDialog({ open, onOpenChange, currentUser, presetClientId, project, onCreated, onUpdated }: NewProjectDialogProps) {
+function parseStoredDate(value?: string): Date | undefined {
+  if (!value) return undefined;
+  const parsed = parse(value.slice(0, 10), "yyyy-MM-dd", new Date());
+  return isValid(parsed) ? parsed : undefined;
+}
+
+export function NewProjectDialog({ open, onOpenChange, currentUser, presetClientId, project, onCreated, onUpdated, onDeleted }: NewProjectDialogProps) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const isEdit = !!project;
@@ -75,16 +93,16 @@ export function NewProjectDialog({ open, onOpenChange, currentUser, presetClient
   useEffect(() => {
     if (!open) return;
     if (project) {
-      const parsedStart = project.scheduledStart ? parse(project.scheduledStart, "yyyy-MM-dd", new Date()) : undefined;
-      const parsedEnd = project.scheduledEnd ? parse(project.scheduledEnd, "yyyy-MM-dd", new Date()) : undefined;
+      const parsedStart = parseStoredDate(project.scheduledStart);
+      const parsedEnd = parseStoredDate(project.scheduledEnd);
       setForm({
         clientId: project.clientId,
         projectNumber: project.projectNumber,
         name: project.name,
         siteAddress: project.siteAddress,
         assignedProjectManagerId: project.assignedProjectManagerId || "",
-        scheduledStart: parsedStart && isValid(parsedStart) ? parsedStart : undefined,
-        scheduledEnd: parsedEnd && isValid(parsedEnd) ? parsedEnd : undefined,
+        scheduledStart: parsedStart,
+        scheduledEnd: parsedEnd,
         finishLevel: project.finishLevel,
       });
     } else {
@@ -111,6 +129,22 @@ export function NewProjectDialog({ open, onOpenChange, currentUser, presetClient
     });
   };
 
+  const invalidateProjectData = (projectId?: string) => {
+    qc.invalidateQueries({ queryKey: ["projects"] });
+    qc.invalidateQueries({ queryKey: ["projects", "all-visible"] });
+    qc.invalidateQueries({ queryKey: ["phases"] });
+    qc.invalidateQueries({ queryKey: ["gates"] });
+    qc.invalidateQueries({ queryKey: ["deficiencies"] });
+    qc.invalidateQueries({ queryKey: ["photos"] });
+    qc.invalidateQueries({ queryKey: ["audit-events"] });
+    qc.invalidateQueries({ queryKey: ["notifications"] });
+    if (projectId) {
+      qc.invalidateQueries({ queryKey: ["project", projectId] });
+      qc.invalidateQueries({ queryKey: ["project-equipment", projectId] });
+      qc.invalidateQueries({ queryKey: ["project-inventory-pickups", projectId] });
+    }
+  };
+
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
     if (errors[key as string]) setErrors((e) => ({ ...e, [key as string]: "" }));
@@ -132,9 +166,7 @@ export function NewProjectDialog({ open, onOpenChange, currentUser, presetClient
     onSuccess: (res) => {
       if (res.ok === true) {
         toast.success(isEdit ? `Project "${res.data.name}" updated` : `Project "${res.data.name}" created`);
-        qc.invalidateQueries({ queryKey: ["projects"] });
-        qc.invalidateQueries({ queryKey: ["projects", "all-visible"] });
-        qc.invalidateQueries({ queryKey: ["project", project?.id] });
+        invalidateProjectData(project?.id);
         if (!isEdit) {
           qc.invalidateQueries({ queryKey: ["phases"] });
           qc.invalidateQueries({ queryKey: ["gates"] });
@@ -151,6 +183,21 @@ export function NewProjectDialog({ open, onOpenChange, currentUser, presetClient
         return;
       }
       setErrors(res.error.fieldErrors ?? {});
+      toast.error(res.error.message);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteProject(project!.id),
+    onSuccess: (res) => {
+      if (res.ok === true) {
+        toast.success(`Project "${res.data.name}" deleted`);
+        invalidateProjectData(res.data.id);
+        reset();
+        onOpenChange(false);
+        onDeleted?.(res.data.id);
+        return;
+      }
       toast.error(res.error.message);
     },
   });
@@ -319,11 +366,46 @@ export function NewProjectDialog({ open, onOpenChange, currentUser, presetClient
             </div>
           </div>
 
+          {isEdit && project && (
+            <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm">
+              <div className="font-semibold text-destructive">Danger zone</div>
+              <p className="mt-1 text-muted-foreground">Deleting removes this project from active app views and cannot be restored from the UI.</p>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button type="button" variant="destructive" size="sm" className="mt-3" disabled={deleteMutation.isPending}>
+                    Delete project
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete {project.name}?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This is a destructive action. <strong>{project.name}</strong> will be removed from active app views and cannot be restored from the UI.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        deleteMutation.mutate();
+                      }}
+                      disabled={deleteMutation.isPending}
+                    >
+                      {deleteMutation.isPending ? "Deleting…" : "Yes, delete project"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
+
           <DialogFooter className="pt-2">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={mutation.isPending || !!validationError}>
+            <Button type="submit" disabled={mutation.isPending || deleteMutation.isPending || !!validationError}>
               {mutation.isPending ? (isEdit ? "Saving…" : "Creating…") : (isEdit ? "Save changes" : "Create project")}
             </Button>
           </DialogFooter>

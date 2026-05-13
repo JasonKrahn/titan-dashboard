@@ -1,5 +1,6 @@
 import { Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -30,6 +31,10 @@ interface QuantityStepperModalProps {
 }
 
 const normalizeQuantity = (quantity: number) => Math.max(0, quantity);
+const parseQuantityInput = (value: string) => {
+  const quantity = Number(value);
+  return Number.isFinite(quantity) ? Math.max(0, Math.floor(quantity)) : 0;
+};
 
 export function QuantityStepperModal({
   open,
@@ -80,7 +85,16 @@ export function QuantityStepperModal({
                     >
                       <Minus className="h-4 w-4" />
                     </Button>
-                    <span className="min-w-8 text-center text-sm font-semibold tabular-nums">{quantity}</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={1}
+                      inputMode="numeric"
+                      aria-label={`Quantity for ${item.label}`}
+                      value={quantity}
+                      onChange={(event) => onQuantityChange(item.itemKey, parseQuantityInput(event.target.value))}
+                      className="h-8 w-16 px-2 text-center text-sm font-semibold tabular-nums"
+                    />
                     <Button
                       type="button"
                       variant="outline"

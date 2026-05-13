@@ -1,6 +1,6 @@
 // Entity types — mirrors architecture/DATA_MODEL.md.
 
-export type UserRole = "admin" | "project_manager";
+export type UserRole = "admin" | "project_manager" | "inventory_viewer";
 
 export interface User {
   id: string;
@@ -86,6 +86,23 @@ export interface EquipmentLog {
   itemKey: string;
   quantity: number;
   updatedAt: string;
+}
+
+export type InventoryPickupItemKind = "material" | "equipment";
+
+export interface InventoryPickupItem {
+  kind: InventoryPickupItemKind;
+  itemKey: string;
+  quantity: number;
+}
+
+export interface InventoryPickup {
+  id: string;
+  projectId: string;
+  pickedUpByUserId: string;
+  items: InventoryPickupItem[];
+  note?: string;
+  createdAt: string;
 }
 
 export type GateType = "site_check" | "inspection" | "attic_check";
@@ -174,6 +191,7 @@ export type AuditEntityType =
   | "photo_evidence"
   | "client_record"
   | "subcontractor_contact"
+  | "inventory_pickup"
   | "user";
 
 export interface AuditEvent {
@@ -185,6 +203,29 @@ export interface AuditEvent {
   previousValue?: unknown;
   nextValue?: unknown;
   metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export type InventoryAuditRequestType = "materials" | "hardware" | "both";
+export type InventoryPickupNotificationKind = "materials" | "hardware";
+
+export interface AppNotification {
+  id: string;
+  recipientUserId: string;
+  type: "inventory_audit_request" | "inventory_pickup" | "phase_end_due";
+  projectId: string;
+  message: string;
+  readAt?: string;
+  metadata?: {
+    auditRequestType?: InventoryAuditRequestType;
+    pickupId?: string;
+    pickupKinds?: InventoryPickupNotificationKind[];
+    phaseId?: string;
+    phaseType?: PhaseType;
+    phaseEndDate?: string;
+    requesterUserId?: string;
+    summary?: string;
+  };
   createdAt: string;
 }
 

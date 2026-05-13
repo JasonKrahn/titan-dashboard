@@ -76,4 +76,37 @@ describe("ActivityList", () => {
     expect(screen.getByText("Acme Cedar Point Villas · Insulation · Missing vapor barrier")).toBeInTheDocument();
     expect(screen.getByText("Notes: Missing vapor barrier at east wall")).toBeInTheDocument();
   });
+
+  it("renders summarized inventory quantity changes", () => {
+    const event: AuditEvent = {
+      id: "audit-materials",
+      entityType: "phase",
+      entityId: "phase-1",
+      action: "materials_updated",
+      actorUserId: "user-1",
+      createdAt: new Date().toISOString(),
+      metadata: {
+        inventoryChanges: [
+          { itemKey: "r20_batt", label: "R-20 Batts", previousQuantity: 3, quantity: 4 },
+          { itemKey: "red_tuck_tape", label: "Red Tuck Tape", previousQuantity: 0, quantity: 2 },
+        ],
+      },
+    };
+
+    render(
+      <ActivityList
+        events={[event]}
+        lookups={{
+          projects: [project],
+          phases: [phase],
+          gates: [gate],
+          deficiencies: [deficiency],
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Materials updated")).toBeInTheDocument();
+    expect(screen.getByText("Acme Cedar Point Villas · Insulation")).toBeInTheDocument();
+    expect(screen.getByText("R-20 Batts: 3 → 4 · Red Tuck Tape: 0 → 2")).toBeInTheDocument();
+  });
 });

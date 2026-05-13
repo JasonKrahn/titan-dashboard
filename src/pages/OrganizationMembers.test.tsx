@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -113,13 +113,10 @@ describe("OrganizationMembersPage", () => {
     deactivateUser.mockResolvedValue({ ok: true, data: { ...users[1], active: false } });
   });
 
-  it("shows member counts and disables removal for assigned project managers", async () => {
+  it("shows member rows and disables removal for assigned project managers", async () => {
     renderPage();
 
     expect(await screen.findByRole("heading", { name: "Organization Members" })).toBeInTheDocument();
-    expect(screen.getByText("Active members")).toBeInTheDocument();
-    expect(screen.getAllByText("Project Managers").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Inactive").length).toBeGreaterThan(0);
 
     const pmRow = screen.getByTestId("member-row-pm-1");
     expect(within(pmRow).getByText("1 active project")).toBeInTheDocument();
@@ -141,6 +138,36 @@ describe("OrganizationMembersPage", () => {
       target: { value: "admin" },
     });
     expect(screen.getByText("No members found")).toBeInTheDocument();
+  });
+
+  it("allows admins to add inventory viewers", async () => {
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Add member" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Add Member" });
+    expect(within(dialog).getByRole("option", { name: "Inventory Viewer" })).toHaveValue("inventory_viewer");
+
+    fireEvent.change(within(dialog).getByLabelText("Full name *"), {
+      target: { value: "Dale Cooper" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Email *"), {
+      target: { value: "dale@titanpm.io" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Phone"), {
+      target: { value: "780-555-0199" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Role *"), {
+      target: { value: "inventory_viewer" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save member" }));
+
+    await waitFor(() => expect(createUser).toHaveBeenCalledWith({
+      fullName: "Dale Cooper",
+      email: "dale@titanpm.io",
+      phone: "780-555-0199",
+      role: "inventory_viewer",
+    }));
   });
 
   it("blocks project managers from viewing organization management", async () => {

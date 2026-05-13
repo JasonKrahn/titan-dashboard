@@ -19,7 +19,9 @@ import {
   setCurrentUser,
   updateAtticGate,
   updatePhaseMaterial,
+  updatePhaseMaterials,
   updateProjectEquipment,
+  updateProjectEquipmentBatch,
   updatePhaseSchedules,
   updateUser,
 } from "./index";
@@ -345,6 +347,73 @@ describe("prototype seed data", () => {
       quantity: 1,
     });
     expect(Number.isNaN(Date.parse(updated.data.updatedAt))).toBe(false);
+  });
+
+  it("creates one summarized activity event for batch material and hardware saves", async () => {
+    setCurrentUser("user-admin");
+
+    const materialEventsBefore = await getAuditEvents();
+    expect(materialEventsBefore.ok).toBe(true);
+    if (!materialEventsBefore.ok) return;
+    const materialCountBefore = materialEventsBefore.data.filter((event) => event.action === "materials_updated").length;
+
+    const materialUpdate = await updatePhaseMaterials({
+      phaseId: "proj-active-insulation-phase-insulation",
+      projectId: "proj-active-insulation",
+      changes: [
+        { itemKey: "r20_batt", quantity: 44 },
+        { itemKey: "red_tuck_tape", quantity: 7 },
+      ],
+    });
+
+    expect(materialUpdate.ok).toBe(true);
+    if (!materialUpdate.ok) return;
+    expect(materialUpdate.data).toHaveLength(2);
+
+    const phaseDetail = await getProject("proj-active-insulation");
+    expect(phaseDetail.ok).toBe(true);
+    if (!phaseDetail.ok) return;
+    const materialEvent = phaseDetail.data.auditEvents.find((event) => event.action === "materials_updated");
+    expect(materialEvent).toMatchObject({
+      entityType: "phase",
+      entityId: "proj-active-insulation-phase-insulation",
+      actorUserId: "user-admin",
+    });
+    expect((materialEvent?.metadata?.inventoryChanges as unknown[] | undefined)?.length).toBe(2);
+
+    const materialEventsAfter = await getAuditEvents();
+    expect(materialEventsAfter.ok).toBe(true);
+    if (!materialEventsAfter.ok) return;
+    expect(materialEventsAfter.data.filter((event) => event.action === "materials_updated")).toHaveLength(materialCountBefore + 1);
+
+    const hardwareEventsBefore = materialEventsAfter.data.filter((event) => event.action === "hardware_updated").length;
+    const hardwareUpdate = await updateProjectEquipmentBatch({
+      projectId: "proj-active-insulation",
+      changes: [
+        { itemKey: "drywall_lift", quantity: 2 },
+        { itemKey: "site_lighting", quantity: 3 },
+      ],
+    });
+
+    expect(hardwareUpdate.ok).toBe(true);
+    if (!hardwareUpdate.ok) return;
+    expect(hardwareUpdate.data).toHaveLength(2);
+
+    const projectDetail = await getProject("proj-active-insulation");
+    expect(projectDetail.ok).toBe(true);
+    if (!projectDetail.ok) return;
+    const hardwareEvent = projectDetail.data.auditEvents.find((event) => event.action === "hardware_updated");
+    expect(hardwareEvent).toMatchObject({
+      entityType: "project",
+      entityId: "proj-active-insulation",
+      actorUserId: "user-admin",
+    });
+    expect((hardwareEvent?.metadata?.inventoryChanges as unknown[] | undefined)?.length).toBe(2);
+
+    const hardwareEventsAfter = await getAuditEvents();
+    expect(hardwareEventsAfter.ok).toBe(true);
+    if (!hardwareEventsAfter.ok) return;
+    expect(hardwareEventsAfter.data.filter((event) => event.action === "hardware_updated")).toHaveLength(hardwareEventsBefore + 1);
   });
 
   it("enforces project manager visibility for material and equipment logs", async () => {

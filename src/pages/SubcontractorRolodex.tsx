@@ -64,6 +64,7 @@ const TRADE_LABEL: Record<string, string> = {
 
 type ViewMode = "cards" | "list";
 type SortOption = "name" | "company" | "trade" | "active" | "assigned" | "next";
+type StatFilter = Pick<SubcontractorRowFilters, "status" | "assignment">;
 
 interface SubcontractorFormState {
   displayName: string;
@@ -219,7 +220,7 @@ export default function SubcontractorRolodexPage() {
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<SubcontractorRowFilters>(DEFAULT_FILTERS);
   const [sortOption, setSortOption] = useState<SortOption>("name");
-  const [viewMode, setViewMode] = useState<ViewMode>("cards");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [mobileActionSubcontractorId, setMobileActionSubcontractorId] = useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -382,6 +383,13 @@ export default function SubcontractorRolodexPage() {
     setFilters((current) => ({ ...current, [key]: value }));
   };
 
+  const applyStatFilter = (nextFilters: StatFilter) => {
+    setFilters((current) => ({ ...current, ...nextFilters }));
+  };
+
+  const isStatFilterActive = (targetFilters: StatFilter) =>
+    filters.status === targetFilters.status && filters.assignment === targetFilters.assignment;
+
   const validateForm = () => {
     if (!formData.displayName || !formData.trade || !formData.companyName || !formData.phone || !formData.email) {
       toast({
@@ -527,6 +535,13 @@ export default function SubcontractorRolodexPage() {
     );
   }
 
+  const statCards: Array<{ label: string; value: number; icon: typeof Building2; filters: StatFilter }> = [
+    { label: "Total subs", value: stats.total, icon: Building2, filters: { status: "all", assignment: "all" } },
+    { label: "Active", value: stats.active, icon: Wrench, filters: { status: "active", assignment: "all" } },
+    { label: "Assigned", value: stats.assigned, icon: BriefcaseBusiness, filters: { status: "all", assignment: "assigned" } },
+    { label: "Unassigned", value: stats.unassigned, icon: CalendarClock, filters: { status: "all", assignment: "unassigned" } },
+  ];
+
   return (
     <div className="min-h-screen bg-background">
       <AppHeader activeSection="subs" />
@@ -546,24 +561,31 @@ export default function SubcontractorRolodexPage() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              { label: "Total subs", value: stats.total, icon: Building2 },
-              { label: "Active", value: stats.active, icon: Wrench },
-              { label: "Assigned", value: stats.assigned, icon: BriefcaseBusiness },
-              { label: "Unassigned", value: stats.unassigned, icon: CalendarClock },
-            ].map((item) => (
-              <Card key={item.label} surface="panel" className="p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground">{item.label}</p>
-                    <p className="mt-1 text-2xl font-semibold tabular-nums">{item.value}</p>
-                  </div>
-                  <IconWell tone="primary" size="lg" shape="square" className="border-transparent">
-                    <item.icon className="h-4 w-4" />
-                  </IconWell>
-                </div>
-              </Card>
-            ))}
+            {statCards.map((item) => {
+              const isSelected = isStatFilterActive(item.filters);
+              return (
+                <Card
+                  key={item.label}
+                  surface="panel"
+                  className={`transition-colors ${isSelected ? "border-primary/70 ring-1 ring-primary/30" : ""}`}
+                >
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-3 p-4 text-left"
+                    aria-pressed={isSelected}
+                    onClick={() => applyStatFilter(item.filters)}
+                  >
+                    <span>
+                      <span className="block text-xs font-medium text-muted-foreground">{item.label}</span>
+                      <span className="mt-1 block text-2xl font-semibold tabular-nums">{item.value}</span>
+                    </span>
+                    <IconWell tone="primary" size="lg" shape="square" className="border-transparent">
+                      <item.icon className="h-4 w-4" />
+                    </IconWell>
+                  </button>
+                </Card>
+              );
+            })}
           </div>
         </section>
 

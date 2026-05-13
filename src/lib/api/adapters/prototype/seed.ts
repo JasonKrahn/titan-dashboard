@@ -7,6 +7,7 @@ import type {
   Deficiency,
   EquipmentLog,
   Gate,
+  InventoryPickup,
   MaterialLog,
   Phase,
   PhotoEvidence,
@@ -45,6 +46,16 @@ export const seedUsers: User[] = [
     email: "william@titanpm.io",
     active: true,
     createdAt: iso(-days(60)),
+    updatedAt: iso(-days(1)),
+  },
+  {
+    id: "user-inventory-1",
+    role: "inventory_viewer",
+    fullName: "Dale Cooper",
+    email: "dale@titanpm.io",
+    phone: "780-555-0199",
+    active: true,
+    createdAt: iso(-days(30)),
     updatedAt: iso(-days(1)),
   },
 ];
@@ -888,6 +899,8 @@ export const seedEquipmentLogs: EquipmentLog[] = [
     updatedAt: iso(-days(1)),
   },
 ];
+
+export const seedInventoryPickups: InventoryPickup[] = [];
 
 function gateSeed(projectId: string, key: string): GateSeed {
   return scenarioFor(projectId).gates?.[key] ?? {};

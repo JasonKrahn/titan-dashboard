@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback, type TouchEvent } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -17,12 +17,38 @@ interface PhotoViewerDialogProps {
   initialPhotoId: string | null;
 }
 
+function formatPhotoDate(value: string) {
+  return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatPhotoStatus(value: PhotoEvidence["status"]) {
+  return value.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatPhotoSize(value?: number) {
+  if (!value) return undefined;
+  return `${Math.max(1, Math.round(value / 1024))} KB`;
+}
+
+function photoMetadata(photo: PhotoEvidence) {
+  return [
+    formatPhotoStatus(photo.status),
+    `Uploaded ${formatPhotoDate(photo.createdAt)}`,
+    formatPhotoSize(photo.fileSizeBytes),
+    photo.mimeType,
+  ].filter(Boolean).join(" · ");
+}
+
 export function PhotoViewerDialog({ open, onOpenChange, items, initialPhotoId }: PhotoViewerDialogProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
   const activeItem = items[currentIndex] ?? null;
   const canGoPrevious = currentIndex > 0;
   const canGoNext = currentIndex < items.length - 1;
+  const goPrevious = useCallback(() => setCurrentIndex((index) => Math.max(0, index - 1)), []);
+  const goNext = useCallback(() => setCurrentIndex((index) => Math.min(items.length - 1, index + 1)), [items.length]);
 
   useEffect(() => {
     if (!open) return;
@@ -50,16 +76,40 @@ export function PhotoViewerDialog({ open, onOpenChange, items, initialPhotoId }:
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "ArrowLeft") {
-        setCurrentIndex((index) => Math.max(0, index - 1));
+        goPrevious();
       }
       if (event.key === "ArrowRight") {
-        setCurrentIndex((index) => Math.min(items.length - 1, index + 1));
+        goNext();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, items.length]);
+  }, [goNext, goPrevious, open, items.length]);
+
+  const handleTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    const touch = event.touches[0];
+    touchStartXRef.current = touch.clientX;
+    touchStartYRef.current = touch.clientY;
+  };
+
+  const handleTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
+    if (items.length <= 1 || touchStartXRef.current === null || touchStartYRef.current === null) return;
+
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - touchStartXRef.current;
+    const deltaY = touch.clientY - touchStartYRef.current;
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+
+    if (Math.abs(deltaX) < 48 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) return;
+
+    if (deltaX < 0) {
+      goNext();
+    } else {
+      goPrevious();
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -72,7 +122,11 @@ export function PhotoViewerDialog({ open, onOpenChange, items, initialPhotoId }:
         <div className="relative flex max-h-[90vh] min-h-0 flex-col md:h-full md:max-h-full">
           {activeItem ? (
             <div className="flex max-h-[90vh] min-h-0 flex-col overflow-hidden bg-muted md:h-full md:max-h-full">
-              <div className="relative flex min-h-0 flex-1 items-center justify-center">
+              <div
+                className="relative flex min-h-0 flex-1 touch-pan-y items-center justify-center"
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
+              >
                 {blobUrl ? (
                   <img
                     src={blobUrl}
@@ -95,8 +149,8 @@ export function PhotoViewerDialog({ open, onOpenChange, items, initialPhotoId }:
                       size="icon"
                       aria-label="Previous photo"
                       disabled={!canGoPrevious}
-                      onClick={() => setCurrentIndex((index) => Math.max(0, index - 1))}
-                      className="absolute left-3 top-1/2 hidden -translate-y-1/2 rounded-full bg-background/80 shadow md:inline-flex"
+                      onClick={goPrevious}
+                      className="absolute left-3 top-1/2 inline-flex -translate-y-1/2 rounded-full bg-background/80 shadow"
                     >
                       <ChevronLeft className="h-5 w-5" />
                     </Button>
@@ -106,16 +160,17 @@ export function PhotoViewerDialog({ open, onOpenChange, items, initialPhotoId }:
                       size="icon"
                       aria-label="Next photo"
                       disabled={!canGoNext}
-                      onClick={() => setCurrentIndex((index) => Math.min(items.length - 1, index + 1))}
-                      className="absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-full bg-background/80 shadow md:inline-flex"
+                      onClick={goNext}
+                      className="absolute right-3 top-1/2 inline-flex -translate-y-1/2 rounded-full bg-background/80 shadow"
                     >
                       <ChevronRight className="h-5 w-5" />
                     </Button>
                   </>
                 )}
               </div>
-              <div className="hidden shrink-0 border-t border-border bg-background px-4 py-3 text-sm md:block">
+              <div className="shrink-0 border-t border-border bg-background px-4 py-3 text-sm" aria-live="polite">
                 <p className="font-medium">{activeItem.caption}</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{photoMetadata(activeItem.photo)}</p>
                 {items.length > 1 && (
                   <p className="mt-1 text-xs text-muted-foreground">
                     Photo {currentIndex + 1} of {items.length}

@@ -253,7 +253,7 @@ export default function ActivityLogPage() {
         </div>
 
         {/* Filter dropdowns */}
-        <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
+        <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
           <Select value={actionFilter} onValueChange={setActionFilter}>
             <SelectTrigger className="w-full md:w-[180px]">
               <SelectValue placeholder="All action types" />

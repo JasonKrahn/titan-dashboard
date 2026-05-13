@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Mail, MoreHorizontal, Pencil, Phone, Plus, Search, ShieldCheck, Trash2, UserCog, Users } from "lucide-react";
+import { Mail, MoreHorizontal, Pencil, Phone, Plus, Search, ShieldCheck, Trash2, UserCog } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/dashboard/AppHeader";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
@@ -16,7 +16,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { createUser, deactivateUser, getCurrentUser, getProjects, getUsers, updateUser, type CreateUserInput, type UpdateUserInput } from "@/lib/api";
 import type { Project, User, UserRole } from "@/lib/types";
 
-type RoleFilter = "all" | "admin" | "project_manager" | "inactive";
+type RoleFilter = "all" | "admin" | "project_manager" | "inventory_viewer" | "inactive";
 
 interface MemberFormState {
   fullName: string;
@@ -33,7 +33,9 @@ const EMPTY_FORM: MemberFormState = {
 };
 
 function roleLabel(role: UserRole) {
-  return role === "admin" ? "Admin" : "Project Manager";
+  if (role === "admin") return "Admin";
+  if (role === "inventory_viewer") return "Inventory Viewer";
+  return "Project Manager";
 }
 
 function activeProjectCount(user: User, projects: Project[]) {
@@ -99,13 +101,6 @@ export default function OrganizationMembersPage() {
         return a.fullName.localeCompare(b.fullName);
       });
   }, [roleFilter, search, users]);
-
-  const stats = useMemo(() => ({
-    active: users.filter((user) => user.active).length,
-    admins: users.filter((user) => user.role === "admin" && user.active).length,
-    pms: users.filter((user) => user.role === "project_manager" && user.active).length,
-    inactive: users.filter((user) => !user.active).length,
-  }), [users]);
 
   const mobileActionUser = memberRows.find((user) => user.id === mobileActionUserId);
 
@@ -265,33 +260,12 @@ export default function OrganizationMembersPage() {
         <section className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <h1 className="text-2xl font-bold">Organization Members</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Manage Titan admins and project managers.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Manage Titan admins, project managers, and inventory viewers.</p>
           </div>
           <Button onClick={() => { resetForm(); setAddOpen(true); }}>
             <Plus className="h-4 w-4" />
             Add member
           </Button>
-        </section>
-
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { label: "Active members", value: stats.active, icon: Users },
-            { label: "Admins", value: stats.admins, icon: ShieldCheck },
-            { label: "Project Managers", value: stats.pms, icon: UserCog },
-            { label: "Inactive", value: stats.inactive, icon: Trash2 },
-          ].map((item) => (
-            <Card key={item.label} surface="panel" className="p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground">{item.label}</p>
-                  <p className="mt-1 text-2xl font-semibold tabular-nums">{item.value}</p>
-                </div>
-                <IconWell tone="primary" size="lg" shape="square" className="border-transparent">
-                  <item.icon className="h-4 w-4" />
-                </IconWell>
-              </div>
-            </Card>
-          ))}
         </section>
 
         <Card surface="panel" className="p-3">
@@ -314,6 +288,7 @@ export default function OrganizationMembersPage() {
               <option value="all">All members</option>
               <option value="admin">Admins</option>
               <option value="project_manager">Project Managers</option>
+              <option value="inventory_viewer">Inventory Viewers</option>
               <option value="inactive">Inactive</option>
             </select>
           </div>
@@ -551,6 +526,7 @@ function MemberDialog({
                 className="h-10 rounded-md border border-input bg-background px-3 text-base md:text-sm"
               >
                 <option value="project_manager">Project Manager</option>
+                <option value="inventory_viewer">Inventory Viewer</option>
                 <option value="admin">Admin</option>
               </select>
             </div>

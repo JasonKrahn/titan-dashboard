@@ -191,6 +191,7 @@ interface UploadPhotoEvidenceInput {
 - `uploadPhotoEvidence()` must return only metadata and object keys, not public URLs.
 - PM calls must fail with `FORBIDDEN` for Admin-only mutations.
 - PM calls must fail with `FORBIDDEN` when the target project is not assigned to the current Project Manager.
+- `inventory_viewer` calls to `getProjects()` always return only `status: "active"` projects regardless of filters, with cross-PM visibility. All write functions must fail with `FORBIDDEN` for `inventory_viewer` role.
 - `deletePhotoEvidence()` must write an audit event and fail with `STATE_VIOLATION` if the photo is the sole evidence for a passed gate or completed attic check.
 - `deactivateUser()` must fail with `STATE_VIOLATION` if the user has active assigned projects, unless projects are reassigned first.
 - `reassignProject()` must write an audit event recording the previous and new PM.

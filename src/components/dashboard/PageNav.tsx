@@ -15,7 +15,6 @@ export interface PageNavItem {
   label: string;
   to?: string;
   state?: unknown;
-  back?: boolean;
 }
 
 interface PageNavProps {
@@ -67,12 +66,6 @@ export function PageNav({ backFallback, backLabel, items, className }: PageNavPr
                       <BreadcrumbPage className="inline-flex min-w-0 max-w-[190px] items-center rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-sm font-medium text-foreground">
                         <span className="block truncate">{item.label}</span>
                       </BreadcrumbPage>
-                    ) : item.back ? (
-                      <BreadcrumbLink asChild className="inline-flex min-w-0 max-w-[132px] items-center rounded-md border border-border bg-card px-2 py-1 text-sm font-medium text-muted-foreground hover:border-border-emphasis hover:bg-accent hover:text-foreground">
-                        <button type="button" onClick={handleBack}>
-                          <span className="block truncate">{item.label}</span>
-                        </button>
-                      </BreadcrumbLink>
                     ) : (
                       <BreadcrumbLink asChild className="inline-flex min-w-0 max-w-[132px] items-center rounded-md border border-border bg-card px-2 py-1 text-sm font-medium text-muted-foreground hover:border-border-emphasis hover:bg-accent hover:text-foreground">
                         <Link to={item.to} state={item.state as object | undefined}>
@@ -106,17 +99,6 @@ export function PageNav({ backFallback, backLabel, items, className }: PageNavPr
                         )}
                         <span className="block max-w-[160px] truncate sm:max-w-[220px] md:max-w-[320px]">{item.label}</span>
                       </BreadcrumbPage>
-                    ) : item.back ? (
-                      <BreadcrumbLink asChild className={breadcrumbLinkClass(isFirst)}>
-                        <button type="button" onClick={handleBack}>
-                          {isFirst && (
-                            <span className="hidden h-4 w-4 shrink-0 items-center justify-center rounded-full border border-border-strong bg-muted text-muted-foreground sm:inline-flex">
-                              <Layers3 className="h-2.5 w-2.5" />
-                            </span>
-                          )}
-                          <span className="truncate">{item.label}</span>
-                        </button>
-                      </BreadcrumbLink>
                     ) : (
                       <BreadcrumbLink asChild className={breadcrumbLinkClass(isFirst)}>
                         <Link to={item.to} state={item.state as object | undefined}>

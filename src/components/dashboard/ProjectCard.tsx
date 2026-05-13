@@ -20,6 +20,7 @@ import type {
   Project,
   User,
 } from "@/lib/types";
+import { formatDateWithOptions } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 
 interface ProjectCardProps {
@@ -95,6 +96,16 @@ export function ProjectCard({
             <MapPin className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate">{project.siteAddress}</span>
           </p>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <span className="font-medium text-foreground/80">Start</span>
+              {formatDateWithOptions(project.scheduledStart ?? "")}
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="font-medium text-foreground/80">End</span>
+              {formatDateWithOptions(project.scheduledEnd ?? "")}
+            </span>
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <StatusBadge tone={projectStatusTone(project.status)} label={STATUS_LABEL[project.status]} size="sm" />

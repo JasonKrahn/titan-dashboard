@@ -23,23 +23,23 @@ function renderPageNav(
 }
 
 describe("PageNav", () => {
-  it("renders a back: true breadcrumb item as a button that calls navigate(-1)", () => {
+  it("keeps the dedicated Back button history-based while breadcrumbs remain route links", () => {
     Object.defineProperty(window, "history", { value: { length: 5 }, writable: true });
 
     renderPageNav({
       backFallback: "/",
       backLabel: "Back to Projects",
       items: [
-        { label: "All Projects", to: "/", back: true },
+        { label: "All Projects", to: "/" },
         { label: "Fortress Ready Complete Bungalow" },
       ],
     });
 
     const desktopBreadcrumb = within(screen.getByTestId("page-nav-desktop-breadcrumb"));
-    const crumb = desktopBreadcrumb.getByRole("button", { name: "All Projects" });
-    expect(crumb.tagName).toBe("BUTTON");
+    const crumb = desktopBreadcrumb.getByRole("link", { name: "All Projects" });
+    expect(crumb).toHaveAttribute("href", "/");
 
-    fireEvent.click(crumb);
+    fireEvent.click(screen.getByRole("button", { name: "Back to Projects" }));
     expect(mockNavigate).toHaveBeenCalledWith(-1);
   });
 

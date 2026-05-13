@@ -58,6 +58,12 @@ const routes: RouteDef[] = [
     path: "/archive",
     heading: "Archive",
   },
+  {
+    name: "inventory",
+    path: "/inventory",
+    heading: "Inventory Tracker",
+    boundarySpotCheck: true,
+  },
 ];
 
 const primaryViewports = [

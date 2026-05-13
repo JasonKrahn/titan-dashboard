@@ -60,12 +60,12 @@ import { ProjectScheduleTimeline } from "@/components/dashboard/ProjectScheduleT
 import { PhotoViewerDialog, type PhotoViewerItem } from "@/components/dashboard/PhotoViewerDialog";
 import { DeficiencyDialog } from "@/components/dashboard/DeficiencyDialog";
 import { PhotoUploadDialog } from "@/components/dashboard/PhotoUploadDialog";
-import { InventoryDisplayCard, type InventoryDisplayItem } from "@/components/dashboard/InventoryDisplayCard";
+import { InventoryDisplayCard, type InventoryDisplayItem, type InventoryPickupSummaryItem } from "@/components/dashboard/InventoryDisplayCard";
 import { QuantityStepperModal } from "@/components/dashboard/QuantityStepperModal";
-import { getProject, getProjectEquipment, updateProjectEquipment, updateAtticGate, getPhotoViewUrl, updatePhaseSchedules } from "@/lib/api";
+import { getCurrentUser, getProject, getProjectEquipment, getProjectInventoryPickups, updateProjectEquipmentBatch, updateAtticGate, getPhotoViewUrl, updatePhaseSchedules } from "@/lib/api";
 import { exportProjectZip } from "@/lib/projectExport";
 import { formatDateWithOptions, type PhaseScheduleChange } from "@/lib/schedule";
-import type { EquipmentLog, Gate, Phase, PhotoEvidence } from "@/lib/types";
+import type { EquipmentLog, Gate, InventoryPickup, Phase, PhotoEvidence } from "@/lib/types";
 import { EQUIPMENT_ITEMS } from "@/lib/inventoryCatalog";
 import {
   PHASE_LABEL,
@@ -77,6 +77,7 @@ import {
   initials,
   projectStatusTone,
   relativeTime,
+  type PhaseHealthTone,
 } from "@/lib/derived";
 import { ActionBadge } from "@/components/ui/action-badge";
 import { SeverityBadge } from "@/components/ui/severity-badge";
@@ -92,9 +93,60 @@ const ENTITY_LABEL: Record<string, string> = {
   user: "User",
 };
 
+const PHASE_CARD_ACCENT: Record<PhaseHealthTone, { rail: string; ring: string; footer: string; chevron: string }> = {
+  blocked: {
+    rail: "bg-status-blocked",
+    ring: "ring-status-blocked/25",
+    footer: "border-status-blocked/20 bg-status-blocked/5",
+    chevron: "text-status-blocked",
+  },
+  attention: {
+    rail: "bg-status-attention",
+    ring: "ring-status-attention/25",
+    footer: "border-status-attention/20 bg-status-attention/5",
+    chevron: "text-status-attention",
+  },
+  "in-progress": {
+    rail: "bg-status-in-progress",
+    ring: "ring-status-in-progress/25",
+    footer: "border-status-in-progress/20 bg-status-in-progress/5",
+    chevron: "text-status-in-progress",
+  },
+  ready: {
+    rail: "bg-status-ready",
+    ring: "ring-status-ready/25",
+    footer: "border-status-ready/20 bg-status-ready/5",
+    chevron: "text-status-ready",
+  },
+  closed: {
+    rail: "bg-status-closed",
+    ring: "ring-status-closed/25",
+    footer: "border-status-closed/20 bg-status-closed/5",
+    chevron: "text-status-closed",
+  },
+  "not-started": {
+    rail: "bg-status-not-started",
+    ring: "ring-status-not-started/15",
+    footer: "border-border/70 bg-muted/10",
+    chevron: "text-muted-foreground",
+  },
+};
+
+function formatEquipmentPickupSummary(pickup: InventoryPickup, labelByKey: Map<string, string>) {
+  const parts = pickup.items
+    .filter((item) => item.kind === "equipment")
+    .map((item) => `${labelByKey.get(item.itemKey) ?? item.itemKey} ×${item.quantity}`);
+  return parts.length > 0 ? parts.join(", ") : undefined;
+}
+
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+
+  const meQ = useQuery({ queryKey: ["me"], queryFn: getCurrentUser });
+  useEffect(() => {
+    if (meQ.data?.ok && meQ.data.data.role === "inventory_viewer") navigate("/inventory");
+  }, [meQ.data, navigate]);
 
   const projectQ = useQuery({
     queryKey: ["project", id],
@@ -108,6 +160,11 @@ export default function ProjectDetailPage() {
   const equipmentQ = useQuery({
     queryKey: ["project-equipment", detail?.project.id],
     queryFn: () => getProjectEquipment(detail!.project.id),
+    enabled: !!detail?.project.id,
+  });
+  const pickupsQ = useQuery({
+    queryKey: ["project-inventory-pickups", detail?.project.id],
+    queryFn: () => getProjectInventoryPickups(detail!.project.id),
     enabled: !!detail?.project.id,
   });
 
@@ -160,23 +217,14 @@ export default function ProjectDetailPage() {
     }: {
       projectId: string;
       changes: { itemKey: string; quantity: number }[];
-    }) =>
-      Promise.all(
-        changes.map((change) =>
-          updateProjectEquipment({
-            projectId,
-            itemKey: change.itemKey,
-            quantity: change.quantity,
-          }),
-        ),
-      ),
-    onSuccess: async (results, variables) => {
-      const failed = results.find((result) => result.ok === false);
-      if (failed && failed.ok === false) {
-        setEquipmentSaveError(failed.error.message);
+    }) => updateProjectEquipmentBatch({ projectId, changes }),
+    onSuccess: async (result, variables) => {
+      if (result.ok === false) {
+        setEquipmentSaveError(result.error.message);
         return;
       }
       await qc.invalidateQueries({ queryKey: ["project-equipment", variables.projectId] });
+      await qc.invalidateQueries({ queryKey: ["project", variables.projectId] });
       setEquipmentOpen(false);
       setEquipmentDraft({});
       setEquipmentSaveError(null);
@@ -311,7 +359,7 @@ export default function ProjectDetailPage() {
           <PageNav
             backFallback="/"
             backLabel="Back to Projects"
-            items={[{ label: "All Projects", to: "/", state: { view: "dashboard" }, back: true }, { label: "Project" }]}
+            items={[{ label: "All Projects", to: "/", state: { view: "dashboard" } }, { label: "Project" }]}
             className="mb-4"
           />
           <Alert variant={error ? "destructive" : "default"}>
@@ -334,6 +382,14 @@ export default function ProjectDetailPage() {
       label: equipmentLabelByKey.get(log.itemKey) ?? log.itemKey,
       quantity: log.quantity,
     }));
+  const pickups: InventoryPickup[] = pickupsQ.data?.ok ? pickupsQ.data.data : [];
+  const equipmentPickupSummaries: InventoryPickupSummaryItem[] = pickups
+    .map((pickup) => {
+      const text = formatEquipmentPickupSummary(pickup, equipmentLabelByKey);
+      return text ? { id: pickup.id, text } : undefined;
+    })
+    .filter((item): item is InventoryPickupSummaryItem => Boolean(item))
+    .slice(0, 3);
   const equipmentModalItems = EQUIPMENT_ITEMS.map((item) => ({
     ...item,
     quantity: equipmentDraft[item.itemKey] ?? equipmentQuantityByKey.get(item.itemKey) ?? 0,
@@ -440,7 +496,7 @@ export default function ProjectDetailPage() {
           backFallback="/"
           backLabel="Back to Projects"
           items={[
-            { label: "All Projects", to: "/", state: { view: "dashboard" }, back: true },
+            { label: "All Projects", to: "/", state: { view: "dashboard" } },
             { label: detail.client.name, to: "/", state: { clientId: detail.client.id } },
             { label: p.name },
           ]}
@@ -460,13 +516,23 @@ export default function ProjectDetailPage() {
                 {detail.assignedProjectManager ? ` · ${initials(detail.assignedProjectManager.fullName)}` : ""}
                 {p.siteAddress ? ` · ${formatAddressShort(p.siteAddress)}` : ""}
               </p>
+              <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                <span>
+                  <span className="font-medium text-foreground/80">Start</span>{" "}
+                  {formatDateWithOptions(p.scheduledStart ?? "")}
+                </span>
+                <span>
+                  <span className="font-medium text-foreground/80">End</span>{" "}
+                  {formatDateWithOptions(p.scheduledEnd ?? "")}
+                </span>
+              </p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
               <button
                 type="button"
                 aria-label="Toggle info"
                 onClick={() => setMobileInfoOpen((v) => !v)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-border text-muted-foreground"
               >
                 <ChevronDown className={`h-4 w-4 transition-transform ${mobileInfoOpen ? "rotate-180" : ""}`} />
               </button>
@@ -475,7 +541,7 @@ export default function ProjectDetailPage() {
                   <button
                     type="button"
                     aria-label="More"
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-border text-muted-foreground"
                   >
                     <MoreVertical className="h-4 w-4" />
                   </button>
@@ -507,6 +573,11 @@ export default function ProjectDetailPage() {
                 <div className="flex items-center gap-1.5"><User className="h-3 w-3" />{detail.assignedProjectManager.fullName}</div>
               )}
               <div className="flex items-center gap-1.5"><Clock className="h-3 w-3" />Updated {relativeTime(p.updatedAt)}</div>
+              <div className="flex items-center gap-1.5">
+                <Calendar className="h-3 w-3" />
+                <span>Start {formatDateWithOptions(p.scheduledStart ?? "")}</span>
+                <span>End {formatDateWithOptions(p.scheduledEnd ?? "")}</span>
+              </div>
               {p.finishLevel && <div>Finish level: {p.finishLevel}</div>}
             </div>
           )}
@@ -526,7 +597,7 @@ export default function ProjectDetailPage() {
                 key={item.id}
                 type="button"
                 onClick={() => setMobileTab(item.id)}
-                className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`min-h-11 shrink-0 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                   mobileTab === item.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
                 }`}
               >
@@ -553,6 +624,20 @@ export default function ProjectDetailPage() {
                 <span className="inline-flex items-center gap-1.5">
                   <MapPin className="h-4 w-4" />
                   {formatAddressShort(p.siteAddress)}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Calendar className="h-4 w-4" />
+                  <span>
+                    <span className="font-medium text-foreground/80">Start</span>{" "}
+                    {formatDateWithOptions(p.scheduledStart ?? "")}
+                  </span>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Calendar className="h-4 w-4" />
+                  <span>
+                    <span className="font-medium text-foreground/80">End</span>{" "}
+                    {formatDateWithOptions(p.scheduledEnd ?? "")}
+                  </span>
                 </span>
               </div>
 
@@ -616,171 +701,180 @@ export default function ProjectDetailPage() {
             <SectionHeading as="h2">Phases</SectionHeading>
             <span className="text-xs text-muted-foreground">{detail.phases.length} active work areas</span>
           </div>
-          <Card surface="panel" className="overflow-hidden rounded-xl">
-            <div className="divide-y divide-border/70">
-              {PHASE_ORDER.map((type) => {
+          <div className="space-y-2.5 sm:space-y-3">
+            {PHASE_ORDER.map((type) => {
                 const phase = detail.phases.find((ph) => ph.type === type);
                 const phaseGates = phase ? detail.gates.filter((g) => g.phaseId === phase.id) : [];
                 const phaseDefs = phase ? detail.deficiencies.filter((d) => d.phaseId === phase.id) : [];
                 const health = computePhaseHealth(phase, phaseGates, phaseDefs);
+                const accent = PHASE_CARD_ACCENT[health.tone];
                 const openCount = phaseDefs.filter((d) => d.status === "open" || d.status === "in_progress").length;
                 const siteGate = phase ? phaseGates.find((g) => g.type === "site_check") : undefined;
                 const inspectionGate = phase ? phaseGates.find((g) => g.type === "inspection") : undefined;
+                const hasSiteActions = !!(phase && siteGate && (siteGate.status === "not_started" || siteGate.status === "blocked"));
+                const hasInspectionActions = !!(phase && phase.status === "ready_for_inspection" && inspectionGate);
 
-                const rowInner = (
-                  <div
-                    className={`group flex flex-col gap-2 px-3 py-3 transition-colors sm:grid sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:gap-3 sm:px-4 sm:py-4 ${
-                      phase ? "hover:bg-muted/20" : "opacity-70"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2 sm:contents">
-                      <div className="min-w-0 flex-1">
-                        <div className="text-eyebrow font-semibold uppercase tracking-widest text-muted-foreground">
-                          {phase ? p.projectNumber : "Pending"}
-                        </div>
-                        <div className="mt-0.5 text-sm font-semibold text-foreground">{PHASE_LABEL[type]}</div>
-                        {type === "finishing" && p.finishLevel && (
-                          <div className="mt-0.5 text-xs font-medium text-primary">Finish level: {p.finishLevel}</div>
-                        )}
+                const phaseSummary = (
+                  <div className="relative flex min-h-[92px] flex-col gap-2.5 px-3 py-3 pl-4 pr-10 sm:grid sm:min-h-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-3 sm:px-4 sm:py-4 sm:pl-5 sm:pr-10">
+                    <div className="min-w-0">
+                      <div className="text-eyebrow font-semibold uppercase tracking-widest text-muted-foreground">
+                        {phase ? p.projectNumber : "Pending"}
                       </div>
-
-                      <div className="flex flex-wrap items-center gap-1.5 sm:flex-nowrap sm:gap-2">
-                        <PhaseHealthPill health={health} size="sm" />
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/20 px-2 py-0.5 text-xs text-muted-foreground ${
-                            openCount > 0 ? "text-status-blocked" : ""
-                          }`}
-                        >
-                          <AlertTriangle className="h-3 w-3" />
-                          {openCount} open issues
-                        </span>
-                      </div>
+                      <h3 className="mt-1 text-base font-semibold leading-tight text-foreground sm:text-sm">{PHASE_LABEL[type]}</h3>
+                      {type === "finishing" && p.finishLevel && (
+                        <div className="mt-1 text-xs font-medium text-primary">Finish level: {p.finishLevel}</div>
+                      )}
                     </div>
 
-                    <div className="flex items-center justify-between sm:justify-end">
-                      {phase && siteGate && (siteGate.status === "not_started" || siteGate.status === "blocked") ? (
-                        <div className="flex flex-row gap-2 sm:grid sm:grid-cols-2">
-                          {siteGate.status === "not_started" && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 px-2 text-xs"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setSiteCheckTarget({
-                                    gateId: siteGate.id,
-                                    phaseId: phase.id,
-                                    phaseLabel: PHASE_LABEL[type],
-                                  });
-                                }}
-                              >
-                                Site Checked
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 px-2 text-xs"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setSiteBlockTarget({
-                                    gateId: siteGate.id,
-                                    phaseId: phase.id,
-                                    phaseLabel: PHASE_LABEL[type],
-                                  });
-                                }}
-                              >
-                                Site Blocked
-                              </Button>
-                            </>
-                          )}
-                          {siteGate.status === "blocked" && (
+                    <div className="flex flex-wrap items-center gap-1.5 sm:flex-nowrap sm:justify-end sm:gap-2">
+                      <PhaseHealthPill health={health} size="sm" />
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${
+                          openCount > 0
+                            ? "border-status-blocked/40 bg-status-blocked/10 text-status-blocked"
+                            : "border-border/60 bg-muted/20 text-muted-foreground"
+                        }`}
+                      >
+                        <AlertTriangle className="h-3 w-3" />
+                        {openCount} open issues
+                      </span>
+                    </div>
+
+                    {phase ? (
+                      <span className={`absolute right-3 top-1/2 inline-flex -translate-y-1/2 items-center gap-1 text-sm font-medium sm:right-4 ${accent.chevron}`}>
+                        <ChevronRight className="h-4 w-4" />
+                      </span>
+                    ) : (
+                      <span className="text-sm text-muted-foreground sm:text-right">Waiting to start</span>
+                    )}
+                  </div>
+                );
+
+                const actionControls = phase && (hasSiteActions || hasInspectionActions) ? (
+                  <div className="flex flex-wrap gap-2">
+                    {hasSiteActions && siteGate ? (
+                      <>
+                        {siteGate.status === "not_started" && (
+                          <>
                             <Button
+                              type="button"
                               size="sm"
                               variant="outline"
-                              className="h-8 px-2 text-xs sm:col-span-2"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setSiteUnblockTarget({
+                              className="h-11 flex-1 px-3 text-xs sm:h-8 sm:flex-none sm:px-2"
+                              onClick={() => {
+                                setSiteCheckTarget({
                                   gateId: siteGate.id,
                                   phaseId: phase.id,
                                   phaseLabel: PHASE_LABEL[type],
                                 });
                               }}
                             >
-                              Site Cleared
+                              Site Checked
                             </Button>
-                          )}
-                        </div>
-                      ) : null}
-
-                      {phase && phase.status === "ready_for_inspection" && inspectionGate ? (
-                        <div className="flex flex-row gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-11 flex-1 px-3 text-xs sm:h-8 sm:flex-none sm:px-2"
+                              onClick={() => {
+                                setSiteBlockTarget({
+                                  gateId: siteGate.id,
+                                  phaseId: phase.id,
+                                  phaseLabel: PHASE_LABEL[type],
+                                });
+                              }}
+                            >
+                              Site Blocked
+                            </Button>
+                          </>
+                        )}
+                        {siteGate.status === "blocked" && (
                           <Button
+                            type="button"
                             size="sm"
                             variant="outline"
-                            className="h-8 px-2 text-xs"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setInspectionTarget({
-                                gateId: inspectionGate.id,
+                            className="h-11 flex-1 px-3 text-xs sm:h-8 sm:flex-none sm:px-2"
+                            onClick={() => {
+                              setSiteUnblockTarget({
+                                gateId: siteGate.id,
                                 phaseId: phase.id,
                                 phaseLabel: PHASE_LABEL[type],
                               });
-                              setInspectionMode("passed");
                             }}
                           >
-                            Passed
+                            Site Cleared
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 px-2 text-xs"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setInspectionTarget({
-                                gateId: inspectionGate.id,
-                                phaseId: phase.id,
-                                phaseLabel: PHASE_LABEL[type],
-                              });
-                              setInspectionMode("failed");
-                            }}
-                          >
-                            Failed
-                          </Button>
-                        </div>
-                      ) : null}
+                        )}
+                      </>
+                    ) : null}
 
-                      {phase ? (
-                        <span className="inline-flex items-center gap-1 text-sm font-medium text-primary">
-                          <ChevronRight className="h-4 w-4" />
-                        </span>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">Waiting to start</span>
-                      )}
-                    </div>
+                    {hasInspectionActions && inspectionGate ? (
+                      <>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-11 flex-1 px-3 text-xs sm:h-8 sm:flex-none sm:px-2"
+                          onClick={() => {
+                            setInspectionTarget({
+                              gateId: inspectionGate.id,
+                              phaseId: phase.id,
+                              phaseLabel: PHASE_LABEL[type],
+                            });
+                            setInspectionMode("passed");
+                          }}
+                        >
+                          Passed
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-11 flex-1 px-3 text-xs sm:h-8 sm:flex-none sm:px-2"
+                          onClick={() => {
+                            setInspectionTarget({
+                              gateId: inspectionGate.id,
+                              phaseId: phase.id,
+                              phaseLabel: PHASE_LABEL[type],
+                            });
+                            setInspectionMode("failed");
+                          }}
+                        >
+                          Failed
+                        </Button>
+                      </>
+                    ) : null}
                   </div>
-                );
+                ) : null;
 
-                return phase ? (
-                  <Link
+                return (
+                  <Card
                     key={type}
-                    to={`/project/${p.id}/phase/${phase.id}`}
-                    className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    surface="panel"
+                    className={`relative overflow-hidden rounded-xl border-border-strong shadow-card ring-1 ${accent.ring} ${
+                      phase ? "transition-all hover:-translate-y-0.5 hover:border-border-emphasis hover:shadow-interactive" : "opacity-70"
+                    }`}
                   >
-                    {rowInner}
-                  </Link>
-                ) : (
-                  <div key={type}>{rowInner}</div>
+                    <span className={`absolute inset-y-0 left-0 w-1 ${accent.rail}`} aria-hidden="true" />
+                    {phase ? (
+                      <Link
+                        to={`/project/${p.id}/phase/${phase.id}`}
+                        className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      >
+                        {phaseSummary}
+                      </Link>
+                    ) : (
+                      phaseSummary
+                    )}
+                    {actionControls ? (
+                      <div className={`border-t px-3 py-2.5 pl-4 sm:px-4 sm:py-2 sm:pl-5 ${accent.footer}`}>
+                        {actionControls}
+                      </div>
+                    ) : null}
+                  </Card>
                 );
-              })}
-            </div>
-          </Card>
+            })}
+          </div>
         </section>
 
         {/* Two-column: Attic & Deficiencies */}
@@ -1025,6 +1119,8 @@ export default function ProjectDetailPage() {
             items={equipmentItems}
             onManage={openEquipmentModal}
             emptyText="No equipment logged"
+            layout="grid"
+            pickupSummaries={equipmentPickupSummaries}
           />
         </section>
 
@@ -1089,6 +1185,12 @@ export default function ProjectDetailPage() {
                             )}
                             {typeof a.metadata?.notes === "string" && (
                               <span className="text-xs text-muted-foreground italic">&ldquo;{a.metadata.notes}&rdquo;</span>
+                            )}
+                            {typeof a.metadata?.summary === "string" && (
+                              <span className="text-xs text-muted-foreground">Picked up: {a.metadata.summary}</span>
+                            )}
+                            {typeof a.metadata?.note === "string" && (
+                              <span className="text-xs text-muted-foreground italic">&ldquo;{a.metadata.note}&rdquo;</span>
                             )}
                             <IconWell
                               tone="primary"
@@ -1189,6 +1291,7 @@ export default function ProjectDetailPage() {
           project={detail.project}
           currentUser={detail.assignedProjectManager}
           onUpdated={() => qc.invalidateQueries({ queryKey: ["project", id] })}
+          onDeleted={() => navigate("/")}
         />
       )}
       {selectedPhoto && (
