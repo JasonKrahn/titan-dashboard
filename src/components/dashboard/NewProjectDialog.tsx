@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
+import { AddressAutocomplete } from "@/components/ui/address-autocomplete";
 import { createProject, updateProject, getClients, getProjects, getUsers, type CreateProjectInput, type UpdateProjectInput } from "@/lib/api";
 import type { User, Project } from "@/lib/types";
 
@@ -47,7 +48,7 @@ export function NewProjectDialog({ open, onOpenChange, currentUser, presetClient
 
   const clients = clientsQ.data?.ok ? clientsQ.data.data : [];
   const users = usersQ.data?.ok ? usersQ.data.data : [];
-  const pms = users.filter((u) => u.role === "project_manager");
+  const pms = users.filter((u) => u.role === "project_manager" && u.active);
   const projectCount = allProjectsQ.data?.ok ? allProjectsQ.data.data.length : 0;
 
   const isAdmin = currentUser?.role === "admin";
@@ -247,10 +248,10 @@ export function NewProjectDialog({ open, onOpenChange, currentUser, presetClient
 
           <div className="grid gap-1.5">
             <Label htmlFor="siteAddress">Site address *</Label>
-            <Input
+            <AddressAutocomplete
               id="siteAddress"
               value={form.siteAddress}
-              onChange={(e) => setField("siteAddress", e.target.value)}
+              onChange={(value) => setField("siteAddress", value)}
               placeholder="123 Main St"
             />
             {errors.siteAddress && <p className="text-xs text-destructive">{errors.siteAddress}</p>}

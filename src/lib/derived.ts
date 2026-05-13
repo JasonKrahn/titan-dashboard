@@ -70,16 +70,7 @@ export function openDeficiencyCount(projectId: string, defs: Deficiency[]): numb
   return defs.filter((d) => d.projectId === projectId && (d.status === "open" || d.status === "in_progress")).length;
 }
 
-export function projectHasBlocked(projectId: string, phases: Phase[], gates: Gate[]): boolean {
-  return (
-    phases.some((p) => p.projectId === projectId && p.status === "blocked") ||
-    gates.some((g) => g.projectId === projectId && (g.status === "blocked" || g.status === "failed"))
-  );
-}
 
-export function dueInspectionPhases(projectId: string, phases: Phase[]): Phase[] {
-  return phases.filter((p) => p.projectId === projectId && p.status === "ready_for_inspection");
-}
 
 export type PhaseHealthTone = StatusTone | "attention";
 

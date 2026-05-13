@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { AlertCircle, SlidersHorizontal } from "lucide-react";
+import { AlertCircle, Plus, SlidersHorizontal } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -62,9 +62,17 @@ const DashboardPage = () => {
   const defsQ = useQuery({ queryKey: ["deficiencies"], queryFn: getAllDeficiencies });
   const photosQ = useQuery({ queryKey: ["photos"], queryFn: getAllPhotos });
 
+  const nonArchivedFilters = useMemo(
+    () => ({
+      ...filters,
+      search: debouncedSearch || undefined,
+      status: filters.status?.length ? filters.status : (["draft", "active", "completed"] as ProjectFilters["status"]),
+    }),
+    [filters, debouncedSearch],
+  );
   const projectsQ = useQuery({
-    queryKey: ["projects", { ...filters, search: debouncedSearch }, meQ.data?.ok ? meQ.data.data.id : null],
-    queryFn: () => getProjects({ ...filters, search: debouncedSearch || undefined }),
+    queryKey: ["projects", nonArchivedFilters, meQ.data?.ok ? meQ.data.data.id : null],
+    queryFn: () => getProjects(nonArchivedFilters),
   });
   const allProjectsQ = useQuery({
     queryKey: ["projects", "all-visible", meQ.data?.ok ? meQ.data.data.id : null],
@@ -73,7 +81,7 @@ const DashboardPage = () => {
 
   const me = meQ.data?.ok ? meQ.data.data : undefined;
   const users = usersQ.data?.ok ? usersQ.data.data : [];
-  const pms = users.filter((u) => u.role === "project_manager");
+  const pms = users.filter((u) => u.role === "project_manager" && u.active);
   const defs = defsQ.data?.ok ? defsQ.data.data : [];
   const clients = useMemo(() => (clientsQ.data?.ok ? clientsQ.data.data : []), [clientsQ.data]);
   const phases = useMemo(() => (phasesQ.data?.ok ? phasesQ.data.data : []), [phasesQ.data]);
@@ -187,6 +195,7 @@ const DashboardPage = () => {
         activeSection={activeView === "dashboard" ? "dashboard" : "clients"}
         onSelectDashboardView={handleSelectDashboardView}
         onUserSwitch={() => handleSelectDashboardView("clients")}
+        currentUser={me}
       />
 
       <main className="container py-6 space-y-6">
@@ -264,6 +273,23 @@ const DashboardPage = () => {
           />
         ) : (
           <>
+            {/* New Project button - positioned below description, above Stats */}
+            {(me?.role === "admin" || me?.role === "project_manager") && (
+              <div className="flex justify-start">
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setNewProjectClientId(undefined);
+                    setNewProjectOpen(true);
+                  }}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  New Project
+                </Button>
+              </div>
+            )}
+
             {/* Stats */}
             <StatsRow
               loading={isLoading}

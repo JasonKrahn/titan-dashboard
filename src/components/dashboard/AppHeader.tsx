@@ -1,24 +1,32 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileText, Radar, Settings, Users } from "lucide-react";
+import { Archive, ChevronDown, FileText, Radar, Settings, UserCog, Users } from "lucide-react";
 import { toast } from "sonner";
 import { RoleSwitcher } from "@/components/dashboard/RoleSwitcher";
 import { SettingsDialog } from "@/components/dashboard/SettingsDialog";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { getCurrentUser, getUsers, setCurrentUser } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import type { User } from "@/lib/types";
 
-export type AppHeaderSection = "clients" | "dashboard" | "subs" | "activity" | "command";
+export type AppHeaderSection = "clients" | "dashboard" | "subs" | "activity" | "command" | "organization" | "archive";
 export type DashboardViewTarget = "clients" | "dashboard";
 
 interface AppHeaderProps {
   activeSection?: AppHeaderSection;
   onSelectDashboardView?: (view: DashboardViewTarget) => void;
   onUserSwitch?: () => void;
+  currentUser?: User;
 }
 
-export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch }: AppHeaderProps) {
+export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, currentUser }: AppHeaderProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -28,7 +36,9 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch }
   const usersQ = useQuery({ queryKey: ["users"], queryFn: getUsers });
 
   const me = meQ.data?.ok ? meQ.data.data : undefined;
+  const resolvedUser = currentUser ?? me;
   const users = usersQ.data?.ok ? usersQ.data.data : [];
+  const activeUsers = users.filter((user) => user.active || user.id === resolvedUser?.id);
 
   const section = activeSection ?? sectionFromPath(location.pathname);
 
@@ -81,29 +91,63 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch }
               >
                 All Projects
               </button>
+              <Link
+                to="/archive"
+                className={dashboardNavClass(section === "archive")}
+              >
+                Archive
+              </Link>
             </SegmentedControl>
             {me?.role === "admin" && (
-              <Link to="/command" className={topNavClass(section === "command")}>
-                <Radar className="h-4 w-4" />
-                Admin Overview
-              </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" className={topNavClass(section === "command" || section === "activity" || section === "organization")}>
+                    Admin Tools
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem asChild>
+                    <Link to="/organization">
+                      <UserCog className="h-4 w-4" />
+                      Organization Members
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/activity">
+                      <FileText className="h-4 w-4" />
+                      Activity
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/command">
+                      <Radar className="h-4 w-4" />
+                      Admin Overview
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
-            <Link to="/subs" className={topNavClass(section === "subs")}>
-              <Users className="h-4 w-4" />
-              Subcontractor Rolodex
-            </Link>
-            <Link to="/activity" className={topNavClass(section === "activity")}>
-              <FileText className="h-4 w-4" />
-              Activity
-            </Link>
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-2">
-            {me && <RoleSwitcher current={me} users={users} onSwitch={handleSwitchUser} />}
+            {(me?.role === "admin" || me?.role === "project_manager") && (
+              <Link
+                to="/subs"
+                className={cn(
+                  "inline-flex h-10 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-medium text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground",
+                  section === "subs" && "border-primary/60 bg-primary text-primary-foreground shadow-glow"
+                )}
+              >
+                <Users className="h-4 w-4" />
+                <span className="hidden md:inline">Subcontractors</span>
+              </Link>
+            )}
+            {resolvedUser && <RoleSwitcher current={resolvedUser} users={activeUsers} onSwitch={handleSwitchUser} />}
             <button
               type="button"
               onClick={() => setSettingsOpen(true)}
-              disabled={!me}
+              disabled={!resolvedUser}
               className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-border bg-card text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
               aria-label="Settings"
             >
@@ -128,29 +172,64 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch }
             >
               All Projects
             </button>
+            <Link
+              to="/archive"
+              className={mobileDashboardNavClass(section === "archive")}
+            >
+              <Archive className="h-4 w-4" />
+              Archive
+            </Link>
             {me?.role === "admin" && (
-              <Link to="/command" className={mobileTopNavClass(section === "command")}>
-                <Radar className="h-4 w-4" />
-                Admin Overview
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" className={mobileTopNavClass(section === "command" || section === "activity" || section === "organization")}>
+                    Admin Tools
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem asChild>
+                    <Link to="/organization">
+                      <UserCog className="h-4 w-4" />
+                      Members
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/activity">
+                      <FileText className="h-4 w-4" />
+                      Activity
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/command">
+                      <Radar className="h-4 w-4" />
+                      Admin Overview
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            {(me?.role === "admin" || me?.role === "project_manager") && (
+              <Link
+                to="/subs"
+                className={cn(
+                  "inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-medium text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground",
+                  section === "subs" && "border-primary/60 bg-primary text-primary-foreground shadow-glow"
+                )}
+              >
+                <Users className="h-4 w-4" />
+                Subs
               </Link>
             )}
-            <Link to="/subs" className={mobileTopNavClass(section === "subs")}>
-              <Users className="h-4 w-4" />
-              Subs
-            </Link>
-            <Link to="/activity" className={mobileTopNavClass(section === "activity")}>
-              <FileText className="h-4 w-4" />
-              Activity
-            </Link>
           </div>
         </nav>
       </div>
 
-      {me && (
+      {resolvedUser && (
         <SettingsDialog
           open={settingsOpen}
           onOpenChange={setSettingsOpen}
-          user={me}
+          user={resolvedUser}
           onUpdated={() => {
             // SettingsDialog handles query invalidation for changed user data.
           }}
@@ -164,6 +243,8 @@ function sectionFromPath(pathname: string): AppHeaderSection {
   if (pathname.startsWith("/subs")) return "subs";
   if (pathname.startsWith("/activity")) return "activity";
   if (pathname.startsWith("/command")) return "command";
+  if (pathname.startsWith("/organization")) return "organization";
+  if (pathname.startsWith("/archive")) return "archive";
   if (pathname === "/") return "clients";
   return "dashboard";
 }

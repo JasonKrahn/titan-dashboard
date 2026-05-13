@@ -2,7 +2,6 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  
   ArrowRight,
   Building2,
   MapPin,
@@ -23,7 +22,9 @@ import {
   Plus,
   MoreVertical,
   ShieldCheck,
+  Download,
 } from "lucide-react";
+import { formatAddressShort } from "@/lib/address";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Fab } from "@/components/ui/fab";
 import { MobileActionSheet, type MobileActionItem } from "@/components/ui/mobile-action-sheet";
@@ -51,6 +52,7 @@ import { PhaseHealthPill } from "@/components/dashboard/PhaseHealthPill";
 import { SiteCheckDialog } from "@/components/dashboard/SiteCheckDialog";
 import { SiteBlockDialog } from "@/components/dashboard/SiteBlockDialog";
 import { SiteUnblockDialog } from "@/components/dashboard/SiteUnblockDialog";
+import { InspectionResultDialog } from "@/components/dashboard/InspectionResultDialog";
 import { ArchiveProjectDialog } from "@/components/dashboard/ArchiveProjectDialog";
 import { NewProjectDialog } from "@/components/dashboard/NewProjectDialog";
 import { ProjectNotes } from "@/components/dashboard/ProjectNotes";
@@ -59,6 +61,7 @@ import { PhotoViewerDialog } from "@/components/dashboard/PhotoViewerDialog";
 import { DeficiencyDialog } from "@/components/dashboard/DeficiencyDialog";
 import { PhotoUploadDialog } from "@/components/dashboard/PhotoUploadDialog";
 import { getProject, updateAtticGate, getPhotoViewUrl, updatePhaseSchedules } from "@/lib/api";
+import { exportProjectZip } from "@/lib/projectExport";
 import { formatDateWithOptions, type PhaseScheduleChange } from "@/lib/schedule";
 import type { Gate, Phase, PhotoEvidence } from "@/lib/types";
 import {
@@ -69,13 +72,11 @@ import {
   gateStatusTone,
   GATE_LABEL,
   initials,
-  phaseHealthClasses,
   projectStatusTone,
   relativeTime,
 } from "@/lib/derived";
 import { ActionBadge } from "@/components/ui/action-badge";
 import { SeverityBadge } from "@/components/ui/severity-badge";
-import { KpiChip } from "@/components/ui/kpi-chip";
 
 const ENTITY_LABEL: Record<string, string> = {
   project: "Project",
@@ -87,7 +88,6 @@ const ENTITY_LABEL: Record<string, string> = {
   subcontractor_contact: "Subcontractor",
   user: "User",
 };
-
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -117,9 +117,16 @@ export default function ProjectDetailPage() {
     phaseId: string;
     phaseLabel: string;
   } | null>(null);
+  const [inspectionTarget, setInspectionTarget] = useState<{
+    gateId: string;
+    phaseId: string;
+    phaseLabel: string;
+  } | null>(null);
+  const [inspectionMode, setInspectionMode] = useState<"passed" | "failed">("passed");
 
   const qc = useQueryClient();
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const scheduleMutation = useMutation({
@@ -148,6 +155,16 @@ export default function ProjectDetailPage() {
   const [deficiencyDialogOpen, setDeficiencyDialogOpen] = useState(false);
   const [phaseDeficiencyTarget, setPhaseDeficiencyTarget] = useState<Phase | null>(null);
   const [phasePhotoTarget, setPhasePhotoTarget] = useState<Phase | null>(null);
+  async function handleExport() {
+    if (!detail) return;
+    setExporting(true);
+    try {
+      await exportProjectZip(detail, detail.client, detail.assignedProjectManager);
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const [mobileInfoOpen, setMobileInfoOpen] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const [phaseActionsTarget, setPhaseActionsTarget] = useState<Phase | null>(null);
@@ -228,7 +245,12 @@ export default function ProjectDetailPage() {
       <div className="min-h-screen bg-background">
         <AppHeader activeSection="dashboard" />
         <main className="container py-6">
-          <PageNav backFallback="/" items={[{ label: "All Projects", to: "/", state: { view: "dashboard" } }, { label: "Project" }]} className="mb-4" />
+          <PageNav
+            backFallback="/"
+            backLabel="Back to Projects"
+            items={[{ label: "All Projects", to: "/", state: { view: "dashboard" }, back: true }, { label: "Project" }]}
+            className="mb-4"
+          />
           <Alert variant={error ? "destructive" : "default"}>
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>{error ? "Couldn't load project" : "Project not found"}</AlertTitle>
@@ -312,8 +334,9 @@ export default function ProjectDetailPage() {
       <main className="container space-y-4 py-3 sm:space-y-8 sm:py-6">
         <PageNav
           backFallback="/"
+          backLabel="Back to Projects"
           items={[
-            { label: "All Projects", to: "/", state: { view: "dashboard" } },
+            { label: "All Projects", to: "/", state: { view: "dashboard" }, back: true },
             { label: detail.client.name, to: "/", state: { clientId: detail.client.id } },
             { label: p.name },
           ]}
@@ -331,7 +354,7 @@ export default function ProjectDetailPage() {
               <p className="mt-0.5 truncate text-xs text-muted-foreground">
                 {detail.client.name}
                 {detail.assignedProjectManager ? ` · ${initials(detail.assignedProjectManager.fullName)}` : ""}
-                {p.siteAddress ? ` · ${p.siteAddress}` : ""}
+                {p.siteAddress ? ` · ${formatAddressShort(p.siteAddress)}` : ""}
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
@@ -343,37 +366,39 @@ export default function ProjectDetailPage() {
               >
                 <ChevronDown className={`h-4 w-4 transition-transform ${mobileInfoOpen ? "rotate-180" : ""}`} />
               </button>
-              {((p.status as string) !== "archived") && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label="More"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground"
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {p.status !== "completed" && p.status !== "archived" && (
-                      <DropdownMenuItem onClick={() => setEditOpen(true)}>
-                        <Pencil className="mr-2 h-4 w-4" /> Edit project
-                      </DropdownMenuItem>
-                    )}
-                    {p.status === "completed" && (
-                      <DropdownMenuItem onClick={() => setArchiveOpen(true)}>
-                        <Archive className="mr-2 h-4 w-4" /> Archive
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="More"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {p.status !== "completed" && p.status !== "archived" && (
+                    <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                      <Pencil className="mr-2 h-4 w-4" /> Edit project
+                    </DropdownMenuItem>
+                  )}
+                  {p.status === "completed" && (
+                    <DropdownMenuItem onClick={() => setArchiveOpen(true)}>
+                      <Archive className="mr-2 h-4 w-4" /> Archive
+                    </DropdownMenuItem>
+                  )}
+                  {p.status === "archived" && (
+                    <DropdownMenuItem onClick={handleExport} disabled={exporting}>
+                      <Download className="mr-2 h-4 w-4" /> {exporting ? "Exporting…" : "Export"}
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
           {mobileInfoOpen && (
             <div className="mt-2 space-y-1 border-t border-border pt-2 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1.5"><MapPin className="h-3 w-3" />{p.siteAddress}</div>
-              <div className="flex items-center gap-1.5"><Calendar className="h-3 w-3" />{formatDateWithOptions(p.scheduledStart, { showYear: true })} → {formatDateWithOptions(p.scheduledEnd, { showYear: true })}</div>
+              <div className="flex items-center gap-1.5"><MapPin className="h-3 w-3" />{formatAddressShort(p.siteAddress)}</div>
               {detail.assignedProjectManager && (
                 <div className="flex items-center gap-1.5"><User className="h-3 w-3" />{detail.assignedProjectManager.fullName}</div>
               )}
@@ -411,7 +436,11 @@ export default function ProjectDetailPage() {
         <Card surface="panel" className="hidden rounded-xl p-6 md:block">
           <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
             <div className="min-w-0">
-              <h1 className="text-2xl font-bold sm:text-3xl">{p.name}</h1>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-bold sm:text-3xl">{p.name}</h1>
+                <StatusBadge tone={projectStatusTone(p.status)} label={STATUS_LABEL[p.status]} size="sm" />
+                <span className="text-xs text-muted-foreground">Last update: {relativeTime(p.updatedAt)}</span>
+              </div>
               <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
                 <span className="inline-flex items-center gap-1.5">
                   <Building2 className="h-4 w-4" />
@@ -419,11 +448,7 @@ export default function ProjectDetailPage() {
                 </span>
                 <span className="inline-flex items-center gap-1.5">
                   <MapPin className="h-4 w-4" />
-                  {p.siteAddress}
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <Calendar className="h-4 w-4" />
-                  {formatDateWithOptions(p.scheduledStart, { showYear: true })} → {formatDateWithOptions(p.scheduledEnd, { showYear: true })}
+                  {formatAddressShort(p.siteAddress)}
                 </span>
               </div>
 
@@ -442,7 +467,6 @@ export default function ProjectDetailPage() {
 
             {/* KPI chips */}
             <div className="flex flex-wrap gap-3 lg:flex-col lg:items-end">
-              <StatusBadge tone={projectStatusTone(p.status)} label={STATUS_LABEL[p.status]} size="sm" />
               {p.status !== "completed" && p.status !== "archived" && (
                 <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
                   <Pencil className="mr-1 h-4 w-4" />
@@ -462,13 +486,12 @@ export default function ProjectDetailPage() {
                   </TooltipContent>
                 </Tooltip>
               )}
-              <KpiChip
-                label="Last update"
-                value={relativeTime(p.updatedAt)}
-                tone="neutral"
-                variant="card"
-                icon={<Clock className="h-4 w-4" />}
-              />
+              {p.status === "archived" && (
+                <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting}>
+                  <Download className="mr-1 h-4 w-4" />
+                  {exporting ? "Exporting…" : "Export"}
+                </Button>
+              )}
             </div>
           </div>
         </Card>
@@ -489,169 +512,171 @@ export default function ProjectDetailPage() {
             <SectionHeading as="h2">Phases</SectionHeading>
             <span className="text-xs text-muted-foreground">{detail.phases.length} active work areas</span>
           </div>
-          <div className="grid gap-3 sm:gap-4 md:grid-cols-2 2xl:grid-cols-3">
-            {PHASE_ORDER.map((type) => {
-              const phase = detail.phases.find((ph) => ph.type === type);
-              const phaseGates = phase ? detail.gates.filter((g) => g.phaseId === phase.id) : [];
-              const phaseDefs = phase ? detail.deficiencies.filter((d) => d.phaseId === phase.id) : [];
-              const phasePhotos = phase ? detail.photoEvidence.filter((p) => p.phaseId === phase.id) : [];
-              const health = computePhaseHealth(phase, phaseGates, phaseDefs);
-              const c = phaseHealthClasses(health.tone);
-              const openCount = phaseDefs.filter((d) => d.status === "open" || d.status === "in_progress").length;
+          <Card surface="panel" className="overflow-hidden rounded-xl">
+            <div className="divide-y divide-border/70">
+              {PHASE_ORDER.map((type) => {
+                const phase = detail.phases.find((ph) => ph.type === type);
+                const phaseGates = phase ? detail.gates.filter((g) => g.phaseId === phase.id) : [];
+                const phaseDefs = phase ? detail.deficiencies.filter((d) => d.phaseId === phase.id) : [];
+                const health = computePhaseHealth(phase, phaseGates, phaseDefs);
+                const openCount = phaseDefs.filter((d) => d.status === "open" || d.status === "in_progress").length;
+                const siteGate = phase ? phaseGates.find((g) => g.type === "site_check") : undefined;
+                const inspectionGate = phase ? phaseGates.find((g) => g.type === "inspection") : undefined;
 
-              const cardInner = (
-                <Card
-                  surface={phase ? "interactive" : "panel"}
-                  className={`group relative h-full overflow-hidden p-4 ${phase ? "cursor-pointer" : "opacity-70"}`}
-                >
-                  {/* tone accent strip */}
-                  <div className={`absolute inset-x-0 top-0 h-1 ${c.dot}`} />
-
-                  <div className="flex h-full flex-col gap-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
+                const rowInner = (
+                  <div
+                    className={`group flex flex-col gap-2 px-3 py-3 transition-colors sm:grid sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:gap-3 sm:px-4 sm:py-4 ${
+                      phase ? "hover:bg-muted/20" : "opacity-70"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 sm:contents">
+                      <div className="min-w-0 flex-1">
                         <div className="text-eyebrow font-semibold uppercase tracking-widest text-muted-foreground">
                           {phase ? p.projectNumber : "Pending"}
                         </div>
-                        <div className="mt-1 text-base font-semibold text-foreground">{PHASE_LABEL[type]}</div>
+                        <div className="mt-0.5 text-sm font-semibold text-foreground">{PHASE_LABEL[type]}</div>
                         {type === "finishing" && p.finishLevel && (
-                          <div className="mt-1 text-xs font-medium text-primary">Finish level: {p.finishLevel}</div>
+                          <div className="mt-0.5 text-xs font-medium text-primary">Finish level: {p.finishLevel}</div>
                         )}
                       </div>
-                      <div className="flex items-center gap-1">
-                        {phase && (
-                          <button
-                            type="button"
-                            aria-label={`${PHASE_LABEL[type]} actions`}
-                            className="md:hidden inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setPhaseActionsTarget(phase);
-                            }}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </button>
-                        )}
-                        <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-                      </div>
-                    </div>
 
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        {health.tone === "attention" && phase ? (
-                          <button
-                            className="cursor-pointer rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              navigate(`/project/${p.id}/phase/${phase.id}?tab=deficiencies`);
-                            }}
-                          >
-                            <PhaseHealthPill health={health} size="lg" className="underline-offset-2 hover:underline" />
-                          </button>
-                        ) : (
-                          <PhaseHealthPill health={health} size="lg" />
-                        )}
-                        <p className="mt-2 text-sm text-muted-foreground">{health.reason}</p>
-                      </div>
-                      <div className="hidden shrink-0 text-right text-xs text-muted-foreground xl:block">
-                        {phase && <div>Updated {relativeTime(phase.updatedAt)}</div>}
-                      </div>
-                    </div>
-
-                    <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                      <span className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-muted/20 px-2.5 py-2">
-                        <Camera className="h-3.5 w-3.5" />
-                        {phasePhotos.length} photos
-                      </span>
-                      <span className={`inline-flex items-center gap-1 rounded-md border border-border/60 bg-muted/20 px-2.5 py-2 ${openCount > 0 ? "text-status-blocked" : ""}`}>
-                        <AlertTriangle className="h-3.5 w-3.5" />
-                        {openCount} open deficiencies
-                      </span>
-                    </div>
-
-                    <div className="mt-auto space-y-2">
-                      {phase?.status === "not_started" && (() => {
-                        const siteGate = phaseGates.find((g) => g.type === "site_check");
-                        return siteGate && siteGate.status === "not_started" ? (
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="justify-center"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setSiteCheckTarget({
-                                  gateId: siteGate.id,
-                                  phaseId: phase.id,
-                                  phaseLabel: PHASE_LABEL[type],
-                                });
-                              }}
-                            >
-                              Site Checked
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="justify-center"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setSiteBlockTarget({
-                                  gateId: siteGate.id,
-                                  phaseId: phase.id,
-                                  phaseLabel: PHASE_LABEL[type],
-                                });
-                              }}
-                            >
-                              Site Blocked
-                            </Button>
-                          </div>
-                        ) : null;
-                      })()}
-                      {phase?.status === "blocked" && (() => {
-                        const siteGate = phaseGates.find((g) => g.type === "site_check");
-                        return siteGate && siteGate.status === "blocked" ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="w-full justify-center"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setSiteUnblockTarget({
-                                gateId: siteGate.id,
-                                phaseId: phase.id,
-                                phaseLabel: PHASE_LABEL[type],
-                              });
-                            }}
-                          >
-                            Site Cleared
-                          </Button>
-                        ) : null;
-                      })()}
-                      <div className="flex items-center justify-between border-t border-border/60 pt-2 text-sm">
-                        <span className="text-muted-foreground">{phase ? "Open phase" : "Waiting to start"}</span>
-                        <span className="inline-flex items-center gap-1 text-primary">
-                          Details <ArrowRight className="h-3.5 w-3.5" />
+                      <div className="flex flex-wrap items-center gap-1.5 sm:flex-nowrap sm:gap-2">
+                        <PhaseHealthPill health={health} size="sm" />
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/20 px-2 py-0.5 text-xs text-muted-foreground ${
+                            openCount > 0 ? "text-status-blocked" : ""
+                          }`}
+                        >
+                          <AlertTriangle className="h-3 w-3" />
+                          {openCount} open issues
                         </span>
                       </div>
                     </div>
-                  </div>
-                </Card>
-              );
 
-              return phase ? (
-                <Link key={type} to={`/project/${p.id}/phase/${phase.id}`} className="block">
-                  {cardInner}
-                </Link>
-              ) : (
-                <div key={type}>{cardInner}</div>
-              );
-            })}
-          </div>
+                    <div className="flex items-center justify-between sm:justify-end">
+                      {phase && siteGate && (siteGate.status === "not_started" || siteGate.status === "blocked") ? (
+                        <div className="flex flex-row gap-2 sm:grid sm:grid-cols-2">
+                          {siteGate.status === "not_started" && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-2 text-xs"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setSiteCheckTarget({
+                                    gateId: siteGate.id,
+                                    phaseId: phase.id,
+                                    phaseLabel: PHASE_LABEL[type],
+                                  });
+                                }}
+                              >
+                                Site Checked
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-2 text-xs"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setSiteBlockTarget({
+                                    gateId: siteGate.id,
+                                    phaseId: phase.id,
+                                    phaseLabel: PHASE_LABEL[type],
+                                  });
+                                }}
+                              >
+                                Site Blocked
+                              </Button>
+                            </>
+                          )}
+                          {siteGate.status === "blocked" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-2 text-xs sm:col-span-2"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setSiteUnblockTarget({
+                                  gateId: siteGate.id,
+                                  phaseId: phase.id,
+                                  phaseLabel: PHASE_LABEL[type],
+                                });
+                              }}
+                            >
+                              Site Cleared
+                            </Button>
+                          )}
+                        </div>
+                      ) : null}
+
+                      {phase && phase.status === "ready_for_inspection" && inspectionGate ? (
+                        <div className="flex flex-row gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-2 text-xs"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setInspectionTarget({
+                                gateId: inspectionGate.id,
+                                phaseId: phase.id,
+                                phaseLabel: PHASE_LABEL[type],
+                              });
+                              setInspectionMode("passed");
+                            }}
+                          >
+                            Passed
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-2 text-xs"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setInspectionTarget({
+                                gateId: inspectionGate.id,
+                                phaseId: phase.id,
+                                phaseLabel: PHASE_LABEL[type],
+                              });
+                              setInspectionMode("failed");
+                            }}
+                          >
+                            Failed
+                          </Button>
+                        </div>
+                      ) : null}
+
+                      {phase ? (
+                        <span className="inline-flex items-center gap-1 text-sm font-medium text-primary">
+                          <ChevronRight className="h-4 w-4" />
+                        </span>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">Waiting to start</span>
+                      )}
+                    </div>
+                  </div>
+                );
+
+                return phase ? (
+                  <Link
+                    key={type}
+                    to={`/project/${p.id}/phase/${phase.id}`}
+                    className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    {rowInner}
+                  </Link>
+                ) : (
+                  <div key={type}>{rowInner}</div>
+                );
+              })}
+            </div>
+          </Card>
         </section>
 
         {/* Two-column: Attic & Deficiencies */}
@@ -706,7 +731,7 @@ export default function ProjectDetailPage() {
                             <div>
                               <p className="mb-1 text-xs text-muted-foreground">Insulator (optional)</p>
                               <Select value={callInSubId} onValueChange={setCallInSubId}>
-                                <SelectTrigger className="h-8 text-xs">
+                                <SelectTrigger className="h-8 text-base md:text-xs">
                                   <SelectValue placeholder="Select insulator" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -816,23 +841,30 @@ export default function ProjectDetailPage() {
           </Card>
 
           <Card id="deficiencies" className="p-3 shadow-card sm:p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <SectionHeading as="h3">Deficiencies</SectionHeading>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">{activeDefs.length} active</span>
-                <Button size="sm" className="hidden md:inline-flex" onClick={() => setDeficiencyDialogOpen(true)}>
-                  Add Deficiency
-                </Button>
-                <button
-                  type="button"
-                  aria-label="Add deficiency"
-                  onClick={() => setDeficiencyDialogOpen(true)}
-                  className="md:hidden inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground"
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
+            {p.status !== "completed" && p.status !== "archived" && (
+              <div className="mb-3 flex items-center justify-between">
+                <SectionHeading as="h3">Deficiencies</SectionHeading>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">{activeDefs.length} active</span>
+                  <Button size="sm" className="hidden md:inline-flex" onClick={() => setDeficiencyDialogOpen(true)}>
+                    Add Deficiency
+                  </Button>
+                  <button
+                    type="button"
+                    aria-label="Add deficiency"
+                    onClick={() => setDeficiencyDialogOpen(true)}
+                    className="md:hidden inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
+            {p.status === "completed" || p.status === "archived" ? (
+              <div className="mb-3">
+                <SectionHeading as="h3">Deficiencies</SectionHeading>
+              </div>
+            ) : null}
             {activeDefs.length === 0 ? (
               <EmptyInline text="No active deficiencies" />
             ) : (
@@ -1015,6 +1047,17 @@ export default function ProjectDetailPage() {
           phaseId={siteUnblockTarget.phaseId}
           projectId={detail.project.id}
           phaseLabel={siteUnblockTarget.phaseLabel}
+        />
+      )}
+      {inspectionTarget && detail && (
+        <InspectionResultDialog
+          open={!!inspectionTarget}
+          onOpenChange={(o) => { if (!o) setInspectionTarget(null); }}
+          gateId={inspectionTarget.gateId}
+          phaseId={inspectionTarget.phaseId}
+          projectId={detail.project.id}
+          phaseLabel={inspectionTarget.phaseLabel}
+          mode={inspectionMode}
         />
       )}
       {detail && (

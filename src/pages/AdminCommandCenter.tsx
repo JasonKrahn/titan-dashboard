@@ -18,7 +18,7 @@ import {
   getUsers,
 } from "@/lib/api";
 import { buildAttentionQueue, markItemResolved, type QueueFilter, type QueueFilters, type QueueItem } from "@/lib/command/attentionQueue";
-import { buildBottleneckInsights, buildHeatmap } from "@/lib/command/heatmap";
+import { buildBottleneckInsights, buildHeatmap, type BottleneckInsight } from "@/lib/command/heatmap";
 import { KPI_TO_FILTER, buildCommandKpis } from "@/lib/command/kpis";
 
 export default function AdminCommandCenter() {
@@ -63,7 +63,11 @@ export default function AdminCommandCenter() {
   const insights = useMemo(() => buildBottleneckInsights(matrix, projects), [matrix, projects]);
 
   const kpis: KpiData[] = useMemo(() => {
-    return buildCommandKpis({ projects, phases, gates, photos });
+    return buildCommandKpis({ projects, phases, gates, photos }).filter((kpi) => kpi.key !== "active");
+  }, [projects, phases, gates, photos]);
+
+  const activeKpiData = useMemo(() => {
+    return buildCommandKpis({ projects, phases, gates, photos }).find((kpi) => kpi.key === "active");
   }, [projects, phases, gates, photos]);
 
   const handleKpi = (key: KpiKey) => {
@@ -81,12 +85,20 @@ export default function AdminCommandCenter() {
     setActiveKpi(null);
   };
 
-  const handleMarkResolved = (itemId: string) => {
-    setQueueItems((prev) => markItemResolved(prev, itemId));
-  };
-
   const handleFiltersChange = (filters: QueueFilters) => {
     setAdvancedFilters(filters);
+  };
+
+  const handleBottleneckClick = (insight: BottleneckInsight) => {
+    // Map bottleneck to queue filter
+    if (insight.id.includes("blocked")) {
+      setFilter("critical_blocker");
+    } else if (insight.id.includes("ready")) {
+      setFilter("aging_ready_inspection");
+    } else if (insight.id === "archive") {
+      setFilter("completed");
+    }
+    setActiveKpi(null);
   };
 
   const clientNames = useMemo(() => clients.map(c => c.name), [clients]);
@@ -129,6 +141,11 @@ export default function AdminCommandCenter() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold sm:text-3xl">Command Center</h1>
+              {activeKpiData && (
+                <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-md">
+                  {activeKpiData.count} active
+                </span>
+              )}
               <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md">
                 Updated {formatLastUpdated()}
               </span>
@@ -140,7 +157,7 @@ export default function AdminCommandCenter() {
         </div>
 
         {!isAdmin ? (
-          <div className="rounded-md border border-border bg-surface-panel p-10 text-center shadow-card">
+          <div className="rounded-md border border-border bg-surface-panel p-10 text-center">
             <ShieldAlert className="mx-auto h-8 w-8 text-status-attention" aria-hidden />
             <h2 className="mt-3 text-lg font-semibold">Admin only</h2>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -162,12 +179,11 @@ export default function AdminCommandCenter() {
                   clients={clientNames}
                   users={userNames}
                   onOpenProject={(id) => navigate(`/project/${id}`)}
-                  onMarkResolved={handleMarkResolved}
                 />
               </div>
               <div className="space-y-4 lg:col-span-5 xl:col-span-4">
+                <BottleneckInsights insights={insights} onInsightClick={handleBottleneckClick} />
                 <PhaseFlowHeatmap matrix={matrix} />
-                <BottleneckInsights insights={insights} />
               </div>
             </div>
           </>

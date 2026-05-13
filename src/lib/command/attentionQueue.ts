@@ -320,9 +320,6 @@ function compareQueueItems(a: QueueItem, b: QueueItem) {
   );
 }
 
-function matchesFilter(item: QueueItem, filter: QueueFilter) {
-  return filter === "all" || item.category === filter || item.type === filter;
-}
 
 export function buildVisibleQueue(items: QueueItem[], filter: QueueFilter, filters?: QueueFilters): QueueItem[] {
   let filtered = items.filter((item) => !item.resolved);

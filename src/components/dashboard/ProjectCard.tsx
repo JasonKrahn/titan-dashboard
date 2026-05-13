@@ -149,10 +149,11 @@ export function ProjectCard({
             <button
               type="button"
               title="Archive project"
-              className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               onClick={(e) => { e.stopPropagation(); onArchive(project.id, project.name); }}
             >
               <Archive className="h-3.5 w-3.5" />
+              Archive
             </button>
           )}
           <span className="text-[11px] text-muted-foreground">Updated {relativeTime(project.updatedAt)}</span>

@@ -3,6 +3,7 @@ import type {
   Deficiency,
   Gate,
   Phase,
+  PhotoEvidence,
   Project,
   User,
 } from "@/lib/types";
@@ -99,6 +100,7 @@ export interface AuditLookups {
   gates: Gate[];
   deficiencies: Deficiency[];
   users?: User[];
+  photoEvidence?: PhotoEvidence[];
 }
 
 export interface AuditEventDisplay {
@@ -109,6 +111,7 @@ export interface AuditEventDisplay {
   priority?: "danger" | "warning";
   context: string;
   entityLabel: string;
+  linkUrl?: string;
   metadataText?: string;
   priorityBorderClass?: string;
   relativeTime: string;
@@ -219,6 +222,48 @@ export function resolveProjectId(
   return undefined;
 }
 
+export function resolveEventUrl(
+  event: AuditEvent,
+  lookups: AuditLookups,
+): string | undefined {
+  if (event.entityType === "project") {
+    return `/project/${event.entityId}`;
+  }
+  if (event.entityType === "phase") {
+    const phase = lookups.phases.find((p) => p.id === event.entityId);
+    if (!phase) return undefined;
+    return `/project/${phase.projectId}/phase/${phase.id}`;
+  }
+  if (event.entityType === "gate") {
+    const gate = lookups.gates.find((g) => g.id === event.entityId);
+    const phase = gate?.phaseId
+      ? lookups.phases.find((p) => p.id === gate.phaseId)
+      : undefined;
+    if (phase) return `/project/${phase.projectId}/phase/${phase.id}`;
+    if (gate) return `/project/${gate.projectId}`;
+    return undefined;
+  }
+  if (event.entityType === "deficiency") {
+    const deficiency = lookups.deficiencies.find((d) => d.id === event.entityId);
+    const phase = deficiency
+      ? lookups.phases.find((p) => p.id === deficiency.phaseId)
+      : undefined;
+    if (phase) return `/project/${phase.projectId}/phase/${phase.id}`;
+    if (deficiency) return `/project/${deficiency.projectId}`;
+    return undefined;
+  }
+  if (event.entityType === "photo_evidence") {
+    const photo = lookups.photoEvidence?.find((p) => p.id === event.entityId);
+    const phase = photo?.phaseId
+      ? lookups.phases.find((p) => p.id === photo.phaseId)
+      : undefined;
+    if (phase) return `/project/${phase.projectId}/phase/${phase.id}`;
+    if (photo) return `/project/${photo.projectId}`;
+    return undefined;
+  }
+  return undefined;
+}
+
 export function formatAuditEvent(event: AuditEvent, lookups: AuditLookups): AuditEventDisplay {
   const actor = lookups.users?.find((item) => item.id === event.actorUserId);
   const actionLabel = getAuditActionLabel(event.action);
@@ -226,6 +271,7 @@ export function formatAuditEvent(event: AuditEvent, lookups: AuditLookups): Audi
   const context = formatContext(event, lookups);
   const metadataText = formatMetadataText(event.metadata);
   const statusText = formatStatusText(event);
+  const linkUrl = resolveEventUrl(event, lookups);
 
   const priority = AUDIT_ACTION_PRIORITY[event.action];
   return {
@@ -236,6 +282,7 @@ export function formatAuditEvent(event: AuditEvent, lookups: AuditLookups): Audi
     priority,
     context,
     entityLabel,
+    linkUrl,
     metadataText,
     priorityBorderClass:
       priority === "danger"

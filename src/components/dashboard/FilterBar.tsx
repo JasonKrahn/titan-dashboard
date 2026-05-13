@@ -16,14 +16,15 @@ interface FilterBarProps {
   clients: ClientRecord[];
   pms: User[];
   isAdmin: boolean;
+  hideStatus?: boolean;
 }
 
-export function FilterBar({ filters, search, onSearchChange, onChange, clients, pms, isAdmin }: FilterBarProps) {
+export function FilterBar({ filters, search, onSearchChange, onChange, clients, pms, isAdmin, hideStatus }: FilterBarProps) {
   const clientValue = filters.clientId ?? "all";
   const statusValue = filters.status?.[0] ?? "all";
   const pmValue = filters.assignedProjectManagerId ?? "all";
   const sortedClients = [...clients].sort((a, b) => a.name.localeCompare(b.name));
-  const projectStatuses: ProjectStatus[] = ["active", "completed", "draft", "archived"];
+  const projectStatuses: ProjectStatus[] = ["active", "completed", "draft"];
 
   const hasActive =
     !!search ||
@@ -68,27 +69,29 @@ export function FilterBar({ filters, search, onSearchChange, onChange, clients, 
           </SelectContent>
         </Select>
 
-        <Select
-          value={statusValue}
-          onValueChange={(v) =>
-            onChange({
-              ...filters,
-              status: v === "all" ? undefined : [v as ProjectStatus],
-            })
-          }
-        >
-          <SelectTrigger className="w-full bg-background/60 md:w-[150px]">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            {projectStatuses.map((status) => (
-              <SelectItem key={status} value={status}>
-                {status[0].toUpperCase() + status.slice(1)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {!hideStatus && (
+          <Select
+            value={statusValue}
+            onValueChange={(v) =>
+              onChange({
+                ...filters,
+                status: v === "all" ? undefined : [v as ProjectStatus],
+              })
+            }
+          >
+            <SelectTrigger className="w-full bg-background/60 md:w-[150px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              {projectStatuses.map((status) => (
+                <SelectItem key={status} value={status}>
+                  {status[0].toUpperCase() + status.slice(1)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         {isAdmin && (
           <Select

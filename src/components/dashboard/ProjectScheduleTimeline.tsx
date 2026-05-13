@@ -212,7 +212,7 @@ export function ProjectScheduleTimeline({
                     aria-label={`${PHASE_LABEL[phase.type]} schedule`}
                     onPointerDown={(event) => startDrag(event, phase.id, "move")}
                     className={cn(
-                      "absolute top-1/2 flex min-h-11 -translate-y-1/2 items-center justify-between overflow-hidden rounded-md border px-2 text-center text-xs shadow-card transition",
+                      "absolute top-1/2 flex min-h-11 -translate-y-1/2 items-center justify-center overflow-hidden rounded-md border px-2 text-center text-xs shadow-card transition",
                       readOnly ? "cursor-default" : "cursor-grab active:cursor-grabbing",
                       classes.bg,
                       classes.border,
@@ -307,7 +307,7 @@ export function ProjectScheduleTimeline({
                 {/* Mini timeline bar */}
                 <div className="mt-2 h-1.5 w-full rounded-full bg-muted">
                   <div
-                    className={cn("h-full rounded-full", classes.bg.replace('/10', '/40'))}
+                    className={cn("h-full rounded-full", classes.bg.replace('/15', ''))}
                     style={{ marginLeft: `${left}%`, width: `${width}%` }}
                   />
                 </div>
