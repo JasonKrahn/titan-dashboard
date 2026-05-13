@@ -242,6 +242,10 @@
   h1, h2, h3, h4 {
     @apply tracking-tight;
   }
+
+  input, textarea, select {
+    @apply text-base md:text-sm;
+  }
 }
 
 @layer utilities {

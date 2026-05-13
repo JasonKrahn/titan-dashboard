@@ -15,11 +15,14 @@ import {
   ShieldCheck,
   Upload,
   User as UserIcon,
+  X,
   XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { BadgeTone } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -56,6 +59,14 @@ import {
   phaseStatusTone,
   relativeTime,
 } from "@/lib/derived";
+
+const GATE_BADGE_CLASS: Record<StatusTone, string> = {
+  "not-started": "bg-status-not-started/15 text-status-not-started",
+  "in-progress": "bg-status-in-progress/15 text-status-in-progress",
+  ready: "bg-status-ready/15 text-status-ready",
+  blocked: "bg-status-blocked/15 text-status-blocked",
+  closed: "bg-status-closed/15 text-status-closed",
+};
 
 export default function PhaseDetailPage() {
   const { projectId, phaseId } = useParams<{ projectId: string; phaseId: string }>();
@@ -113,9 +124,41 @@ export default function PhaseDetailPage() {
   const deficiencyRefs = useRef<Record<string, HTMLLIElement | null>>({});
   const siteCheckHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const inspectionHeadingRef = useRef<HTMLHeadingElement | null>(null);
+  const taskChecklistInputRef = useRef<HTMLInputElement | null>(null);
   const [dateValidationError, setDateValidationError] = useState<string | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
+
+  // Task checklist state
+  interface Task {
+    id: string;
+    text: string;
+    completed: boolean;
+    createdAt: string;
+  }
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [newTaskText, setNewTaskText] = useState("");
+
+  const addTask = () => {
+    const trimmed = newTaskText.trim();
+    if (!trimmed) return;
+    const task: Task = {
+      id: crypto.randomUUID(),
+      text: trimmed,
+      completed: false,
+      createdAt: new Date().toISOString(),
+    };
+    setTasks((prev) => [...prev, task]);
+    setNewTaskText("");
+  };
+
+  const toggleTask = (id: string) => {
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t)));
+  };
+
+  const deleteTask = (id: string) => {
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+  };
 
   useEffect(() => {
     if (!highlightedDeficiencyId) return;
@@ -151,8 +194,9 @@ export default function PhaseDetailPage() {
         <main className="container py-6">
           <PageNav
             backFallback={`/project/${detail?.project.id ?? ""}`}
+            backLabel="Back to Project"
             items={[
-              { label: "All Projects", to: "/", state: { view: "dashboard" } },
+              { label: "All Projects", to: "/", state: { view: "dashboard" }, back: true },
               { label: "Phase" },
             ]}
             className="mb-4"
@@ -265,17 +309,21 @@ export default function PhaseDetailPage() {
           },
         ]
       : []),
-    {
-      label: "Add deficiency",
-      icon: <Plus className="h-4 w-4" />,
-      helperText: "Log an issue for this phase",
-      onClick: () => {
-        setActiveTab("deficiencies");
-        setDeficiencyDialogMode("create");
-        setSelectedDeficiencyId(null);
-        setDeficiencyDialogOpen(true);
-      },
-    },
+    ...(project.status !== "completed" && project.status !== "archived"
+      ? [
+          {
+            label: "Add deficiency",
+            icon: <Plus className="h-4 w-4" />,
+            helperText: "Log an issue for this phase",
+            onClick: () => {
+              setActiveTab("deficiencies");
+              setDeficiencyDialogMode("create");
+              setSelectedDeficiencyId(null);
+              setDeficiencyDialogOpen(true);
+            },
+          },
+        ]
+      : []),
     {
       label: "Upload photo",
       icon: <Upload className="h-4 w-4" />,
@@ -283,6 +331,18 @@ export default function PhaseDetailPage() {
       onClick: () => {
         setActiveTab("photos");
         setPhotoUploadOpen(true);
+      },
+    },
+    {
+      label: "Add checklist item",
+      icon: <Plus className="h-4 w-4" />,
+      helperText: "Add a task to the phase checklist",
+      onClick: () => {
+        setActiveTab("overview");
+        window.setTimeout(() => {
+          taskChecklistInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+          taskChecklistInputRef.current?.focus();
+        }, 0);
       },
     },
   ];
@@ -294,8 +354,9 @@ export default function PhaseDetailPage() {
       <main className="container space-y-5 pb-28 pt-5 md:space-y-6 md:py-6">
         <PageNav
           backFallback={`/project/${project.id}`}
+          backLabel="Back to Project"
           items={[
-            { label: "All Projects", to: "/", state: { view: "dashboard" } },
+            { label: "All Projects", to: "/", state: { view: "dashboard" }, back: true },
             { label: project.name, to: `/project/${project.id}` },
             { label: PHASE_LABEL[phase.type] },
           ]}
@@ -339,57 +400,10 @@ export default function PhaseDetailPage() {
             </div>
 
             <div className="hidden md:flex md:flex-col md:items-stretch md:gap-3">
-              {siteGate?.status === "not_started" && (
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" className="flex-1" onClick={() => setSiteCheckOpen(true)}>
-                    <CheckCircle2 className="mr-1.5 h-4 w-4" /> Site Checked
-                  </Button>
-                  <Button size="sm" variant="outline" className="flex-1" onClick={() => setSiteBlockOpen(true)}>
-                    <AlertTriangle className="mr-1.5 h-4 w-4" /> Site Blocked
-                  </Button>
-                </div>
-              )}
               {siteGate?.status === "blocked" && (
                 <Button size="sm" variant="outline" onClick={() => setSiteUnblockOpen(true)}>
                   <ShieldCheck className="mr-1.5 h-4 w-4" /> Site Cleared
                 </Button>
-              )}
-              {showReadyButton && (
-                <Button
-                  size="sm"
-                  onClick={() => readyMutation.mutate({ phaseId: phase.id, projectId: project.id })}
-                  disabled={readyMutation.isPending}
-                >
-                  <ShieldCheck className="mr-1.5 h-4 w-4" />
-                  {readyMutation.isPending ? "Marking ready…" : "Ready for Inspection"}
-                </Button>
-              )}
-              {showPassedFailed && inspectionGate && (
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => {
-                      setSelectedGateId(inspectionGate.id);
-                      setInspectionResultMode("passed");
-                      setInspectionResultOpen(true);
-                    }}
-                  >
-                    <CheckCircle2 className="mr-1.5 h-4 w-4" /> Mark Passed
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => {
-                      setSelectedGateId(inspectionGate.id);
-                      setInspectionResultMode("failed");
-                      setInspectionResultOpen(true);
-                    }}
-                  >
-                    <XCircle className="mr-1.5 h-4 w-4" /> Mark Failed
-                  </Button>
-                </div>
               )}
             </div>
           </div>
@@ -452,6 +466,9 @@ export default function PhaseDetailPage() {
               ) : (
                 <div className="mobile-list overflow-hidden">
                   {gates.map((g) => {
+                    if (g.type === "inspection" && siteGate?.status !== "passed") {
+                      return null;
+                    }
                     const gatePhotos = photoEvidence.filter((p) => p.gateId === g.id);
                     const hasMobileAction = mobileGateHasAction({
                       gate: g,
@@ -466,14 +483,27 @@ export default function PhaseDetailPage() {
                         <span className="min-w-0 flex-1">
                           <span className="flex items-center gap-2">
                             <span className="truncate text-sm font-semibold text-foreground">{GATE_LABEL[g.type]}</span>
-                            <span
-                              className={cn(
-                                "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                                g.requiredPhotoEvidence ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
-                              )}
-                            >
-                              {gatePhotos.length > 0 ? `${gatePhotos.length} photo${gatePhotos.length === 1 ? "" : "s"}` : STATUS_LABEL[g.status]}
-                            </span>
+                            {gatePhotos.length > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => { setSelectedPhoto(gatePhotos[0]); setPhotoViewerOpen(true); }}
+                                className={cn(
+                                  "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide cursor-pointer hover:opacity-80",
+                                  GATE_BADGE_CLASS[gateStatusTone(g.status)],
+                                )}
+                              >
+                                {gatePhotos.length} photo{gatePhotos.length === 1 ? "" : "s"}
+                              </button>
+                            ) : (
+                              <span
+                                className={cn(
+                                  "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                                  GATE_BADGE_CLASS[gateStatusTone(g.status)],
+                                )}
+                              >
+                                {STATUS_LABEL[g.status]}
+                              </span>
+                            )}
                           </span>
                           <span className="mt-1 block text-xs text-muted-foreground">
                             {gatePhotos.length > 0
@@ -487,12 +517,51 @@ export default function PhaseDetailPage() {
                           </span>
                           {g.notes && <span className="mt-1 block text-xs text-foreground">{g.notes}</span>}
                         </span>
-                        {hasMobileAction && (
-                          <span className="shrink-0 rounded-full border border-border px-2.5 py-1 text-xs font-semibold text-foreground">
-                            Actions
-                          </span>
+                        {g.type === "site_check" && g.status === "not_started" && (
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline" className="h-8 px-2 text-xs" onClick={() => setSiteCheckOpen(true)}>
+                              Site Checked
+                            </Button>
+                            <Button size="sm" variant="outline" className="h-8 px-2 text-xs" onClick={() => setSiteBlockOpen(true)}>
+                              Site Blocked
+                            </Button>
+                          </div>
+                        )}
+                        {g.type === "site_check" && g.status === "blocked" && (
+                          <Button size="sm" variant="outline" className="h-8 px-2 text-xs" onClick={() => setSiteUnblockOpen(true)}>
+                            Site Cleared
+                          </Button>
                         )}
                       </>
+                    );
+
+                    const inspectionButtons = g.type === "inspection" && showPassedFailed && (
+                      <div className="mt-3 flex gap-2">
+                        <Button
+                          size="sm"
+                          className="flex-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedGateId(g.id);
+                            setInspectionResultMode("passed");
+                            setInspectionResultOpen(true);
+                          }}
+                        >
+                          Passed
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="flex-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedGateId(g.id);
+                            setInspectionResultMode("failed");
+                            setInspectionResultOpen(true);
+                          }}
+                        >
+                          Failed
+                        </Button>
+                      </div>
                     );
 
                     return hasMobileAction ? (
@@ -500,13 +569,15 @@ export default function PhaseDetailPage() {
                         key={g.id}
                         type="button"
                         onClick={() => setMobileActionsOpen(true)}
-                        className="flex w-full items-center gap-3 px-3 py-3 text-left active:bg-muted/60"
+                        className="flex w-full flex-col items-start gap-3 px-3 py-3 text-left active:bg-muted/60"
                       >
                         {content}
+                        {inspectionButtons}
                       </button>
                     ) : (
-                      <div key={g.id} className="flex items-center gap-3 px-3 py-3">
+                      <div key={g.id} className="flex flex-col items-start gap-3 px-3 py-3">
                         {content}
+                        {inspectionButtons}
                       </div>
                     );
                   })}
@@ -520,6 +591,9 @@ export default function PhaseDetailPage() {
                   <EmptyCard icon={<ShieldCheck className="h-5 w-5" />} text="No gates configured for this phase yet." />
                 ) : (
                   gates.map((g) => {
+                    if (g.type === "inspection" && siteGate?.status !== "passed") {
+                      return null;
+                    }
                     const gatePhotos = photoEvidence.filter((p) => p.gateId === g.id);
                     const tone = gateStatusTone(g.status);
                     const headingRef = g.type === "site_check" ? siteCheckHeadingRef : g.type === "inspection" ? inspectionHeadingRef : undefined;
@@ -558,6 +632,55 @@ export default function PhaseDetailPage() {
                           </div>
                           {g.notes && <p className="text-foreground">{g.notes}</p>}
                         </div>
+                        {g.type === "site_check" && g.status === "not_started" && (
+                          <div className="mt-4 flex gap-2">
+                            <Button size="sm" variant="outline" className="flex-1" onClick={() => setSiteCheckOpen(true)}>
+                              <CheckCircle2 className="mr-1.5 h-4 w-4" /> Site Checked
+                            </Button>
+                            <Button size="sm" variant="outline" className="flex-1" onClick={() => setSiteBlockOpen(true)}>
+                              <AlertTriangle className="mr-1.5 h-4 w-4" /> Site Blocked
+                            </Button>
+                          </div>
+                        )}
+                        {g.type === "inspection" && showReadyButton && (
+                          <div className="mt-4">
+                            <Button
+                              size="sm"
+                              onClick={() => readyMutation.mutate({ phaseId: phase.id, projectId: project.id })}
+                              disabled={readyMutation.isPending}
+                            >
+                              <ShieldCheck className="mr-1.5 h-4 w-4" />
+                              {readyMutation.isPending ? "Marking ready…" : "Ready for Inspection"}
+                            </Button>
+                          </div>
+                        )}
+                        {g.type === "inspection" && showPassedFailed && (
+                          <div className="mt-4 flex gap-2">
+                            <Button
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => {
+                                setSelectedGateId(g.id);
+                                setInspectionResultMode("passed");
+                                setInspectionResultOpen(true);
+                              }}
+                            >
+                              <CheckCircle2 className="mr-1.5 h-4 w-4" /> Mark Passed
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1"
+                              onClick={() => {
+                                setSelectedGateId(g.id);
+                                setInspectionResultMode("failed");
+                                setInspectionResultOpen(true);
+                              }}
+                            >
+                              <XCircle className="mr-1.5 h-4 w-4" /> Mark Failed
+                            </Button>
+                          </div>
+                        )}
                       </Card>
                     );
                   })
@@ -591,6 +714,71 @@ export default function PhaseDetailPage() {
                     </div>
                   </Card>
                 )}
+
+                {/* Task Checklist */}
+                <Card className="p-5 shadow-card">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <SectionHeading as="h3">Task Checklist</SectionHeading>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={addTask}
+                      disabled={!newTaskText.trim()}
+                    >
+                      <Plus className="mr-1 h-4 w-4" />
+                      Add Item
+                    </Button>
+                  </div>
+                  <div className="mb-3 flex gap-2">
+                    <Input
+                      value={newTaskText}
+                      onChange={(e) => setNewTaskText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addTask();
+                        }
+                      }}
+                      placeholder="Add a new task..."
+                      className="flex-1"
+                    />
+                  </div>
+                  {tasks.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">No tasks yet</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {tasks.map((task) => (
+                        <div
+                          key={task.id}
+                          className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2"
+                        >
+                          <Checkbox
+                            checked={task.completed}
+                            onCheckedChange={() => toggleTask(task.id)}
+                            id={`task-${task.id}`}
+                          />
+                          <label
+                            htmlFor={`task-${task.id}`}
+                            className={cn(
+                              "flex-1 cursor-pointer text-sm",
+                              task.completed && "line-through text-muted-foreground"
+                            )}
+                          >
+                            {task.text}
+                          </label>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 shrink-0"
+                            onClick={() => deleteTask(task.id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
               </div>
 
               <div className="space-y-4">
@@ -662,7 +850,7 @@ export default function PhaseDetailPage() {
                             });
                           }}
                         >
-                          <SelectTrigger className="mt-1 h-8 border border-input bg-background px-3 py-2 text-xs font-medium">
+                          <SelectTrigger className="mt-1 h-8 border border-input bg-background px-3 py-2 text-base md:text-xs font-medium">
                             <SelectValue placeholder="Select subcontractor" />
                           </SelectTrigger>
                           <SelectContent>
@@ -716,7 +904,7 @@ export default function PhaseDetailPage() {
                         });
                       }}
                     >
-                      <SelectTrigger className="mt-0.5 h-auto border-0 bg-transparent p-0 text-sm font-semibold shadow-none ring-offset-0 focus:ring-0 focus:ring-offset-0 md:h-7 md:border md:border-input md:bg-background md:px-3 md:py-2 md:text-xs md:font-normal md:focus:ring-2 md:focus:ring-ring md:focus:ring-offset-2">
+                      <SelectTrigger className="mt-0.5 h-auto border-0 bg-transparent p-0 text-base md:text-xs font-semibold shadow-none ring-offset-0 focus:ring-0 focus:ring-offset-0 md:h-7 md:border md:border-input md:bg-background md:px-3 md:py-2 md:font-normal md:focus:ring-2 md:focus:ring-ring md:focus:ring-offset-2">
                         <SelectValue placeholder="Select subcontractor" />
                       </SelectTrigger>
                       <SelectContent>
@@ -743,6 +931,73 @@ export default function PhaseDetailPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+            </Card>
+
+            {/* Task Checklist (mobile) */}
+            <Card className="border-border bg-card p-0 shadow-card md:hidden">
+              <div className="p-4 pb-2">
+                <SectionHeading as="h4" size="sm">Task Checklist</SectionHeading>
+              </div>
+              <div className="px-4 pb-4">
+                <div className="mb-3 flex gap-2">
+                  <Input
+                    ref={taskChecklistInputRef}
+                    value={newTaskText}
+                    onChange={(e) => setNewTaskText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addTask();
+                      }
+                    }}
+                    placeholder="Add a new task..."
+                    className="flex-1"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={addTask}
+                    disabled={!newTaskText.trim()}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                {tasks.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">No tasks yet</div>
+                ) : (
+                  <div className="space-y-2">
+                    {tasks.map((task) => (
+                      <div
+                        key={task.id}
+                        className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2"
+                      >
+                        <Checkbox
+                          checked={task.completed}
+                          onCheckedChange={() => toggleTask(task.id)}
+                          id={`mobile-task-${task.id}`}
+                        />
+                        <label
+                          htmlFor={`mobile-task-${task.id}`}
+                          className={cn(
+                            "flex-1 cursor-pointer text-sm",
+                            task.completed && "line-through text-muted-foreground"
+                          )}
+                        >
+                          {task.text}
+                        </label>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 shrink-0"
+                          onClick={() => deleteTask(task.id)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </Card>
 
@@ -788,11 +1043,13 @@ export default function PhaseDetailPage() {
 
           {/* Deficiencies */}
           <TabsContent value="deficiencies">
-            <div className="mb-4 flex justify-end">
-              <Button size="sm" onClick={() => { setDeficiencyDialogMode("create"); setSelectedDeficiencyId(null); setDeficiencyDialogOpen(true); }}>
-                Add Deficiency
-              </Button>
-            </div>
+            {project.status !== "completed" && project.status !== "archived" && (
+              <div className="mb-4 flex justify-end">
+                <Button size="sm" onClick={() => { setDeficiencyDialogMode("create"); setSelectedDeficiencyId(null); setDeficiencyDialogOpen(true); }}>
+                  Add Deficiency
+                </Button>
+              </div>
+            )}
             {deficiencies.length === 0 ? (
               <EmptyCard icon={<AlertTriangle className="h-5 w-5" />} text="No deficiencies logged for this phase." />
             ) : (

@@ -1,7 +1,9 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
+  createUser,
   completeInspection,
   completeSiteCheck,
+  deactivateUser,
   getAuditEvents,
   getAllDeficiencies,
   getAllGates,
@@ -15,6 +17,7 @@ import {
   setCurrentUser,
   updateAtticGate,
   updatePhaseSchedules,
+  updateUser,
 } from "./index";
 
 describe("prototype seed data", () => {
@@ -278,6 +281,53 @@ describe("prototype seed data", () => {
     setCurrentUser("user-admin");
   });
 
+  it("blocks unsafe user deactivation scenarios", async () => {
+    setCurrentUser("user-admin");
+
+    const selfRemoval = await deactivateUser("user-admin");
+    expect(selfRemoval.ok).toBe(false);
+    if (selfRemoval.ok) return;
+    expect(selfRemoval.error.code).toBe("STATE_VIOLATION");
+
+    const lastAdminRoleChange = await updateUser("user-admin", {
+      fullName: "James Harrison",
+      role: "project_manager",
+    });
+    expect(lastAdminRoleChange.ok).toBe(false);
+    if (lastAdminRoleChange.ok) return;
+    expect(lastAdminRoleChange.error.code).toBe("STATE_VIOLATION");
+
+    const assignedPmRemoval = await deactivateUser("user-pm-1");
+    expect(assignedPmRemoval.ok).toBe(false);
+    if (assignedPmRemoval.ok) return;
+    expect(assignedPmRemoval.error.code).toBe("STATE_VIOLATION");
+  });
+
+  it("keeps user management admin-only", async () => {
+    setCurrentUser("user-pm-1");
+
+    const createResult = await createUser({
+      email: "blocked-create@titanpm.io",
+      fullName: "Blocked Create",
+      role: "project_manager",
+    });
+    const roleChangeResult = await updateUser("user-pm-1", {
+      fullName: "Robert Thompson",
+      role: "admin",
+    });
+    const deactivateResult = await deactivateUser("user-pm-2");
+
+    expect(createResult.ok).toBe(false);
+    expect(roleChangeResult.ok).toBe(false);
+    expect(deactivateResult.ok).toBe(false);
+    if (createResult.ok || roleChangeResult.ok || deactivateResult.ok) return;
+    expect(createResult.error.code).toBe("FORBIDDEN");
+    expect(roleChangeResult.error.code).toBe("FORBIDDEN");
+    expect(deactivateResult.error.code).toBe("FORBIDDEN");
+
+    setCurrentUser("user-admin");
+  });
+
   it("promotes an active project to completed when the attic gate is the last remaining requirement", async () => {
     setCurrentUser("user-pm-2");
     const file = new File(["attic"], "attic.jpg", { type: "image/jpeg" });
@@ -349,5 +399,75 @@ describe("prototype seed data", () => {
     expect(afterAttic.data.project.status).toBe("completed");
     expect(afterAttic.data.project.completedAt).toBeTruthy();
     setCurrentUser("user-admin");
+  });
+
+  it("lets admins create and update organization members with audit history", async () => {
+    setCurrentUser("user-admin");
+
+    const createdPm = await createUser({
+      email: "new-pm@titanpm.io",
+      fullName: "New Project Manager",
+      role: "project_manager",
+      phone: "555-0199",
+    });
+    const createdAdmin = await createUser({
+      email: "new-admin@titanpm.io",
+      fullName: "New Admin",
+      role: "admin",
+    });
+
+    expect(createdPm.ok).toBe(true);
+    expect(createdAdmin.ok).toBe(true);
+    if (!createdPm.ok || !createdAdmin.ok) return;
+    expect(createdPm.data.active).toBe(true);
+    expect(createdAdmin.data.role).toBe("admin");
+
+    const roleChange = await updateUser(createdPm.data.id, {
+      fullName: "Promoted Member",
+      phone: "555-0200",
+      role: "admin",
+    });
+
+    expect(roleChange.ok).toBe(true);
+    if (!roleChange.ok) return;
+    expect(roleChange.data.role).toBe("admin");
+    expect(roleChange.data.fullName).toBe("Promoted Member");
+
+    const auditResult = await getAuditEvents({ entityType: "user", entityId: createdPm.data.id });
+    expect(auditResult.ok).toBe(true);
+    if (!auditResult.ok) return;
+    expect(auditResult.data.some((event) => event.action === "role_changed")).toBe(true);
+  });
+
+  it("has valid seed phase schedules within project bounds", async () => {
+    setCurrentUser("user-admin");
+    const [projectsResult, phasesResult] = await Promise.all([
+      getProjects(),
+      getAllPhases(),
+    ]);
+
+    expect(projectsResult.ok).toBe(true);
+    expect(phasesResult.ok).toBe(true);
+    if (!projectsResult.ok || !phasesResult.ok) return;
+
+    const projectsById = new Map(projectsResult.data.map((p) => [p.id, p]));
+
+    for (const phase of phasesResult.data) {
+      const start = phase.scheduledStart;
+      const end = phase.scheduledEnd;
+      if (start && end) {
+        expect(new Date(start).getTime()).toBeLessThan(new Date(end).getTime());
+      }
+
+      const project = projectsById.get(phase.projectId);
+      if (project?.scheduledStart && project?.scheduledEnd && start && end) {
+        const phaseStartMs = new Date(start).getTime();
+        const phaseEndMs = new Date(end).getTime();
+        const projStartMs = new Date(project.scheduledStart).getTime();
+        const projEndMs = new Date(project.scheduledEnd).getTime();
+        expect(phaseStartMs).toBeGreaterThanOrEqual(projStartMs);
+        expect(phaseEndMs).toBeLessThanOrEqual(projEndMs);
+      }
+    }
   });
 });

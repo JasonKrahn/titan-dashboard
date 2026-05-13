@@ -115,5 +115,6 @@ describe("ProjectDetailPage schedule", () => {
     renderPage();
 
     expect(await screen.findByRole("heading", { name: "Project Schedule" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Phases" })).toBeInTheDocument();
   });
 });

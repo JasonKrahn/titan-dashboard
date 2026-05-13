@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { Clock, FileText, Search } from "lucide-react";
 import { AppHeader } from "@/components/dashboard/AppHeader";
 import { Card } from "@/components/ui/card";
@@ -9,7 +10,7 @@ import { SectionHeading } from "@/components/ui/section-heading";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ActionBadge } from "@/components/ui/action-badge";
-import { getAuditEvents, getProjects, getAllPhases, getUsers, getAllGates, getAllDeficiencies, getClients } from "@/lib/api";
+import { getAuditEvents, getProjects, getAllPhases, getUsers, getAllGates, getAllDeficiencies, getClients, getAllPhotos } from "@/lib/api";
 import { formatAuditEvent, getAuditActionLabel, resolveProjectId } from "@/lib/audit";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { AuditEvent } from "@/lib/types";
@@ -45,6 +46,7 @@ export default function ActivityLogPage() {
   const usersQ = useQuery({ queryKey: ["users"], queryFn: getUsers });
   const gatesQ = useQuery({ queryKey: ["gates"], queryFn: getAllGates });
   const deficienciesQ = useQuery({ queryKey: ["deficiencies"], queryFn: getAllDeficiencies });
+  const photosQ = useQuery({ queryKey: ["photos"], queryFn: getAllPhotos });
   const clientsQ = useQuery({ queryKey: ["clients"], queryFn: getClients });
 
   const events = useMemo(() => {
@@ -76,6 +78,11 @@ export default function ActivityLogPage() {
     if (!deficienciesQ.data?.ok) return [];
     return deficienciesQ.data.data;
   }, [deficienciesQ.data]);
+
+  const photos = useMemo(() => {
+    if (!photosQ.data?.ok) return [];
+    return photosQ.data.data;
+  }, [photosQ.data]);
 
   const clients = useMemo(() => {
     if (!clientsQ.data?.ok) return [];
@@ -122,9 +129,10 @@ export default function ActivityLogPage() {
           gates,
           deficiencies,
           users,
+          photoEvidence: photos,
         }),
       })),
-    [deficiencies, gates, nonArchivedEvents, phases, projects, users],
+    [deficiencies, gates, nonArchivedEvents, phases, photos, projects, users],
   );
 
   const filtered = useMemo(() => {
@@ -194,6 +202,7 @@ export default function ActivityLogPage() {
     usersQ.isLoading ||
     gatesQ.isLoading ||
     deficienciesQ.isLoading ||
+    photosQ.isLoading ||
     clientsQ.isLoading
   ) {
     return (
@@ -312,11 +321,11 @@ export default function ActivityLogPage() {
                 </SectionHeading>
                 <div className="space-y-2">
                   {grouped[group]!.map(({ event, display }) => {
-                    return (
+                    const card = (
                       <Card
                         key={event.id}
                         surface="default"
-                        className={`p-4 shadow-card ${display.priorityBorderClass ?? ""}`}
+                        className={`p-4 shadow-card ${display.priorityBorderClass ?? ""} ${display.linkUrl ? "cursor-pointer hover:shadow-lg hover:border-primary/50 transition-shadow" : ""}`}
                       >
                         <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
                           <div className="flex items-center gap-2">
@@ -349,6 +358,14 @@ export default function ActivityLogPage() {
                         )}
                       </Card>
                     );
+                    if (display.linkUrl) {
+                      return (
+                        <Link key={event.id} to={display.linkUrl} className="block">
+                          {card}
+                        </Link>
+                      );
+                    }
+                    return card;
                   })}
                 </div>
               </div>

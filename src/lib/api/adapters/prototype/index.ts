@@ -20,8 +20,44 @@ import type {
   UpdateDeficiencyInput,
   UpdateSubcontractorInput,
   User,
+  UserRole,
 } from "@/lib/types";
 import { orderedSchedulePhases, parseScheduleDate, toScheduleDate } from "@/lib/schedule";
+
+import imgInsulationSiteCheck from "@/install-photos/jpeg-install-images/insulation/site-check-insulation.jpeg";
+import imgDrywallSiteCheck from "@/install-photos/jpeg-install-images/boarding/site-check-drywall.jpeg";
+import imgSiteBlockedAccess from "@/install-photos/jpeg-install-images/boarding/camphoto_1296255701.jpg";
+import imgFailedInspection from "@/install-photos/jpeg-install-images/insulation/IMG_3372.jpeg";
+import imgReworkBefore from "@/install-photos/jpeg-install-images/insulation/IMG_3448.jpeg";
+import imgReworkAfter from "@/install-photos/jpeg-install-images/insulation/IMG_3475.jpeg";
+import imgFinishingGeneral from "@/install-photos/jpeg-install-images/finishing/IMG_4350.jpeg";
+import imgReadyCompleteAttic from "@/install-photos/jpeg-install-images/insulation/IMG_3653.jpeg";
+import imgCompletedInspection from "@/install-photos/jpeg-install-images/finishing/IMG_4493.jpeg";
+import imgCompletedAttic from "@/install-photos/jpeg-install-images/foam/foam-joist.jpeg";
+import imgArchivedAttic from "@/install-photos/jpeg-install-images/foam/foam-skylight.jpeg";
+import imgInsulation3480 from "@/install-photos/jpeg-install-images/insulation/IMG_3480.jpeg";
+import imgInsulation3487 from "@/install-photos/jpeg-install-images/insulation/IMG_3487.jpeg";
+import imgInsulation3570 from "@/install-photos/jpeg-install-images/insulation/IMG_3570.jpeg";
+import imgInsulation3700 from "@/install-photos/jpeg-install-images/insulation/IMG_3700.jpeg";
+import imgInsulation5020 from "@/install-photos/jpeg-install-images/insulation/IMG_5020.jpeg";
+import imgBoarding3659 from "@/install-photos/jpeg-install-images/boarding/IMG_3659.jpeg";
+import imgBoarding3908 from "@/install-photos/jpeg-install-images/boarding/IMG_3908.jpeg";
+import imgBoardingCamphoto351212254 from "@/install-photos/jpeg-install-images/boarding/camphoto_351212254.jpg";
+import imgBoardingPhoto6626 from "@/install-photos/jpeg-install-images/boarding/photo-6626_singular_display_fullPicture.jpeg";
+import imgBoardingPhoto9075 from "@/install-photos/jpeg-install-images/boarding/photo-9075_singular_display_fullPicture.jpeg";
+import imgFinishing4467 from "@/install-photos/jpeg-install-images/finishing/IMG_4467.jpeg";
+import imgFinishing4505 from "@/install-photos/jpeg-install-images/finishing/IMG_4505.jpeg";
+import imgFinishing4527 from "@/install-photos/jpeg-install-images/finishing/IMG_4527.jpeg";
+import imgFinishing4545 from "@/install-photos/jpeg-install-images/finishing/IMG_4545.jpeg";
+import imgFinishingSiteCheck from "@/install-photos/jpeg-install-images/finishing/finishing-site-check.jpeg";
+import imgFinishingPhoto9151 from "@/install-photos/jpeg-install-images/finishing/photo-9151_singular_display_fullPicture.jpeg";
+import imgFinishingPhoto9172 from "@/install-photos/jpeg-install-images/finishing/photo-9172_singular_display_fullPicture.jpeg";
+import imgFinishingPhoto9314 from "@/install-photos/jpeg-install-images/finishing/photo-9314_singular_display_fullPicture.jpeg";
+import imgFoamJoist2 from "@/install-photos/jpeg-install-images/foam/foam-joist-2.jpeg";
+import imgFraming3007 from "@/install-photos/jpeg-install-images/framing/IMG_3007.jpeg";
+import imgFraming3055 from "@/install-photos/jpeg-install-images/framing/IMG_3055.jpeg";
+import imgFraming3186 from "@/install-photos/jpeg-install-images/framing/IMG_3186.jpeg";
+import imgRoot4458 from "@/install-photos/jpeg-install-images/IMG_4458.jpeg";
 import {
   seedAuditEvents,
   seedClients,
@@ -36,7 +72,42 @@ import {
 
 const SIMULATED_LATENCY_MS = 250;
 
-export const photoBlobUrls = new Map<string, string>();
+export const photoBlobUrls = new Map<string, string>([
+  ["photo-active-insulation-site-check", imgInsulationSiteCheck],
+  ["photo-ready-inspection-drywall-site-check", imgDrywallSiteCheck],
+  ["photo-site-blocked-access", imgSiteBlockedAccess],
+  ["photo-failed-inspection-before", imgFailedInspection],
+  ["photo-rework-before", imgReworkBefore],
+  ["photo-rework-after", imgReworkAfter],
+  ["photo-finishing-general", imgFinishingGeneral],
+  ["photo-ready-complete-attic", imgReadyCompleteAttic],
+  ["photo-completed-inspection", imgCompletedInspection],
+  ["photo-completed-attic", imgCompletedAttic],
+  ["photo-archived-attic", imgArchivedAttic],
+  ["photo-active-insulation-3480", imgInsulation3480],
+  ["photo-active-insulation-3487", imgInsulation3487],
+  ["photo-failed-inspection-3570", imgInsulation3570],
+  ["photo-deficiency-rework-3700", imgInsulation3700],
+  ["photo-deficiency-rework-5020", imgInsulation5020],
+  ["photo-ready-inspection-3659", imgBoarding3659],
+  ["photo-ready-inspection-3908", imgBoarding3908],
+  ["photo-site-blocked-351212254", imgBoardingCamphoto351212254],
+  ["photo-site-blocked-6626", imgBoardingPhoto6626],
+  ["photo-site-blocked-9075", imgBoardingPhoto9075],
+  ["photo-finishing-active-4467", imgFinishing4467],
+  ["photo-finishing-active-4505", imgFinishing4505],
+  ["photo-finishing-active-4527", imgFinishing4527],
+  ["photo-finishing-active-4545", imgFinishing4545],
+  ["photo-archived-finishing-site-check", imgFinishingSiteCheck],
+  ["photo-archived-9151", imgFinishingPhoto9151],
+  ["photo-archived-9172", imgFinishingPhoto9172],
+  ["photo-archived-9314", imgFinishingPhoto9314],
+  ["photo-ready-complete-foam-joist-2", imgFoamJoist2],
+  ["photo-ready-complete-framing-3007", imgFraming3007],
+  ["photo-ready-complete-framing-3055", imgFraming3055],
+  ["photo-ready-complete-framing-3186", imgFraming3186],
+  ["photo-completed-4458", imgRoot4458],
+]);
 
 export interface UploadPhotoEvidenceInput {
   projectId: string;
@@ -77,6 +148,13 @@ export async function getUsers(): Promise<ApiResult<User[]>> {
   return delay(ok(seedUsers));
 }
 
+export interface CreateUserInput {
+  email: string;
+  fullName: string;
+  role: UserRole;
+  phone?: string;
+}
+
 export async function updateUser(userId: string, input: UpdateUserInput): Promise<ApiResult<User>> {
   const me = seedUsers.find((u) => u.id === currentUserId);
   if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
@@ -84,22 +162,142 @@ export async function updateUser(userId: string, input: UpdateUserInput): Promis
   const user = seedUsers.find((u) => u.id === userId);
   if (!user) return delay({ ok: false, error: { code: "NOT_FOUND", message: "User not found" } });
 
-  if (!input.fullName?.trim()) {
-    return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Name is required", fieldErrors: { fullName: "Required" } } });
+  const isRoleChange = input.role !== undefined && input.role !== user.role;
+  if (me.role !== "admin" && (user.id !== me.id || isRoleChange)) {
+    return delay({ ok: false, error: { code: "FORBIDDEN", message: "Admins only" } });
+  }
+  if (isRoleChange && me.role !== "admin") {
+    return delay({ ok: false, error: { code: "FORBIDDEN", message: "Admins only" } });
+  }
+
+  const fieldErrors: Record<string, string> = {};
+  if (input.fullName !== undefined && !input.fullName.trim()) fieldErrors.fullName = "Required";
+  if (input.email !== undefined && !input.email.trim()) fieldErrors.email = "Required";
+  if (input.email?.trim()) {
+    const email = input.email.trim().toLowerCase();
+    const duplicate = seedUsers.some((u) => u.id !== userId && u.email.toLowerCase() === email);
+    if (duplicate) fieldErrors.email = "Email already exists";
+  }
+  if (Object.keys(fieldErrors).length) {
+    return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Invalid user details", fieldErrors } });
   }
 
   const nowIso = new Date().toISOString();
-  user.fullName = input.fullName.trim();
-  user.phone = input.phone?.trim() || undefined;
-  user.email = input.email?.trim() || undefined;
+  const previousRole = user.role;
+  const previousValue = { fullName: user.fullName, email: user.email, phone: user.phone, role: user.role };
+  if (user.role === "admin" && user.active && input.role !== undefined && input.role !== "admin") {
+    const activeAdmins = seedUsers.filter((u) => u.role === "admin" && u.active);
+    if (activeAdmins.length <= 1) {
+      return delay({ ok: false, error: { code: "STATE_VIOLATION", message: "At least one active admin is required" } });
+    }
+  }
+  if (input.fullName !== undefined) user.fullName = input.fullName.trim();
+  if (input.phone !== undefined) user.phone = input.phone?.trim() || undefined;
+  if (input.email !== undefined) user.email = input.email.trim();
+  if (me.role === "admin" && input.role !== undefined) user.role = input.role;
   user.updatedAt = nowIso;
 
   seedAuditEvents.unshift({
     id: `audit-${Date.now()}`,
     entityType: "user",
     entityId: user.id,
-    action: "updated",
+    action: previousRole !== user.role ? "role_changed" : "updated",
     actorUserId: me.id,
+    previousValue,
+    nextValue: { fullName: user.fullName, email: user.email, phone: user.phone, role: user.role },
+    createdAt: nowIso,
+  });
+
+  return delay(ok(user));
+}
+
+export async function createUser(input: CreateUserInput): Promise<ApiResult<User>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+  if (me.role !== "admin") return delay({ ok: false, error: { code: "FORBIDDEN", message: "Admins only" } });
+
+  const fieldErrors: Record<string, string> = {};
+  if (!input.fullName?.trim()) fieldErrors.fullName = "Required";
+  if (!input.email?.trim()) fieldErrors.email = "Required";
+  if (!input.role) fieldErrors.role = "Required";
+  if (input.email?.trim()) {
+    const email = input.email.trim().toLowerCase();
+    if (seedUsers.some((u) => u.email.toLowerCase() === email)) fieldErrors.email = "Email already exists";
+  }
+  if (Object.keys(fieldErrors).length) {
+    return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Invalid user details", fieldErrors } });
+  }
+
+  const nowIso = new Date().toISOString();
+  const user: User = {
+    id: `user-${Date.now()}`,
+    role: input.role,
+    fullName: input.fullName.trim(),
+    email: input.email.trim(),
+    phone: input.phone?.trim() || undefined,
+    active: true,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  };
+  seedUsers.push(user);
+
+  seedAuditEvents.unshift({
+    id: `audit-${Date.now()}`,
+    entityType: "user",
+    entityId: user.id,
+    action: "create_user",
+    actorUserId: me.id,
+    nextValue: { fullName: user.fullName, email: user.email, phone: user.phone, role: user.role },
+    createdAt: nowIso,
+  });
+
+  return delay(ok(user));
+}
+
+export async function deactivateUser(userId: string): Promise<ApiResult<User>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+  if (me.role !== "admin") return delay({ ok: false, error: { code: "FORBIDDEN", message: "Admins only" } });
+
+  const user = seedUsers.find((u) => u.id === userId);
+  if (!user) return delay({ ok: false, error: { code: "NOT_FOUND", message: "User not found" } });
+  if (user.id === me.id) {
+    return delay({ ok: false, error: { code: "STATE_VIOLATION", message: "You cannot remove your own admin account" } });
+  }
+  if (user.role === "admin" && user.active) {
+    const activeAdmins = seedUsers.filter((u) => u.role === "admin" && u.active);
+    if (activeAdmins.length <= 1) {
+      return delay({ ok: false, error: { code: "STATE_VIOLATION", message: "At least one active admin is required" } });
+    }
+  }
+  if (user.role === "project_manager") {
+    const activeAssignments = seedProjects.filter(
+      (project) => project.assignedProjectManagerId === user.id && project.status !== "completed" && project.status !== "archived",
+    );
+    if (activeAssignments.length > 0) {
+      return delay({
+        ok: false,
+        error: {
+          code: "STATE_VIOLATION",
+          message: "Project managers with active assigned projects must be reassigned before removal",
+        },
+      });
+    }
+  }
+
+  const nowIso = new Date().toISOString();
+  const previousValue = { active: user.active };
+  user.active = false;
+  user.updatedAt = nowIso;
+
+  seedAuditEvents.unshift({
+    id: `audit-${Date.now()}`,
+    entityType: "user",
+    entityId: user.id,
+    action: "deactivated",
+    actorUserId: me.id,
+    previousValue,
+    nextValue: { active: user.active },
     createdAt: nowIso,
   });
 
@@ -324,6 +522,7 @@ export interface UpdateUserInput {
   fullName?: string;
   phone?: string;
   email?: string;
+  role?: UserRole;
 }
 
 export async function createClient(input: CreateClientInput): Promise<ApiResult<ClientRecord>> {

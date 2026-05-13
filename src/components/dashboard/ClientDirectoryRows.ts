@@ -7,6 +7,15 @@ export interface ClientDirectoryRow {
   latestProject?: Project;
 }
 
+export type ClientSortKey = "client" | "contact" | "active" | "total";
+
+export interface ClientSortState {
+  key: ClientSortKey;
+  direction: "asc" | "desc";
+}
+
+const DEFAULT_SORT: ClientSortState = { key: "client", direction: "asc" };
+
 function matchesSearch(client: ClientRecord, search: string) {
   if (!search) return true;
   return [client.name, client.primaryContactName, client.phone, client.email]
@@ -18,11 +27,11 @@ export function buildClientRows(
   clients: ClientRecord[],
   projects: Project[],
   search: string,
+  sort: ClientSortState = DEFAULT_SORT,
 ): ClientDirectoryRow[] {
   const normalizedSearch = search.trim().toLowerCase();
-  return clients
+  const rows = clients
     .filter((client) => matchesSearch(client, normalizedSearch))
-    .sort((a, b) => a.name.localeCompare(b.name))
     .map((client) => {
       const clientProjects = projects.filter((project) => project.clientId === client.id);
       const latestProject = [...clientProjects].sort((a, b) =>
@@ -36,4 +45,21 @@ export function buildClientRows(
         latestProject,
       };
     });
+
+  const direction = sort.direction === "asc" ? 1 : -1;
+  return rows.sort((a, b) => {
+    let result = 0;
+    if (sort.key === "client") {
+      result = a.client.name.localeCompare(b.client.name);
+    } else if (sort.key === "contact") {
+      result = (a.client.primaryContactName ?? "").localeCompare(b.client.primaryContactName ?? "");
+    } else if (sort.key === "active") {
+      result = a.activeProjects - b.activeProjects;
+    } else if (sort.key === "total") {
+      result = a.totalJobs - b.totalJobs;
+    }
+
+    if (result !== 0) return result * direction;
+    return a.client.name.localeCompare(b.client.name);
+  });
 }

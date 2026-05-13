@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { AddressAutocomplete } from "@/components/ui/address-autocomplete";
 import { createClient, updateClient, type CreateClientInput } from "@/lib/api";
 import type { ClientRecord } from "@/lib/types";
 
@@ -131,12 +132,12 @@ export function NewClientDialog({ open, onOpenChange, client, onCreated, onUpdat
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="billing">Billing address</Label>
-            <Textarea
+            <Label htmlFor="billing">Address</Label>
+            <AddressAutocomplete
               id="billing"
               value={form.billingAddress ?? ""}
-              onChange={(e) => setField("billingAddress", e.target.value)}
-              rows={2}
+              onChange={(value) => setField("billingAddress", value)}
+              placeholder="123 Main St"
             />
           </div>
 

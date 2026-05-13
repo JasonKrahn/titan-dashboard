@@ -10,17 +10,18 @@ const DOT: Record<BadgeTone, string> = {
   success: "bg-status-closed",
   warning: "bg-status-attention",
   danger: "bg-status-blocked",
-  accent: "bg-status-accent",
+  accent: "bg-status-not-started",
 };
 
 interface Props {
   insights: BottleneckInsight[];
+  onInsightClick?: (insight: BottleneckInsight) => void;
 }
 
-export function BottleneckInsights({ insights }: Props) {
+export function BottleneckInsights({ insights, onInsightClick }: Props) {
   return (
-    <section className="rounded-md border border-border bg-surface-panel shadow-card">
-      <header className="flex items-center gap-2 border-b border-border px-4 py-3">
+    <section className="rounded-md border border-border bg-surface-panel">
+      <header className="flex items-center gap-2 px-4 py-3">
         <Lightbulb className="h-3.5 w-3.5 text-status-attention" aria-hidden />
         <h2 className="text-sm font-bold uppercase tracking-widest">Bottlenecks</h2>
       </header>
@@ -31,9 +32,16 @@ export function BottleneckInsights({ insights }: Props) {
       ) : (
         <ul className="divide-y divide-border">
           {insights.map((i) => (
-            <li key={i.id} className="flex items-start gap-3 px-4 py-2.5 text-xs">
-              <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", DOT[i.tone])} aria-hidden />
-              <span className="text-foreground/85">{i.message}</span>
+            <li
+              key={i.id}
+              onClick={() => onInsightClick?.(i)}
+              className={cn(
+                "flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-accent/40",
+                onInsightClick && "group"
+              )}
+            >
+              <span className={cn("mt-1 h-2.5 w-2.5 shrink-0 rounded-full", DOT[i.tone])} aria-hidden />
+              <span className="text-[11px] text-foreground/85 group-hover:text-foreground">{i.message}</span>
             </li>
           ))}
         </ul>

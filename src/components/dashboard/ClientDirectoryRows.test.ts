@@ -73,4 +73,24 @@ describe("buildClientRows", () => {
 
     expect(rows.map((row) => row.client.id)).toEqual(["cedar", "northbridge", "summit"]);
   });
+
+  it("sorts by contact, active, and total using selected direction", () => {
+    const customClients = [
+      client({ id: "a", name: "Atlas Homes", primaryContactName: "Zed" }),
+      client({ id: "b", name: "Briar Builds", primaryContactName: "Amy" }),
+      client({ id: "c", name: "Crown Projects", primaryContactName: "Moe" }),
+    ];
+    const customProjects = [
+      project({ id: "a1", clientId: "a", status: "active" }),
+      project({ id: "a2", clientId: "a", status: "completed" }),
+      project({ id: "a3", clientId: "a", status: "active" }),
+      project({ id: "b1", clientId: "b", status: "completed" }),
+      project({ id: "c1", clientId: "c", status: "active" }),
+      project({ id: "c2", clientId: "c", status: "completed" }),
+    ];
+
+    expect(buildClientRows(customClients, customProjects, "", { key: "contact", direction: "asc" }).map((row) => row.client.id)).toEqual(["b", "c", "a"]);
+    expect(buildClientRows(customClients, customProjects, "", { key: "active", direction: "desc" }).map((row) => row.client.id)).toEqual(["a", "c", "b"]);
+    expect(buildClientRows(customClients, customProjects, "", { key: "total", direction: "desc" }).map((row) => row.client.id)).toEqual(["a", "c", "b"]);
+  });
 });

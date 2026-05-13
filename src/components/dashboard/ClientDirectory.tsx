@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpRight, Building2, Grid2X2, List, Mail, MoreHorizontal, Phone, Pencil, Plus, Search } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ArrowDown, ArrowUp, ArrowUpRight, Building2, Grid2X2, List, Mail, MoreHorizontal, Phone, Pencil, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Card } from "@/components/ui/card";
@@ -16,7 +16,8 @@ import {
 } from "@/components/ui/table";
 import type { ClientRecord, Project } from "@/lib/types";
 import { relativeTime } from "@/lib/derived";
-import { buildClientRows } from "./ClientDirectoryRows";
+import { cn } from "@/lib/utils";
+import { buildClientRows, type ClientSortKey, type ClientSortState } from "./ClientDirectoryRows";
 
 interface ClientDirectoryProps {
   clients: ClientRecord[];
@@ -28,6 +29,43 @@ interface ClientDirectoryProps {
   onEditClient?: (id: string) => void;
   onNewClient?: () => void;
   isAdmin?: boolean;
+}
+
+const sortLabels: Record<ClientSortKey, string> = {
+  client: "Client",
+  contact: "Contact",
+  active: "Active",
+  total: "Total",
+};
+
+function SortButton({
+  sortKey,
+  sort,
+  onSort,
+  children,
+}: {
+  sortKey: ClientSortKey;
+  sort: ClientSortState;
+  onSort: (key: ClientSortKey) => void;
+  children: ReactNode;
+}) {
+  const active = sort.key === sortKey;
+  const Icon = active && sort.direction === "asc" ? ArrowUp : ArrowDown;
+
+  return (
+    <button
+      type="button"
+      className={cn(
+        "inline-flex items-center gap-1 rounded-sm text-left font-medium transition-colors hover:text-foreground",
+        active ? "text-foreground" : "text-muted-foreground",
+      )}
+      aria-label={`Sort by ${sortLabels[sortKey]}`}
+      onClick={() => onSort(sortKey)}
+    >
+      {children}
+      <Icon className={cn("h-3.5 w-3.5", !active && "opacity-40")} />
+    </button>
+  );
 }
 
 export function ClientDirectory({
@@ -47,8 +85,17 @@ export function ClientDirectory({
     const saved = localStorage.getItem("clientViewMode");
     return saved === "list" || saved === "cards" ? saved : "cards";
   });
-  const rows = useMemo(() => buildClientRows(clients, projects, search), [clients, projects, search]);
+  const [sort, setSort] = useState<ClientSortState>({ key: "client", direction: "asc" });
+  const rows = useMemo(() => buildClientRows(clients, projects, search, sort), [clients, projects, search, sort]);
   const mobileActionRow = rows.find((row) => row.client.id === mobileActionClientId);
+
+  const handleSort = (key: ClientSortKey) => {
+    setSort((current) =>
+      current.key === key
+        ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
+        : { key, direction: key === "active" || key === "total" ? "desc" : "asc" },
+    );
+  };
 
   useEffect(() => {
     localStorage.setItem("clientViewMode", displayMode);
@@ -165,12 +212,24 @@ export function ClientDirectory({
           <Table className="table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[58%] md:w-[50%] lg:w-[30%] xl:w-[22%]">Client</TableHead>
-                <TableHead className="hidden md:table-cell md:w-[24%] lg:w-[18%] xl:w-[14%]">Contact</TableHead>
+                <TableHead className="w-[58%] md:w-[50%] lg:w-[30%] xl:w-[22%]">
+                  <SortButton sortKey="client" sort={sort} onSort={handleSort}>Client</SortButton>
+                </TableHead>
+                <TableHead className="hidden md:table-cell md:w-[24%] lg:w-[18%] xl:w-[14%]">
+                  <SortButton sortKey="contact" sort={sort} onSort={handleSort}>Contact</SortButton>
+                </TableHead>
                 <TableHead className="hidden lg:table-cell lg:w-[12%] xl:w-[10%]">Phone</TableHead>
                 <TableHead className="hidden lg:table-cell lg:w-[20%] xl:w-[18%]">Email</TableHead>
-                <TableHead className="w-[21%] text-right md:w-[13%] lg:w-[10%] xl:w-[7%]">Active</TableHead>
-                <TableHead className="w-[21%] text-right md:w-[13%] lg:w-[10%] xl:w-[7%]">Total</TableHead>
+                <TableHead className="w-[21%] text-right md:w-[13%] lg:w-[10%] xl:w-[7%]">
+                  <div className="flex justify-end">
+                    <SortButton sortKey="active" sort={sort} onSort={handleSort}>Active</SortButton>
+                  </div>
+                </TableHead>
+                <TableHead className="w-[21%] text-right md:w-[13%] lg:w-[10%] xl:w-[7%]">
+                  <div className="flex justify-end">
+                    <SortButton sortKey="total" sort={sort} onSort={handleSort}>Total</SortButton>
+                  </div>
+                </TableHead>
                 <TableHead className="hidden xl:table-cell xl:w-[22%]">Latest</TableHead>
                 <TableHead className="w-[36px]"></TableHead>
               </TableRow>

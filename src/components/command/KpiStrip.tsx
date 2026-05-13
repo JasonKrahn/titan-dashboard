@@ -28,7 +28,7 @@ const TONE_RING: Record<BadgeTone, string> = {
   success: "border-status-closed/30 hover:border-status-closed/60",
   warning: "border-status-attention/40 hover:border-status-attention/70",
   danger: "border-status-blocked/40 hover:border-status-blocked/70",
-  accent: "border-status-accent/30 hover:border-status-accent/60",
+  accent: "border-status-not-started/30 hover:border-status-not-started/60",
 };
 
 const TONE_TEXT: Record<BadgeTone, string> = {
@@ -38,7 +38,7 @@ const TONE_TEXT: Record<BadgeTone, string> = {
   success: "text-status-closed",
   warning: "text-status-attention",
   danger: "text-status-blocked",
-  accent: "text-status-accent",
+  accent: "text-status-not-started",
 };
 
 const TONE_STRIPE: Record<BadgeTone, string> = {
@@ -48,7 +48,7 @@ const TONE_STRIPE: Record<BadgeTone, string> = {
   success: "bg-status-closed",
   warning: "bg-status-attention",
   danger: "bg-status-blocked",
-  accent: "bg-status-accent",
+  accent: "bg-status-not-started",
 };
 
 interface KpiStripProps {
@@ -61,11 +61,12 @@ export function KpiStrip({ items, active, onSelect }: KpiStripProps) {
   return (
     <div
       role="list"
-      className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5"
+      className="grid grid-cols-2 gap-2 sm:grid-cols-4"
     >
       {items.map((item) => {
         const Icon = ICON[item.key];
         const isActive = active === item.key;
+        const isRiskState = item.key === "blocked" || item.key === "failed" || item.key === "attic";
         return (
           <button
             key={item.key}
@@ -73,7 +74,8 @@ export function KpiStrip({ items, active, onSelect }: KpiStripProps) {
             role="listitem"
             onClick={() => onSelect?.(item.key)}
             className={cn(
-              "group relative flex items-center gap-3 overflow-hidden rounded-md border bg-surface-panel px-3 py-2.5 text-left transition-colors",
+              "group relative flex items-center gap-3 overflow-hidden rounded-md border bg-surface-panel text-left transition-colors",
+              isRiskState ? "px-4 py-3" : "px-3 py-2.5",
               TONE_RING[item.tone],
               isActive && "ring-2 ring-ring",
             )}
@@ -86,7 +88,11 @@ export function KpiStrip({ items, active, onSelect }: KpiStripProps) {
                 {item.label}
               </div>
               <div className="flex items-baseline gap-2">
-                <span className={cn("text-2xl font-bold tabular-nums leading-none", TONE_TEXT[item.tone])}>
+                <span className={cn(
+                  isRiskState ? "text-3xl" : "text-2xl",
+                  "font-bold tabular-nums leading-none",
+                  TONE_TEXT[item.tone]
+                )}>
                   {item.count}
                 </span>
                 {item.hint && (
