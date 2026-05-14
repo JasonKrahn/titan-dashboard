@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Camera, Upload } from "lucide-react";
@@ -7,12 +7,14 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { uploadPhotoEvidence, type UploadPhotoEvidenceInput } from "@/lib/api";
-import type { Deficiency, PhotoEvidencePurpose } from "@/lib/types";
+import type { Deficiency, PhotoEvidencePurpose, Phase } from "@/lib/types";
+import { PHASE_LABEL } from "@/lib/derived";
 
 interface PhotoUploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  phaseId: string;
+  phases: Phase[];
+  defaultPhaseId?: string;
   projectId: string;
   deficiencies: Deficiency[];
 }
@@ -30,7 +32,8 @@ const DEFICIENCY_PURPOSES: PhotoEvidencePurpose[] = ["deficiency_before", "defic
 export function PhotoUploadDialog({
   open,
   onOpenChange,
-  phaseId,
+  phases,
+  defaultPhaseId,
   projectId,
   deficiencies,
 }: PhotoUploadDialogProps) {
@@ -38,7 +41,31 @@ export function PhotoUploadDialog({
   const [file, setFile] = useState<File | null>(null);
   const [purpose, setPurpose] = useState<PhotoEvidencePurpose>("general");
   const [deficiencyId, setDeficiencyId] = useState<string>("");
+  const [selectedPhaseId, setSelectedPhaseId] = useState<string>("");
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Determine initial phase: defaultPhaseId, then first in_progress, then first phase
+  const initialPhaseId = useMemo(() => {
+    if (defaultPhaseId && phases.find(p => p.id === defaultPhaseId)) {
+      return defaultPhaseId;
+    }
+    const activePhase = phases.find(p => p.status === "in_progress");
+    if (activePhase) return activePhase.id;
+    return phases[0]?.id ?? "";
+  }, [defaultPhaseId, phases]);
+
+  // Sync selectedPhaseId with initialPhaseId when dialog opens
+  useEffect(() => {
+    if (open) {
+      setSelectedPhaseId(initialPhaseId);
+    }
+  }, [open, initialPhaseId]);
+
+  // Filter deficiencies by selected phase
+  const selectedPhaseDeficiencies = useMemo(
+    () => deficiencies.filter(d => d.phaseId === selectedPhaseId),
+    [deficiencies, selectedPhaseId],
+  );
 
   const reset = () => {
     setFile(null);
@@ -57,7 +84,7 @@ export function PhotoUploadDialog({
       if (res.ok === true) {
         toast.success("Photo uploaded");
         qc.invalidateQueries({ queryKey: ["project", projectId] });
-        qc.invalidateQueries({ queryKey: ["phase", phaseId] });
+        qc.invalidateQueries({ queryKey: ["phase", selectedPhaseId] });
         onOpenChange(false);
         return;
       }
@@ -71,13 +98,17 @@ export function PhotoUploadDialog({
       toast.error("Please select a photo");
       return;
     }
+    if (!selectedPhaseId) {
+      toast.error("Please select a phase");
+      return;
+    }
     if (DEFICIENCY_PURPOSES.includes(purpose) && !deficiencyId) {
       toast.error("Please select a deficiency for this photo");
       return;
     }
     mutation.mutate({
       projectId,
-      phaseId,
+      phaseId: selectedPhaseId,
       purpose,
       file,
       deficiencyId: DEFICIENCY_PURPOSES.includes(purpose) ? deficiencyId : undefined,
@@ -97,10 +128,31 @@ export function PhotoUploadDialog({
       <DialogContent className="md:max-w-[440px]">
         <DialogHeader>
           <DialogTitle>Upload Photo</DialogTitle>
-          <DialogDescription>Add a photo to this phase.</DialogDescription>
+          <DialogDescription>Add a photo to this project.</DialogDescription>
         </DialogHeader>
 
         <form className="grid gap-4 py-2" onSubmit={handleSubmit}>
+          {phases.length > 1 && (
+            <div className="grid gap-1.5">
+              <Label htmlFor="photo-phase">Phase *</Label>
+              <Select
+                value={selectedPhaseId}
+                onValueChange={setSelectedPhaseId}
+              >
+                <SelectTrigger id="photo-phase">
+                  <SelectValue placeholder="Select phase" />
+                </SelectTrigger>
+                <SelectContent>
+                  {phases.map((phase) => (
+                    <SelectItem key={phase.id} value={phase.id}>
+                      {PHASE_LABEL[phase.type] ?? phase.type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="grid gap-1.5">
             <Label htmlFor="photo-purpose">Purpose *</Label>
             <Select
@@ -131,12 +183,12 @@ export function PhotoUploadDialog({
                   <SelectValue placeholder="Select deficiency" />
                 </SelectTrigger>
                 <SelectContent>
-                  {deficiencies.length === 0 ? (
+                  {selectedPhaseDeficiencies.length === 0 ? (
                     <SelectItem value="none" disabled>
                       No deficiencies on this phase
                     </SelectItem>
                   ) : (
-                    deficiencies.map((d) => (
+                    selectedPhaseDeficiencies.map((d) => (
                       <SelectItem key={d.id} value={d.id}>
                         {d.title}
                       </SelectItem>

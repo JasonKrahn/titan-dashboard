@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -223,6 +223,10 @@ export default function SubcontractorRolodexPage() {
   const [sortOption, setSortOption] = useState<SortOption>("name");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [mobileActionSubcontractorId, setMobileActionSubcontractorId] = useState<string | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem("subcontractorViewMode", viewMode);
+  }, [viewMode]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);

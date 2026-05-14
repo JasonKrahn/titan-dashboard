@@ -66,6 +66,8 @@ const INVENTORY_FILTERS: { value: InventoryFilter; label: string }[] = [
   { value: "picked_up", label: "Picked up" },
 ];
 
+const VISIBLE_ITEM_CHIP_COUNT = 3;
+
 function auditRequestLabel(type: AuditRequestType) {
   if (type === "materials") return "Materials audit";
   if (type === "hardware") return "Hardware audit";
@@ -161,26 +163,36 @@ function matchesSearch(query: string, project: Project, pmName: string, equipmen
 function ItemChips({ items, query }: { items: AggregatedItem[]; query: string }) {
   if (items.length === 0) return null;
   const q = query.toLowerCase();
+  const sortedItems = q
+    ? [...items].sort((a, b) => Number(b.label.toLowerCase().includes(q)) - Number(a.label.toLowerCase().includes(q)))
+    : items;
+  const visibleItems = sortedItems.slice(0, VISIBLE_ITEM_CHIP_COUNT);
+  const hiddenItemCount = Math.max(0, items.length - visibleItems.length);
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {items.map((item) => {
+    <div className="flex flex-wrap gap-1">
+      {visibleItems.map((item) => {
         const isMatch = q && item.label.toLowerCase().includes(q);
         return (
           <span
             key={item.itemKey}
-            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
+            className={`inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors ${
               isMatch
                 ? "border-primary/60 bg-primary/10 text-primary"
-                : "border-border bg-muted/30 text-foreground"
+                : "border-border/70 bg-background/35 text-foreground"
             }`}
           >
-            {item.label}
-            <span className={`rounded-full px-1 py-px text-[10px] font-semibold tabular-nums ${isMatch ? "bg-primary/15" : "bg-foreground/10"}`}>
+            <span className="truncate">{item.label}</span>
+            <span className={`shrink-0 rounded-full px-1 py-px text-[10px] font-semibold tabular-nums ${isMatch ? "bg-primary/15" : "bg-foreground/10"}`}>
               ×{item.quantity}
             </span>
           </span>
         );
       })}
+      {hiddenItemCount > 0 && (
+        <span className="inline-flex items-center rounded-full border border-border/60 bg-muted/10 px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+          +{hiddenItemCount} more
+        </span>
+      )}
     </div>
   );
 }
@@ -202,10 +214,10 @@ function InventorySection({ title, items, query }: { title: string; items: Aggre
   if (items.length === 0) return null;
   const total = items.reduce((sum, item) => sum + item.quantity, 0);
   return (
-    <div className="rounded-lg border border-border/80 bg-muted/15 p-3">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{title}</p>
-        <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-foreground">
+    <div className="border-t border-border/60 pt-2 first:border-t-0 first:pt-0">
+      <div className="mb-1.5 flex items-center justify-between gap-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{title}</p>
+        <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-foreground/90">
           {items.length} · ×{total}
         </span>
       </div>
@@ -225,11 +237,11 @@ function ProjectCard({ project, pmName, pmPhone, equipment, materials, pickups, 
   const mapsUrl = getGoogleMapsSearchUrl(project.siteAddress);
 
   return (
-    <Card className="overflow-hidden border-border-strong bg-gradient-surface shadow-card">
-      <div className="p-3 sm:p-4">
-      <div className="mb-2.5 flex items-start justify-between gap-2 sm:mb-3">
-        <div className="min-w-0">
-          <h2 className="line-clamp-2 text-base font-semibold leading-tight">{project.name}</h2>
+    <Card className="overflow-hidden border-border bg-gradient-surface shadow-card">
+      <div className="space-y-3 p-3 sm:p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h2 className="line-clamp-2 text-base font-semibold leading-tight text-foreground">{project.name}</h2>
           <a
             href={mapsUrl}
             target="_blank"
@@ -246,7 +258,7 @@ function ProjectCard({ project, pmName, pmPhone, equipment, materials, pickups, 
       </div>
 
       {pmName && (
-        <div className="mb-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground sm:mb-3">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           <User className="h-3.5 w-3.5 shrink-0" />
           <span className="font-medium text-foreground">{pmName}</span>
           {pmPhone && (
@@ -261,23 +273,23 @@ function ProjectCard({ project, pmName, pmPhone, equipment, materials, pickups, 
         </div>
       )}
 
-      <div className="mb-2.5 grid grid-cols-3 gap-1.5 rounded-lg border border-border/70 bg-background/35 p-2 sm:mb-3 sm:gap-2">
-        <div>
-          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Hardware</p>
+      <div className="grid grid-cols-[1.2fr_0.9fr_0.9fr] overflow-hidden rounded-md border border-border/60 bg-background/25">
+        <div className="border-r border-border/50 px-3 py-2">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">On site</p>
+          <p className="mt-0.5 text-xl font-bold leading-none tabular-nums">×{currentQuantity}</p>
+        </div>
+        <div className="border-r border-border/50 px-3 py-2">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Hardware</p>
           <p className="mt-0.5 text-sm font-semibold tabular-nums">{equipment.length}</p>
         </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Materials</p>
+        <div className="px-3 py-2">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Materials</p>
           <p className="mt-0.5 text-sm font-semibold tabular-nums">{materials.length}</p>
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">On site</p>
-          <p className="mt-0.5 text-sm font-semibold tabular-nums">×{currentQuantity}</p>
         </div>
       </div>
 
       {hasAuditRequest && (
-        <div className="mb-2.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary sm:mb-3">
+        <div className="rounded-md border border-primary/25 bg-primary/10 px-3 py-2 text-sm text-primary">
           <p className="font-semibold">Audit requested</p>
           <p className="mt-1 text-xs leading-snug">
             {auditRequestTypes.map((type) => `${auditRequestLabel(type)} requested`).join(" · ")}
@@ -286,14 +298,14 @@ function ProjectCard({ project, pmName, pmPhone, equipment, materials, pickups, 
       )}
 
       {showEmptyInventory ? (
-        <div className="space-y-2.5 sm:space-y-3">
-          <p className="rounded-lg border border-dashed border-border bg-muted/10 px-3 py-2 text-sm text-muted-foreground">Nothing logged yet</p>
+        <div className="space-y-2.5">
+          <p className="rounded-md border border-dashed border-border/70 bg-muted/10 px-3 py-2 text-sm text-muted-foreground">Nothing logged yet</p>
           <Button variant="outline" className="h-11 w-full" onClick={() => onRequestAudit(project)}>
             Request audit
           </Button>
         </div>
       ) : (
-        <div className="space-y-2 sm:space-y-2.5">
+        <div className="space-y-2 rounded-md bg-muted/10 p-2.5">
           <InventorySection title="Hardware on site" items={equipment} query={query} />
           <InventorySection title="Materials on site" items={materials} query={query} />
           <InventorySection title="Picked up" items={pickups} query={query} />
@@ -552,6 +564,11 @@ const InventoryTrackerPage = () => {
     }))
     .filter((item) => item.quantity > 0);
   const selectedPickupQuantity = selectedPickupItems.reduce((sum, item) => sum + item.quantity, 0);
+  const allPickupItemsSelected = pickupItems.length > 0 && pickupItems.every((item) => (pickupDraft[pickupDraftKey(item)] ?? 0) >= item.available);
+
+  const handleSelectAllPickupItems = () => {
+    setPickupDraft(Object.fromEntries(pickupItems.map((item) => [pickupDraftKey(item), item.available])));
+  };
 
   const pickupMutation = useMutation({
     mutationFn: () =>
@@ -595,7 +612,7 @@ const InventoryTrackerPage = () => {
           <p className="text-xs text-muted-foreground mt-0.5">Active job sites · materials and hardware on site</p>
         </div>
 
-        <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+        <div className="grid grid-cols-5 gap-1 sm:gap-2">
           {inventoryStatCards.map((stat) => {
             const isActive = inventoryFilter === stat.value;
             return (
@@ -606,8 +623,8 @@ const InventoryTrackerPage = () => {
                 aria-pressed={isActive}
                 onClick={() => setInventoryFilter(stat.value)}
                 className={cn(
-                  "min-w-0 rounded-lg border bg-muted/20 p-1.5 text-left text-card-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 sm:p-2.5",
-                  isActive ? "border-primary/60 bg-primary/10 shadow-glow" : "border-border hover:border-border-emphasis hover:bg-muted/30",
+                  "min-w-0 rounded-md border bg-muted/10 p-1.5 text-left text-card-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 sm:p-2.5",
+                  isActive ? "border-primary/60 bg-primary/10 shadow-glow" : "border-border/70 hover:border-border-emphasis hover:bg-muted/20",
                 )}
               >
                 <p className={cn("truncate text-[9px] uppercase tracking-[0.12em] sm:text-[10px] sm:tracking-widest", isActive ? "text-primary" : "text-muted-foreground")}>{stat.label}</p>
@@ -632,7 +649,7 @@ const InventoryTrackerPage = () => {
               autoComplete="off"
             />
           </div>
-          <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 scrollbar-hide sm:mx-0 sm:max-w-[28rem] sm:px-0 sm:pb-0">
+          <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5 scrollbar-hide sm:mx-0 sm:max-w-[28rem] sm:px-0 sm:pb-0">
             {INVENTORY_FILTERS.map((filter) => (
               <button
                 key={filter.value}
@@ -640,10 +657,10 @@ const InventoryTrackerPage = () => {
                 aria-pressed={inventoryFilter === filter.value}
                 onClick={() => setInventoryFilter(filter.value)}
                 className={cn(
-                  "h-8 shrink-0 rounded-full border px-3 text-xs font-semibold transition-colors sm:h-9",
+                  "h-7 shrink-0 rounded-full border px-2.5 text-[11px] font-semibold transition-colors sm:h-8 sm:px-3",
                   inventoryFilter === filter.value
-                    ? "border-primary/60 bg-primary text-primary-foreground shadow-glow"
-                    : "border-border bg-card text-muted-foreground",
+                    ? "border-primary/50 bg-primary/15 text-primary"
+                    : "border-border/60 bg-transparent text-muted-foreground hover:bg-muted/20 hover:text-foreground",
                 )}
               >
                 {filter.label}
@@ -777,6 +794,24 @@ const InventoryTrackerPage = () => {
               >
                 {pickupProject.siteAddress}
               </a>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 rounded-md border border-border/70 bg-muted/10 px-3 py-2">
+              <div>
+                <p className="text-xs font-semibold text-foreground">Pickup quantities</p>
+                <p className="text-[11px] text-muted-foreground">Set each line manually or max everything at once.</p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                aria-label="Set all pickup quantities to available"
+                disabled={allPickupItemsSelected}
+                onClick={handleSelectAllPickupItems}
+              >
+                All
+              </Button>
             </div>
 
             <div className="space-y-2">

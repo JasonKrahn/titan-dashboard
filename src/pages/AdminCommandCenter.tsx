@@ -7,6 +7,7 @@ import { KpiStrip, type KpiData, type KpiKey } from "@/components/command/KpiStr
 import { AttentionQueue } from "@/components/command/AttentionQueue";
 import { PhaseFlowHeatmap } from "@/components/command/PhaseFlowHeatmap";
 import { BottleneckInsights } from "@/components/command/BottleneckInsights";
+import { ExecutiveBrief } from "@/components/command/ExecutiveBrief";
 import {
   getAllDeficiencies,
   getAllGates,
@@ -17,9 +18,10 @@ import {
   getProjects,
   getUsers,
 } from "@/lib/api";
-import { buildAttentionQueue, markItemResolved, type QueueFilter, type QueueFilters, type QueueItem } from "@/lib/command/attentionQueue";
+import { buildAttentionQueue, type QueueFilter, type QueueFilters, type QueueItem } from "@/lib/command/attentionQueue";
 import { buildBottleneckInsights, buildHeatmap, type BottleneckInsight } from "@/lib/command/heatmap";
 import { KPI_TO_FILTER, buildCommandKpis } from "@/lib/command/kpis";
+import { buildExecutiveSummary } from "@/lib/command/executiveSummary";
 
 export default function AdminCommandCenter() {
   const navigate = useNavigate();
@@ -61,6 +63,7 @@ export default function AdminCommandCenter() {
 
   const matrix = useMemo(() => buildHeatmap(projects, phases), [projects, phases]);
   const insights = useMemo(() => buildBottleneckInsights(matrix, projects), [matrix, projects]);
+  const executiveSummary = useMemo(() => buildExecutiveSummary(projects, queueItems), [projects, queueItems]);
 
   const kpis: KpiData[] = useMemo(() => {
     return buildCommandKpis({ projects, phases, gates, photos }).filter((kpi) => kpi.key !== "active");
@@ -81,6 +84,12 @@ export default function AdminCommandCenter() {
   };
 
   const handleFilter = (f: QueueFilter) => {
+    setFilter(f);
+    setActiveKpi(null);
+  };
+
+  const handleExecutiveMetric = (f?: QueueFilter) => {
+    if (!f) return;
     setFilter(f);
     setActiveKpi(null);
   };
@@ -166,7 +175,23 @@ export default function AdminCommandCenter() {
           </div>
         ) : (
           <>
-            <KpiStrip items={kpis} active={activeKpi} onSelect={handleKpi} />
+            <ExecutiveBrief
+              summary={executiveSummary}
+              onMetricSelect={handleExecutiveMetric}
+              onOpenProject={(id) => navigate(`/project/${id}`)}
+            />
+
+            <section className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-bold uppercase tracking-widest">Exception Filters</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Drill into the operating signals behind the executive brief.
+                  </p>
+                </div>
+              </div>
+              <KpiStrip items={kpis} active={activeKpi} onSelect={handleKpi} />
+            </section>
 
             <div className="grid gap-4 lg:grid-cols-12">
               <div className="lg:col-span-7 xl:col-span-8">

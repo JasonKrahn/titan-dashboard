@@ -15,7 +15,7 @@ import type { BadgeTone } from "@/components/ui/badge";
 export const AUDIT_ACTION_LABEL: Record<string, string> = {
   activate_project: "Project activated",
   archive_project: "Project archived",
-  attic_gate_updated: "Attic gate updated",
+  attic_gate_updated: "Attic check updated",
   complete_project: "Project completed",
   create_client: "Client created",
   delete_client: "Client deleted",

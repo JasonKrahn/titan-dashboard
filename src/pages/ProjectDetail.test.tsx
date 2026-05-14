@@ -178,6 +178,13 @@ describe("ProjectDetailPage schedule", () => {
     expect(await screen.findByRole("heading", { name: "Phases" })).toBeInTheDocument();
   });
 
+  it("keeps the project photo upload header action desktop-only", async () => {
+    renderPage();
+
+    expect(await screen.findByRole("heading", { name: "Project Photos" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Upload Photo" })).toHaveClass("hidden", "md:inline-flex");
+  });
+
   it("keeps phase actions separate from phase navigation links", async () => {
     getProject.mockResolvedValue({
       ok: true,

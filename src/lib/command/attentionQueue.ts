@@ -414,7 +414,7 @@ export function markItemResolved(items: QueueItem[], itemId: string): QueueItem[
 }
 
 export const QUEUE_FILTERS: { value: QueueCategory | "all"; label: string }[] = [
-  { value: "all", label: "All" },
+  { value: "all", label: "Projects" },
   { value: "critical", label: "Critical" },
   { value: "warning", label: "Warning" },
   { value: "ready", label: "Ready" },

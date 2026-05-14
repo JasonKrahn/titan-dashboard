@@ -9,6 +9,8 @@ interface StatsRowProps {
   blockedItems: number;
   inspectionsDueThisWeek: number;
   loading?: boolean;
+  activeFilter?: "active" | "blocked" | "inspections" | null;
+  onSelect?: (filter: "active" | "blocked" | "inspections" | null) => void;
 }
 
 interface StatProps {
@@ -17,11 +19,19 @@ interface StatProps {
   icon: React.ReactNode;
   tone: "primary" | "danger" | "ready";
   hint?: string;
+  filterKey: "active" | "blocked" | "inspections";
+  isActive: boolean;
+  onSelect?: (filter: "active" | "blocked" | "inspections" | null) => void;
 }
 
-function Stat({ label, value, icon, tone, hint }: StatProps) {
+function Stat({ label, value, icon, tone, hint, filterKey, isActive, onSelect }: StatProps) {
   return (
-    <Card surface="panel" className="p-3 sm:p-5">
+    <button
+      type="button"
+      onClick={() => onSelect?.(filterKey)}
+      className={`relative rounded-lg border text-card-foreground border-border-strong bg-gradient-surface shadow-panel p-3 sm:p-5 transition-colors ${isActive ? "ring-2 ring-ring" : ""}`}
+      aria-pressed={isActive}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <SectionHeading as="p" size="sm" className="sm:text-xs">
@@ -34,11 +44,11 @@ function Stat({ label, value, icon, tone, hint }: StatProps) {
           {icon}
         </IconWell>
       </div>
-    </Card>
+    </button>
   );
 }
 
-export function StatsRow({ activeProjects, blockedItems, inspectionsDueThisWeek, loading }: StatsRowProps) {
+export function StatsRow({ activeProjects, blockedItems, inspectionsDueThisWeek, loading, activeFilter, onSelect }: StatsRowProps) {
   if (loading) {
     return (
       <div className="grid gap-2 grid-cols-3 sm:gap-4">
@@ -56,6 +66,9 @@ export function StatsRow({ activeProjects, blockedItems, inspectionsDueThisWeek,
         hint="Visible to your role"
         icon={<Activity className="h-5 w-5 text-primary" />}
         tone="primary"
+        filterKey="active"
+        isActive={activeFilter === "active"}
+        onSelect={onSelect}
       />
       <Stat
         label="Blocked items"
@@ -63,6 +76,9 @@ export function StatsRow({ activeProjects, blockedItems, inspectionsDueThisWeek,
         hint="Across phases & gates"
         icon={<AlertTriangle className="h-5 w-5 text-status-blocked" />}
         tone="danger"
+        filterKey="blocked"
+        isActive={activeFilter === "blocked"}
+        onSelect={onSelect}
       />
       <Stat
         label="Inspections due"
@@ -70,6 +86,9 @@ export function StatsRow({ activeProjects, blockedItems, inspectionsDueThisWeek,
         hint="Phases ready for inspection"
         icon={<ClipboardCheck className="h-5 w-5 text-status-ready" />}
         tone="ready"
+        filterKey="inspections"
+        isActive={activeFilter === "inspections"}
+        onSelect={onSelect}
       />
     </div>
   );

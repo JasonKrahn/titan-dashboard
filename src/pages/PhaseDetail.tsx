@@ -379,6 +379,15 @@ export default function PhaseDetailPage() {
     }, 0);
   };
   const phaseMobileActions: MobileActionItem[] = [
+    {
+      label: "Upload photo",
+      icon: <Upload className="h-4 w-4" />,
+      helperText: "Add phase or deficiency evidence",
+      onClick: () => {
+        setActiveTab("photos");
+        setPhotoUploadOpen(true);
+      },
+    },
     ...(phase.status !== "closed"
       ? [
           {
@@ -466,15 +475,6 @@ export default function PhaseDetailPage() {
         ]
       : []),
     {
-      label: "Upload photo",
-      icon: <Upload className="h-4 w-4" />,
-      helperText: "Add phase or deficiency evidence",
-      onClick: () => {
-        setActiveTab("photos");
-        setPhotoUploadOpen(true);
-      },
-    },
-    {
       label: "Add checklist item",
       icon: <Plus className="h-4 w-4" />,
       helperText: "Add a task to the phase checklist",
@@ -540,13 +540,6 @@ export default function PhaseDetailPage() {
               </div>
             </div>
 
-            <div className="hidden md:flex md:flex-col md:items-stretch md:gap-3">
-              {siteGate?.status === "blocked" && (
-                <Button size="sm" variant="outline" onClick={() => setSiteUnblockOpen(true)}>
-                  <ShieldCheck className="mr-1.5 h-4 w-4" /> Site Cleared
-                </Button>
-              )}
-            </div>
           </div>
         </Card>
 
@@ -619,7 +612,7 @@ export default function PhaseDetailPage() {
                     const content = (
                       <>
                         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                          {g.requiredPhotoEvidence ? <Camera className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
+                          {(g.requiredPhotoEvidence || g.status === "blocked") ? <Camera className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="flex items-center gap-2">
@@ -649,7 +642,7 @@ export default function PhaseDetailPage() {
                           <span className="mt-1 block text-xs text-muted-foreground">
                             {gatePhotos.length > 0
                               ? "Photo evidence attached"
-                              : g.requiredPhotoEvidence
+                              : (g.requiredPhotoEvidence || g.status === "blocked")
                                 ? "Photo evidence required"
                                 : "No photo required"}
                           </span>
@@ -770,7 +763,7 @@ export default function PhaseDetailPage() {
                           ) : (
                             <div className="flex items-center gap-1.5">
                               <Camera className="h-3.5 w-3.5" />
-                              {g.requiredPhotoEvidence ? "Photo evidence required" : "No photo required"}
+                              {(g.requiredPhotoEvidence || g.status === "blocked") ? "Photo evidence required" : "No photo required"}
                             </div>
                           )}
                           <div className="flex items-center gap-1.5">
@@ -786,6 +779,13 @@ export default function PhaseDetailPage() {
                             </Button>
                             <Button size="sm" variant="outline" className="flex-1" onClick={() => setSiteBlockOpen(true)}>
                               <AlertTriangle className="mr-1.5 h-4 w-4" /> Site Blocked
+                            </Button>
+                          </div>
+                        )}
+                        {g.type === "site_check" && g.status === "blocked" && (
+                          <div className="mt-4">
+                            <Button size="sm" variant="outline" className="flex-1" onClick={() => setSiteUnblockOpen(true)}>
+                              <ShieldCheck className="mr-1.5 h-4 w-4" /> Site Cleared
                             </Button>
                           </div>
                         )}
@@ -842,21 +842,37 @@ export default function PhaseDetailPage() {
                     </div>
                     <div className="space-y-2">
                       {activeDefs.slice(0, 3).map((d) => (
-                        <button
+                        <div
                           key={d.id}
-                          type="button"
                           onClick={() => {
                             setActiveTab("deficiencies");
                             setHighlightedDeficiencyId(d.id);
                           }}
-                          className="flex w-full items-start justify-between gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2 text-left hover:bg-muted/35"
+                          className="flex w-full cursor-pointer items-start justify-between gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2 text-left hover:bg-muted/35"
                         >
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1">
                             <div className="truncate text-sm font-medium text-foreground">{d.title}</div>
                             <div className="mt-0.5 text-xs text-muted-foreground">{STATUS_LABEL[phase.status]}</div>
                           </div>
-                          <SeverityBadge severity={d.severity} size="xs" />
-                        </button>
+                          <div className="flex items-center gap-2">
+                            <SeverityBadge severity={d.severity} size="xs" />
+                            {project.status !== "completed" && project.status !== "archived" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeficiencyDialogMode("resolve");
+                                  setSelectedDeficiencyId(d.id);
+                                  setDeficiencyDialogOpen(true);
+                                }}
+                              >
+                                Resolve
+                              </Button>
+                            )}
+                          </div>
+                        </div>
                       ))}
                     </div>
                   </Card>
@@ -1427,7 +1443,8 @@ export default function PhaseDetailPage() {
         <PhotoUploadDialog
           open={photoUploadOpen}
           onOpenChange={setPhotoUploadOpen}
-          phaseId={phase.id}
+          phases={[phase]}
+          defaultPhaseId={phase.id}
           projectId={project.id}
           deficiencies={deficiencies}
         />
