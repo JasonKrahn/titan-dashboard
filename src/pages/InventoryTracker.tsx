@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Minus, Phone, Plus, Search, User } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useTypeToSearch } from "@/hooks/useTypeToSearch";
 import { getGoogleMapsSearchUrl } from "@/lib/address";
 import { cn } from "@/lib/utils";
 import {
@@ -311,6 +312,14 @@ const InventoryTrackerPage = () => {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useTypeToSearch({
+    searchInputRef,
+    search,
+    onSearchChange: setSearch,
+  });
+
   const [inventoryFilter, setInventoryFilter] = useState<InventoryFilter>("all");
   const [auditProject, setAuditProject] = useState<Project | null>(null);
   const [auditType, setAuditType] = useState<AuditRequestType | "">("");
@@ -612,6 +621,7 @@ const InventoryTrackerPage = () => {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <Input
+              ref={searchInputRef}
               id="inventory-search"
               name="inventorySearch"
               aria-label="Search inventory sites and items"

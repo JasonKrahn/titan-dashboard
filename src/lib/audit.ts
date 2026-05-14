@@ -8,6 +8,7 @@ import type {
   User,
 } from "@/lib/types";
 import { GATE_LABEL, initials, PHASE_LABEL, relativeTime, STATUS_LABEL } from "@/lib/derived";
+import { formatDateWithOptions } from "@/lib/schedule";
 import type { BadgeTone } from "@/components/ui/badge";
 
 
@@ -312,6 +313,45 @@ export function formatAuditEvent(event: AuditEvent, lookups: AuditLookups): Audi
   const statusText = formatStatusText(event);
   const linkUrl = resolveEventUrl(event, lookups);
 
+  // Handle schedule changes from previousValue/nextValue (top-level event properties)
+  let scheduleChangeText: string | undefined;
+  if (
+    event.previousValue &&
+    event.nextValue &&
+    typeof event.previousValue === "object" &&
+    typeof event.nextValue === "object"
+  ) {
+    const prev = event.previousValue as Record<string, unknown>;
+    const next = event.nextValue as Record<string, unknown>;
+    
+    if (
+      typeof prev.scheduledStart === "string" ||
+      typeof prev.scheduledEnd === "string" ||
+      typeof next.scheduledStart === "string" ||
+      typeof next.scheduledEnd === "string"
+    ) {
+      const parts: string[] = [];
+      
+      if (
+        typeof prev.scheduledStart === "string" &&
+        typeof next.scheduledStart === "string" &&
+        prev.scheduledStart !== next.scheduledStart
+      ) {
+        parts.push(`Start: ${formatDateWithOptions(prev.scheduledStart)} → ${formatDateWithOptions(next.scheduledStart)}`);
+      }
+      
+      if (
+        typeof prev.scheduledEnd === "string" &&
+        typeof next.scheduledEnd === "string" &&
+        prev.scheduledEnd !== next.scheduledEnd
+      ) {
+        parts.push(`End: ${formatDateWithOptions(prev.scheduledEnd)} → ${formatDateWithOptions(next.scheduledEnd)}`);
+      }
+      
+      if (parts.length > 0) scheduleChangeText = parts.join(", ");
+    }
+  }
+
   const priority = AUDIT_ACTION_PRIORITY[event.action];
   return {
     actionLabel,
@@ -322,7 +362,7 @@ export function formatAuditEvent(event: AuditEvent, lookups: AuditLookups): Audi
     context,
     entityLabel,
     linkUrl,
-    metadataText,
+    metadataText: scheduleChangeText ?? metadataText,
     priorityBorderClass:
       priority === "danger"
         ? "border-l-4 border-l-status-blocked"
@@ -330,7 +370,7 @@ export function formatAuditEvent(event: AuditEvent, lookups: AuditLookups): Audi
           ? "border-l-4 border-l-status-attention"
           : undefined,
     relativeTime: relativeTime(event.createdAt),
-    searchText: [actionLabel, entityLabel, context, metadataText, statusText].filter(Boolean).join(" ").toLowerCase(),
+    searchText: [actionLabel, entityLabel, context, scheduleChangeText ?? metadataText, statusText].filter(Boolean).join(" ").toLowerCase(),
     statusText,
     title: actionLabel,
   };

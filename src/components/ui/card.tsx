@@ -11,7 +11,7 @@ const surfaceCardVariants = cva("rounded-lg border text-card-foreground", {
       inset: "border-border bg-surface-inset",
       muted: "border-border bg-card/60",
       interactive:
-        "border-border-strong bg-gradient-surface shadow-panel transition-all hover:-translate-y-0.5 hover:border-border-emphasis hover:shadow-interactive",
+        "border-border-strong bg-gradient-surface shadow-panel transition-all hover:-translate-y-0.3 hover:border-border-emphasis hover:shadow-interactive",
     },
   },
   defaultVariants: {

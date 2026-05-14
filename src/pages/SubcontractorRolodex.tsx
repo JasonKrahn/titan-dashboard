@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -44,6 +44,7 @@ import type { Phase, Project, TradeType, SubcontractorContact } from "@/lib/type
 import { Badge } from "@/components/ui/badge";
 import { TradeBadge } from "@/components/ui/trade-badge";
 import { useToast } from "@/hooks/use-toast";
+import { useTypeToSearch } from "@/hooks/useTypeToSearch";
 import { Fab } from "@/components/ui/fab";
 import {
   buildSubcontractorRows,
@@ -228,6 +229,13 @@ export default function SubcontractorRolodexPage() {
   const [editingSubcontractor, setEditingSubcontractor] = useState<SubcontractorContact | null>(null);
   const [deletingSubcontractor, setDeletingSubcontractor] = useState<SubcontractorContact | null>(null);
   const [formData, setFormData] = useState<SubcontractorFormState>(resetForm);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useTypeToSearch({
+    searchInputRef,
+    search,
+    onSearchChange: setSearch,
+  });
 
   const subsQ = useQuery({
     queryKey: ["subcontractors"],
@@ -598,6 +606,7 @@ export default function SubcontractorRolodexPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
+                ref={searchInputRef}
                 id="subcontractor-search"
                 name="subcontractorSearch"
                 aria-label="Search subcontractors"
@@ -962,7 +971,16 @@ export default function SubcontractorRolodexPage() {
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
+              <Button
+                type="submit"
+                disabled={createMutation.isPending}
+                onKeyDown={(e) => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                    e.preventDefault();
+                    (e.currentTarget as HTMLButtonElement).click();
+                  }
+                }}
+              >
                 {createMutation.isPending ? "Adding..." : "Add Subcontractor"}
               </Button>
             </DialogFooter>
@@ -985,7 +1003,16 @@ export default function SubcontractorRolodexPage() {
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={updateMutation.isPending}>
+              <Button
+                type="submit"
+                disabled={updateMutation.isPending}
+                onKeyDown={(e) => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                    e.preventDefault();
+                    (e.currentTarget as HTMLButtonElement).click();
+                  }
+                }}
+              >
                 {updateMutation.isPending ? "Updating..." : "Update Subcontractor"}
               </Button>
             </DialogFooter>

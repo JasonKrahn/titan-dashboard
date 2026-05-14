@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Grid2X2, List, Mail, Phone, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProjectResults, type ProjectDisplayMode } from "@/components/dashboard/ProjectResults";
 import type { ClientRecord, Deficiency, Gate, Phase, Project, ProjectStatus, User } from "@/lib/types";
+import { useTypeToSearch } from "@/hooks/useTypeToSearch";
 
 type ClientProjectFilter = "all" | ProjectStatus;
 
@@ -55,6 +56,13 @@ export function ClientProjectsView({
     return saved === "list" || saved === "cards" ? saved : "cards";
   });
   const [search, setSearch] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useTypeToSearch({
+    searchInputRef,
+    search,
+    onSearchChange: setSearch,
+  });
 
   useEffect(() => {
     localStorage.setItem("clientProjectViewMode", displayMode);
@@ -127,6 +135,7 @@ export function ClientProjectsView({
         <div className="relative w-full md:max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
+            ref={searchInputRef}
             id="client-project-search"
             name="clientProjectSearch"
             aria-label="Search client projects"

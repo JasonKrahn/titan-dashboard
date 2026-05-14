@@ -1,4 +1,6 @@
 import { Search } from "lucide-react";
+import { useRef } from "react";
+import { useTypeToSearch } from "@/hooks/useTypeToSearch";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +22,14 @@ interface FilterBarProps {
 }
 
 export function FilterBar({ filters, search, onSearchChange, onChange, clients, pms, isAdmin, hideStatus }: FilterBarProps) {
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useTypeToSearch({
+    searchInputRef,
+    search,
+    onSearchChange,
+  });
+
   const clientValue = filters.clientId ?? "all";
   const statusValue = filters.status?.[0] ?? "all";
   const pmValue = filters.assignedProjectManagerId ?? "all";
@@ -40,6 +50,7 @@ export function FilterBar({ filters, search, onSearchChange, onChange, clients, 
         <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
+            ref={searchInputRef}
             id="project-filter-search"
             name="projectFilterSearch"
             aria-label="Search projects"
