@@ -11,6 +11,7 @@ import {
   getPhaseMaterials,
   getProjectEquipment,
   getProjects,
+  markAllNotificationsRead,
   markNotificationRead,
   setCurrentUser,
   updatePhase,
@@ -195,6 +196,32 @@ describe("inventory pickup UI", () => {
     await waitFor(() => expect(quantityInput).toHaveValue(available));
     expect(within(screen.getByRole("dialog")).getByRole("button", { name: "Picked up" })).toBeEnabled();
   }, 10_000);
+
+  it("maxes every pickup line when All is selected", async () => {
+    setCurrentUser("user-inventory-1");
+    renderInventoryTracker();
+
+    const pickupButtons = await screen.findAllByRole("button", { name: "Pick up" });
+    const enabledPickupButton = pickupButtons.find((button) => !button.hasAttribute("disabled"));
+    expect(enabledPickupButton).toBeDefined();
+
+    fireEvent.click(enabledPickupButton!);
+
+    expect(await screen.findByRole("heading", { name: "What did you pick up" })).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog");
+    const quantityInputs = within(dialog).getAllByRole("spinbutton", { name: /^Quantity for / }) as HTMLInputElement[];
+    const maxQuantity = quantityInputs.reduce((sum, input) => sum + Number(input.max), 0);
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Set all pickup quantities to available" }));
+
+    await waitFor(() => {
+      for (const input of quantityInputs) {
+        expect(input).toHaveValue(Number(input.max));
+      }
+    });
+    expect(within(dialog).getByText(`${quantityInputs.length} items · ×${maxQuantity}`)).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Picked up" })).toBeEnabled();
+  }, 10_000);
 });
 
 describe("inventory audit request notifications", () => {
@@ -349,6 +376,34 @@ describe("inventory audit request notifications", () => {
     expect(afterRead.ok).toBe(true);
     if (!afterRead.ok) return;
     expect(afterRead.data.some((item) => item.id === notification!.id)).toBe(false);
+  });
+
+  it("clears only the current project manager's unread notifications", async () => {
+    setCurrentUser("user-inventory-1");
+    const created = await createInventoryAuditRequest({ projectId: "proj-ready-inspection", type: "hardware" });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    setCurrentUser("user-pm-1");
+    const cleared = await markAllNotificationsRead();
+    expect(cleared).toMatchObject({ ok: true, data: { count: expect.any(Number) } });
+
+    const pmOneAfterClear = await getNotifications();
+    expect(pmOneAfterClear.ok).toBe(true);
+    if (!pmOneAfterClear.ok) return;
+    expect(pmOneAfterClear.data.some((notification) => notification.id === created.data.id)).toBe(false);
+
+    setCurrentUser("user-inventory-1");
+    const outstandingAfterClear = await getOutstandingInventoryAuditRequests();
+    expect(outstandingAfterClear.ok).toBe(true);
+    if (!outstandingAfterClear.ok) return;
+    expect(outstandingAfterClear.data.some((notification) => notification.id === created.data.id)).toBe(false);
+
+    setCurrentUser("user-pm-2");
+    const otherPmNotifications = await getNotifications();
+    expect(otherPmNotifications.ok).toBe(true);
+    if (!otherPmNotifications.ok) return;
+    expect(otherPmNotifications.data.some((notification) => notification.recipientUserId === "user-pm-2")).toBe(true);
   });
 });
 

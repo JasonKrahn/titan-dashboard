@@ -134,7 +134,7 @@ export function ProjectResults({
 }: ProjectResultsProps) {
   const [internalDisplayMode, setInternalDisplayMode] = useState<ProjectDisplayMode>(() => {
     const saved = localStorage.getItem("projectViewMode");
-    return saved === "list" || saved === "cards" ? saved : "cards";
+    return saved === "list" || saved === "cards" ? saved : "list";
   });
   const displayMode = externalDisplayMode ?? internalDisplayMode;
   const setDisplayMode = externalOnDisplayModeChange ?? setInternalDisplayMode;
@@ -341,7 +341,7 @@ export function ProjectResults({
                       PM
                     </SortButton>
                   </TableHead>
-                  {onArchiveProject && <TableHead className="w-28 px-2" />}
+                  {onArchiveProject && <TableHead className="w-auto px-2" />}
                 </TableRow>
               </TableHeader>
               <TableBody>

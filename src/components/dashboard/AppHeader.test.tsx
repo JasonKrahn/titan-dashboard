@@ -6,8 +6,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppHeader } from "./AppHeader";
 import type { AppNotification, User } from "@/lib/types";
 
-const { getNotifications, markNotificationRead, setCurrentUser } = vi.hoisted(() => ({
+const { getNotifications, markAllNotificationsRead, markNotificationRead, setCurrentUser } = vi.hoisted(() => ({
   getNotifications: vi.fn(),
+  markAllNotificationsRead: vi.fn(),
   markNotificationRead: vi.fn(),
   setCurrentUser: vi.fn(),
 }));
@@ -17,6 +18,7 @@ vi.mock("@/lib/api", async () => {
   return {
     ...actual,
     getNotifications,
+    markAllNotificationsRead,
     markNotificationRead,
     setCurrentUser,
   };
@@ -68,6 +70,19 @@ const notification: AppNotification = {
   createdAt: "2026-05-13T18:00:00.000Z",
 };
 
+const phaseNotification: AppNotification = {
+  id: "notification-phase-1",
+  recipientUserId: "pm-1",
+  type: "phase_end_due",
+  projectId: "proj-1",
+  message: "Drywall phase ends today for Randall Prairie Duplex",
+  metadata: {
+    phaseType: "drywall",
+    phaseEndDate: "2026-05-14",
+  },
+  createdAt: "2026-05-14T02:00:00.000Z",
+};
+
 function LocationProbe() {
   const location = useLocation();
   return <div data-testid="location">{location.pathname}</div>;
@@ -91,6 +106,7 @@ function renderHeader(props?: { currentUser?: User }) {
 beforeEach(() => {
   vi.clearAllMocks();
   getNotifications.mockResolvedValue({ ok: true, data: [] });
+  markAllNotificationsRead.mockResolvedValue({ ok: true, data: { count: 1 } });
   markNotificationRead.mockResolvedValue({ ok: true, data: notification });
 });
 
@@ -143,6 +159,7 @@ describe("AppHeader project manager notifications", () => {
 
     expect(await screen.findByRole("button", { name: "Notifications" })).toBeInTheDocument();
     expect(screen.getByText("No notifications yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Clear" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("notification-unread-marker")).not.toBeInTheDocument();
   });
 
@@ -158,10 +175,38 @@ describe("AppHeader project manager notifications", () => {
     renderHeader({ currentUser: pm });
 
     expect(await screen.findByTestId("notification-unread-marker")).toBeInTheDocument();
-    fireEvent.click(await screen.findByRole("button", { name: notification.message }));
+    fireEvent.click(await screen.findByRole("button", { name: /Dale requested materials and hardware audit/ }));
 
     await waitFor(() => expect(markNotificationRead).toHaveBeenCalledWith(notification.id));
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/project/proj-1"));
   });
-});
 
+  it("renders typed notification rows that wrap long text", async () => {
+    getNotifications.mockResolvedValue({ ok: true, data: [notification] });
+    renderHeader({ currentUser: pm });
+
+    expect(await screen.findByTestId("notification-icon-inventory_audit_request")).toBeInTheDocument();
+    expect(screen.getByText("Materials and hardware audit")).toBeInTheDocument();
+    expect(screen.getByTestId("notification-message")).toHaveClass("whitespace-normal", "break-words");
+  });
+
+  it("formats date-only phase notifications without timezone drift", async () => {
+    getNotifications.mockResolvedValue({ ok: true, data: [phaseNotification] });
+    renderHeader({ currentUser: pm });
+
+    expect(await screen.findByTestId("notification-icon-phase_end_due")).toBeInTheDocument();
+    expect(screen.getByText("Drywall · May 14")).toBeInTheDocument();
+  });
+
+  it("clears all visible notifications without navigating", async () => {
+    getNotifications.mockResolvedValueOnce({ ok: true, data: [notification] }).mockResolvedValue({ ok: true, data: [] });
+    renderHeader({ currentUser: pm });
+
+    expect(await screen.findByTestId("notification-unread-marker")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "Clear" }));
+
+    await waitFor(() => expect(markAllNotificationsRead).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByTestId("notification-unread-marker")).not.toBeInTheDocument());
+    expect(screen.getByTestId("location")).toHaveTextContent("/");
+  });
+});

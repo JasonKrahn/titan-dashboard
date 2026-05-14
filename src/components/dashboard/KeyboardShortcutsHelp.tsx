@@ -46,7 +46,7 @@ export function KeyboardShortcutsHelp({ open, onOpenChange }: KeyboardShortcutsH
           <div>
             <SectionHeading as="h3" className="text-base mb-3">Help</SectionHeading>
             <div className="space-y-2">
-              <ShortcutRow keys={["?"]} description="Show this help dialog" />
+              <ShortcutRow keys={["Cmd", "?"]} description="Show this help dialog" />
               <ShortcutRow keys={["Esc"]} description="Close dialogs" />
             </div>
           </div>

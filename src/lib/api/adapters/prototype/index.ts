@@ -123,7 +123,6 @@ export const photoBlobUrls = new Map<string, string>([
   ["photo-completed-4458", imgRoot4458],
   ["photo-pending-active-insulation-poly", imgInsulation3480],
   ["photo-uploaded-ready-finishing", imgFinishingSiteCheck],
-  ["photo-failed-site-blocked-delivery", imgBoardingPhoto9075],
 ]);
 
 export interface UploadPhotoEvidenceInput {
@@ -675,6 +674,21 @@ export async function markNotificationRead(notificationId: string): Promise<ApiR
 
   notification.readAt = new Date().toISOString();
   return delay(ok(notification));
+}
+
+export async function markAllNotificationsRead(): Promise<ApiResult<{ count: number }>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+
+  const nowIso = new Date().toISOString();
+  let count = 0;
+  for (const notification of seedNotifications) {
+    if (notification.recipientUserId !== me.id || notification.readAt) continue;
+    notification.readAt = nowIso;
+    count += 1;
+  }
+
+  return delay(ok({ count }));
 }
 
 export async function getPhase(phaseId: string): Promise<ApiResult<PhaseDetail>> {
@@ -2286,7 +2300,7 @@ export async function updateAtticGate(input: UpdateAtticGateInput): Promise<ApiR
   if (!drywallStarted) {
     return delay({
       ok: false,
-      error: { code: "STATE_VIOLATION", message: "Attic gate cannot be modified until the drywall phase has begun" },
+      error: { code: "STATE_VIOLATION", message: "Attic check cannot be modified until the drywall phase has begun" },
     });
   }
 

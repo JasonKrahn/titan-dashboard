@@ -1,7 +1,5 @@
 import { Calendar, Users, Filter, Inbox, ChevronDown } from "lucide-react";
-import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   QUEUE_FILTERS,
@@ -28,6 +26,10 @@ export function AttentionQueue({ items, filter, onFilterChange, onOpenProject, f
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const filtered = buildVisibleQueue(items, filter, filters);
   const counts = getQueueCounts(items);
+  const visibleFlagCount = filtered.reduce((sum, item) => sum + 1 + (item.secondaryFlags?.length ?? 0), 0);
+  const countLabel = filter === "all"
+    ? `${filtered.length} project${filtered.length === 1 ? "" : "s"} / ${visibleFlagCount} flag${visibleFlagCount === 1 ? "" : "s"}`
+    : `${filtered.length} flag${filtered.length === 1 ? "" : "s"}`;
 
   return (
     <section className="flex h-full flex-col rounded-md border border-border bg-surface-panel">
@@ -35,9 +37,12 @@ export function AttentionQueue({ items, filter, onFilterChange, onOpenProject, f
       <header className="flex items-center justify-between gap-3 px-4 py-3">
         <div>
           <h2 className="text-sm font-bold uppercase tracking-widest">Attention Queue</h2>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Grouped project exceptions with the next executive action.
+          </p>
         </div>
         <div className="text-[11px] text-muted-foreground">
-          {filtered.length} item{filtered.length === 1 ? "" : "s"}
+          {countLabel}
         </div>
       </header>
 
@@ -179,7 +184,7 @@ export function AttentionQueue({ items, filter, onFilterChange, onOpenProject, f
             <Inbox className="h-8 w-8 text-muted-foreground/60" aria-hidden />
             <p className="text-sm font-semibold">All clear</p>
             <p className="text-xs text-muted-foreground">
-              No items in the {filter === "all" ? "queue" : filter + " filter"}.
+              No items in the {filter === "all" ? "grouped project queue" : filter + " filter"}.
             </p>
           </div>
         ) : (

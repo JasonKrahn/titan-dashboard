@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, Bell, ChevronDown, FileText, Package, Radar, Settings, UserCog, Users } from "lucide-react";
+import { Archive, Bell, CalendarClock, ChevronDown, ClipboardCheck, FileText, Package, PackageCheck, Radar, Settings, UserCog, Users, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { RoleSwitcher } from "@/components/dashboard/RoleSwitcher";
 import { SettingsDialog } from "@/components/dashboard/SettingsDialog";
@@ -12,12 +12,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getCurrentUser, getNotifications, getUsers, markNotificationRead, setCurrentUser } from "@/lib/api";
+import { getCurrentUser, getNotifications, getUsers, markAllNotificationsRead, markNotificationRead, setCurrentUser } from "@/lib/api";
+import { formatDateWithOptions } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import type { AppNotification, User } from "@/lib/types";
 
 const adminToolsMenuContentClass = "min-w-[13.5rem] p-1.5";
 const adminToolsMenuItemClass = "min-h-10 gap-2.5 rounded-md px-3 py-2 leading-5";
+const notificationMenuContentClass = "w-[min(calc(100vw-1rem),22rem)] p-3";
+type NotificationMetadata = NonNullable<AppNotification["metadata"]>;
 
 export type AppHeaderSection = "clients" | "dashboard" | "subs" | "activity" | "command" | "organization" | "archive" | "inventory";
 export type DashboardViewTarget = "clients" | "dashboard";
@@ -27,6 +30,44 @@ interface AppHeaderProps {
   onSelectDashboardView?: (view: DashboardViewTarget) => void;
   onUserSwitch?: () => void;
   currentUser?: User;
+}
+
+function titleCase(value: string) {
+  return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function auditTypeLabel(type: NotificationMetadata["auditRequestType"]) {
+  if (type === "materials") return "Materials audit";
+  if (type === "hardware") return "Hardware audit";
+  if (type === "both") return "Materials and hardware audit";
+  return "Audit request";
+}
+
+function pickupKindsLabel(kinds: NotificationMetadata["pickupKinds"]) {
+  if (!kinds || kinds.length === 0) return "Inventory pickup";
+  if (kinds.includes("materials") && kinds.includes("hardware")) return "Materials and hardware";
+  return titleCase(kinds[0]);
+}
+
+function formatNotificationDate(value: string) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split("-").map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+  return formatDateWithOptions(value);
+}
+
+function notificationPresentation(notification: AppNotification): { Icon: LucideIcon; meta: string } {
+  if (notification.type === "inventory_audit_request") {
+    return { Icon: ClipboardCheck, meta: auditTypeLabel(notification.metadata?.auditRequestType) };
+  }
+  if (notification.type === "inventory_pickup") {
+    const summary = notification.metadata?.summary;
+    return { Icon: PackageCheck, meta: summary ? `Pickup · ${summary}` : `Pickup · ${pickupKindsLabel(notification.metadata?.pickupKinds)}` };
+  }
+  const phaseType = notification.metadata?.phaseType ? titleCase(notification.metadata.phaseType) : "Phase";
+  const phaseDate = formatNotificationDate(notification.metadata?.phaseEndDate ?? notification.createdAt);
+  return { Icon: CalendarClock, meta: `${phaseType} · ${phaseDate}` };
 }
 
 export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, currentUser }: AppHeaderProps) {
@@ -70,6 +111,7 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, 
   };
 
   const markNotificationMutation = useMutation({ mutationFn: markNotificationRead });
+  const clearNotificationsMutation = useMutation({ mutationFn: markAllNotificationsRead });
 
   const handleNotificationClick = async (notification: AppNotification) => {
     const res = await markNotificationMutation.mutateAsync(notification.id);
@@ -80,6 +122,16 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, 
     await qc.invalidateQueries({ queryKey: ["notifications"] });
     await qc.invalidateQueries({ queryKey: ["inventory-audit-requests"] });
     navigate(`/project/${notification.projectId}`);
+  };
+
+  const handleClearNotifications = async () => {
+    const res = await clearNotificationsMutation.mutateAsync();
+    if (res.ok === false) {
+      toast.error(res.error.message);
+      return;
+    }
+    await qc.invalidateQueries({ queryKey: ["notifications"] });
+    await qc.invalidateQueries({ queryKey: ["inventory-audit-requests"] });
   };
 
   return (
@@ -201,21 +253,47 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, 
                     )}
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-[16rem] p-3">
+                <DropdownMenuContent align="end" className={notificationMenuContentClass}>
                   <div className="space-y-2">
-                    <div className="text-sm font-medium text-foreground">Notifications</div>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-medium text-foreground">Notifications</div>
+                      {notifications.length > 0 && (
+                        <button
+                          type="button"
+                          className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+                          onClick={handleClearNotifications}
+                          disabled={clearNotificationsMutation.isPending}
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
                     {notifications.length > 0 ? (
                       <div className="space-y-1">
-                        {notifications.map((notification) => (
-                          <button
-                            key={notification.id}
-                            type="button"
-                            className="w-full rounded-md px-2 py-2 text-left text-sm leading-snug text-foreground transition-colors hover:bg-accent"
-                            onClick={() => handleNotificationClick(notification)}
-                          >
-                            {notification.message}
-                          </button>
-                        ))}
+                        {notifications.map((notification) => {
+                          const presentation = notificationPresentation(notification);
+                          const NotificationIcon = presentation.Icon;
+                          return (
+                            <button
+                              key={notification.id}
+                              type="button"
+                              className="flex w-full min-w-0 gap-2.5 rounded-md px-2 py-2 text-left text-sm leading-snug text-foreground transition-colors hover:bg-accent"
+                              onClick={() => handleNotificationClick(notification)}
+                            >
+                              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground" aria-hidden="true">
+                                <NotificationIcon className="h-4 w-4" data-testid={`notification-icon-${notification.type}`} />
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block whitespace-normal break-words" data-testid="notification-message">
+                                  {notification.message}
+                                </span>
+                                <span className="mt-0.5 block whitespace-normal break-words text-xs text-muted-foreground">
+                                  {presentation.meta}
+                                </span>
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
                     ) : (
                       <div className="text-sm text-muted-foreground">No notifications yet.</div>

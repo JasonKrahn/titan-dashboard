@@ -37,6 +37,7 @@ interface Props {
 
 export function AttentionQueueItem({ item, onOpen }: Props) {
   const Icon = SEV_ICON[item.severity];
+  const flagCount = 1 + (item.secondaryFlags?.length ?? 0);
   return (
     <div
       className={cn(
@@ -69,6 +70,11 @@ export function AttentionQueueItem({ item, onOpen }: Props) {
           <Badge tone="neutral" appearance="outline" size="xs" className="ml-auto sm:ml-0">
             {ageLabel(item.ageDays)}
           </Badge>
+          {flagCount > 1 && (
+            <Badge tone="warning" appearance="outline" size="xs">
+              {flagCount} flags
+            </Badge>
+          )}
         </div>
 
         {/* Row 2: Project name (prominent) */}
@@ -85,7 +91,7 @@ export function AttentionQueueItem({ item, onOpen }: Props) {
 
         {/* Row 4: Next action (primary) */}
         <p className="text-[11px] text-foreground">
-          <span className="font-semibold uppercase tracking-wider text-foreground/60">Next: </span>
+          <span className="font-semibold uppercase tracking-wider text-foreground/60">Action: </span>
           {item.nextAction}
         </p>
 

@@ -53,7 +53,7 @@ export function ClientProjectsView({
 }: ClientProjectsViewProps) {
   const [displayMode, setDisplayMode] = useState<ProjectDisplayMode>(() => {
     const saved = localStorage.getItem("clientProjectViewMode");
-    return saved === "list" || saved === "cards" ? saved : "cards";
+    return saved === "list" || saved === "cards" ? saved : "list";
   });
   const [search, setSearch] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);

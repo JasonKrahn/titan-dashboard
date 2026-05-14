@@ -29,6 +29,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Fab } from "@/components/ui/fab";
 import { MobileActionSheet, type MobileActionItem } from "@/components/ui/mobile-action-sheet";
 import { EmptyInline } from "@/components/ui/empty-inline";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -243,7 +244,10 @@ export default function ProjectDetailPage() {
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoEvidence | null>(null);
   const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
+  const [photoUploadOpen, setPhotoUploadOpen] = useState(false);
   const [deficiencyDialogOpen, setDeficiencyDialogOpen] = useState(false);
+  const [deficiencyDialogMode, setDeficiencyDialogMode] = useState<"create" | "resolve">("create");
+  const [selectedDeficiencyId, setSelectedDeficiencyId] = useState<string | null>(null);
   const [phaseDeficiencyTarget, setPhaseDeficiencyTarget] = useState<Phase | null>(null);
   const [phasePhotoTarget, setPhasePhotoTarget] = useState<Phase | null>(null);
   async function handleExport() {
@@ -343,6 +347,7 @@ export default function ProjectDetailPage() {
       drywallPhase?.status === "closed",
     [drywallPhase],
   );
+  const activePhase = useMemo(() => detail?.phases.find((ph) => ph.status === "in_progress"), [detail]);
 
   async function saveCallIn() {
     if (!atticGate || !detail || !callInDate) return;
@@ -486,6 +491,15 @@ export default function ProjectDetailPage() {
   const projectMobileActions: MobileActionItem[] = [
     ...(p.status !== "completed" && p.status !== "archived"
       ? [
+          {
+            label: "Upload photo",
+            icon: <Camera className="h-4 w-4" />,
+            helperText: "Add photo evidence to this project",
+            onClick: () => {
+              setMobileTab("photos");
+              setPhotoUploadOpen(true);
+            },
+          },
           {
             label: "Add deficiency",
             icon: <Plus className="h-4 w-4" />,
@@ -926,7 +940,12 @@ export default function ProjectDetailPage() {
         <section className={`grid gap-6 md:grid-cols-2 ${mobileTab === "overview" || mobileTab === "deficiencies" ? "" : "hidden md:grid"}`}>
           <Card id="attic-gate" className="p-3 shadow-card sm:p-5">
             <div className="mb-3 flex items-center justify-between">
-              <SectionHeading as="h3">Attic Gate</SectionHeading>
+              <div className="flex items-center gap-2">
+                <SectionHeading as="h3">Attic Check</SectionHeading>
+                {insulationClosed && drywallStarted && (
+                  <Badge tone="ready" appearance="soft" size="sm">Ready</Badge>
+                )}
+              </div>
             </div>
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm">
@@ -1115,18 +1134,37 @@ export default function ProjectDetailPage() {
                 {activeDefs.map((d) => {
                   const phase = detail.phases.find((ph) => ph.id === d.phaseId);
                   return (
-                    <Link key={d.id} to={`/project/${p.id}/phase/${d.phaseId}?tab=deficiencies`} className="block">
-                      <div className="flex items-start justify-between gap-2 rounded-md border border-border bg-muted/20 p-2 sm:p-2.5 cursor-pointer hover:bg-muted/30 transition-colors">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">{d.title}</p>
-                          <div className="mt-1 flex items-center gap-1.5">
-                            <span className="text-xs text-muted-foreground">{phase ? PHASE_LABEL[phase.type] : "—"}</span>
-                            <SeverityBadge severity={d.severity} size="xs" />
-                          </div>
+                    <div
+                      key={d.id}
+                      onClick={() => navigate(`/project/${p.id}/phase/${d.phaseId}?tab=deficiencies`)}
+                      className="flex items-start justify-between gap-2 rounded-md border border-border bg-muted/20 p-2 sm:p-2.5 cursor-pointer hover:bg-muted/30 transition-colors"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{d.title}</p>
+                        <div className="mt-1 flex items-center gap-1.5">
+                          <span className="text-xs text-muted-foreground">{phase ? PHASE_LABEL[phase.type] : "—"}</span>
+                          <SeverityBadge severity={d.severity} size="xs" />
                         </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {p.status !== "completed" && p.status !== "archived" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeficiencyDialogMode("resolve");
+                              setSelectedDeficiencyId(d.id);
+                              setDeficiencyDialogOpen(true);
+                            }}
+                          >
+                            Resolve
+                          </Button>
+                        )}
                         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                       </div>
-                    </Link>
+                    </div>
                   );
                 })}
               </div>
@@ -1134,11 +1172,11 @@ export default function ProjectDetailPage() {
           </Card>
         </section>
 
-        {/* Attic gate completion warning */}
+        {/* Attic check completion warning */}
         {detail && p.status === "active" && atticGate && atticGate.status !== "passed" && detail.phases.every((ph) => ph.status === "closed") && (
           <Alert variant="default" className="border-amber-500/50 bg-amber-500/10 text-amber-900 dark:text-amber-200">
             <AlertTriangle className="h-4 w-4 text-amber-500" />
-            <AlertTitle>Attic gate incomplete</AlertTitle>
+            <AlertTitle>Attic check incomplete</AlertTitle>
             <AlertDescription>
               This project cannot be completed until the attic install date and photo evidence have been submitted.
             </AlertDescription>
@@ -1172,7 +1210,13 @@ export default function ProjectDetailPage() {
         {/* Project Photos */}
         {detail && (
           <section className={mobileTab === "photos" ? "" : "hidden md:block"}>
-            <SectionHeading as="h3" className="mb-3">Project Photos</SectionHeading>
+            <div className="mb-3 flex items-baseline justify-between">
+              <SectionHeading as="h3" className="mb-0">Project Photos</SectionHeading>
+              <Button size="sm" className="hidden md:inline-flex" onClick={() => setPhotoUploadOpen(true)}>
+                <Camera className="mr-1.5 h-4 w-4" />
+                Upload Photo
+              </Button>
+            </div>
             {projectPhotos.length === 0 ? (
               <>
                 <EmptyInline text="No photos in this project yet" icon={<ImageIcon className="h-3.5 w-3.5" />} className="md:hidden" />
@@ -1374,12 +1418,16 @@ export default function ProjectDetailPage() {
           open={deficiencyDialogOpen}
           onOpenChange={(open) => {
             setDeficiencyDialogOpen(open);
-            if (!open) setPhaseDeficiencyTarget(null);
+            if (!open) {
+              setPhaseDeficiencyTarget(null);
+              setSelectedDeficiencyId(null);
+            }
           }}
           projectId={detail.project.id}
           phaseId={phaseDeficiencyTarget?.id}
           phaseLabel={phaseDeficiencyTarget ? PHASE_LABEL[phaseDeficiencyTarget.type] : undefined}
-          mode="create"
+          mode={deficiencyDialogMode}
+          deficiency={selectedDeficiencyId ? detail.deficiencies.find((d) => d.id === selectedDeficiencyId) : undefined}
           phases={detail.phases}
         />
       )}
@@ -1387,9 +1435,20 @@ export default function ProjectDetailPage() {
         <PhotoUploadDialog
           open={!!phasePhotoTarget}
           onOpenChange={(open) => { if (!open) setPhasePhotoTarget(null); }}
-          phaseId={phasePhotoTarget.id}
+          phases={[phasePhotoTarget]}
+          defaultPhaseId={phasePhotoTarget.id}
           projectId={detail.project.id}
-          deficiencies={detail.deficiencies.filter((d) => d.phaseId === phasePhotoTarget.id)}
+          deficiencies={detail.deficiencies}
+        />
+      )}
+      {detail && (
+        <PhotoUploadDialog
+          open={photoUploadOpen}
+          onOpenChange={setPhotoUploadOpen}
+          phases={detail.phases}
+          defaultPhaseId={activePhase?.id}
+          projectId={p.id}
+          deficiencies={detail.deficiencies}
         />
       )}
     </div>

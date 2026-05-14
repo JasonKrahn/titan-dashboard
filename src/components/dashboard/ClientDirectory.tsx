@@ -83,7 +83,7 @@ export function ClientDirectory({
   const [mobileActionClientId, setMobileActionClientId] = useState<string | null>(null);
   const [displayMode, setDisplayMode] = useState<"list" | "cards">(() => {
     const saved = localStorage.getItem("clientViewMode");
-    return saved === "list" || saved === "cards" ? saved : "cards";
+    return saved === "list" || saved === "cards" ? saved : "list";
   });
   const [sort, setSort] = useState<ClientSortState>({ key: "client", direction: "asc" });
   const rows = useMemo(() => buildClientRows(clients, projects, search, sort), [clients, projects, search, sort]);

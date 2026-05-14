@@ -74,6 +74,8 @@ function AppContent() {
     },
     {
       key: "?",
+      ctrlKey: true,
+      metaKey: true,
       callback: () => setHelpOpen(true),
       description: "Show keyboard shortcuts help",
     },

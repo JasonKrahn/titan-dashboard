@@ -14,6 +14,7 @@ import { ClientProjectsView, type ClientProjectFilter } from "@/components/dashb
 import { ArchivePanel, DueInspectionsPanel } from "@/components/dashboard/AlertPanels";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { ArchiveProjectDialog } from "@/components/dashboard/ArchiveProjectDialog";
+import { InspectionResultDialog } from "@/components/dashboard/InspectionResultDialog";
 import { NewClientDialog } from "@/components/dashboard/NewClientDialog";
 import { NewProjectDialog } from "@/components/dashboard/NewProjectDialog";
 import {
@@ -46,8 +47,10 @@ const DashboardPage = () => {
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [editProjectId, setEditProjectId] = useState<string | undefined>();
   const [archiveTarget, setArchiveTarget] = useState<{ id: string; name: string } | null>(null);
+  const [inspectionTarget, setInspectionTarget] = useState<{ gateId: string; phaseId: string; projectId: string; phaseLabel: string; mode: "passed" | "failed" } | null>(null);
   const [newProjectClientId, setNewProjectClientId] = useState<string | undefined>();
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [activeStatFilter, setActiveStatFilter] = useState<"active" | "blocked" | "inspections" | null>(null);
   const [defaultedUserId, setDefaultedUserId] = useState<string | undefined>();
 
   useEffect(() => {
@@ -149,12 +152,51 @@ const DashboardPage = () => {
     setEditClientId(id);
   };
 
+  const handleStatFilterSelect = (filter: "active" | "blocked" | "inspections" | null) => {
+    if (filter === activeStatFilter) {
+      // Clear filter if clicking the same one
+      setActiveStatFilter(null);
+      setFilters({});
+      setSearch("");
+    } else {
+      // Replace all filters with the selected stat filter
+      setActiveStatFilter(filter);
+      setSearch("");
+      if (filter === "active") {
+        setFilters({ status: ["active"] });
+      } else if (filter === "blocked") {
+        setFilters({ hasBlockedWork: true });
+      } else if (filter === "inspections") {
+        setFilters({ phaseStatus: ["ready_for_inspection"] });
+      }
+    }
+  };
+
   useEffect(() => {
     if (selectedClientId && clients.length && !clients.some((client) => client.id === selectedClientId)) {
       setSelectedClientId(undefined);
       setActiveView("clients");
     }
   }, [clients, selectedClientId]);
+
+  // Clear activeStatFilter when FilterBar filters change (mutual exclusivity)
+  useEffect(() => {
+    if (activeStatFilter && Object.keys(filters).length > 0) {
+      const hasNonStatFilter = Object.keys(filters).some(
+        (key) => key !== "status" && key !== "hasBlockedWork" && key !== "phaseStatus"
+      );
+      if (hasNonStatFilter) {
+        setActiveStatFilter(null);
+      }
+    }
+  }, [filters, activeStatFilter]);
+
+  // Clear activeStatFilter when search changes (mutual exclusivity)
+  useEffect(() => {
+    if (activeStatFilter && debouncedSearch) {
+      setActiveStatFilter(null);
+    }
+  }, [debouncedSearch, activeStatFilter]);
 
   // Derived stats — confined to projects visible to the current user.
   const visibleProjectIds = useMemo(() => new Set(projects.map((p) => p.id)), [projects]);
@@ -315,6 +357,8 @@ const DashboardPage = () => {
               activeProjects={stats.active}
               blockedItems={stats.blockedItems}
               inspectionsDueThisWeek={stats.inspections}
+              activeFilter={activeStatFilter}
+              onSelect={handleStatFilterSelect}
             />
 
             {/* Filters */}
@@ -351,7 +395,14 @@ const DashboardPage = () => {
             {/* Alert panels */}
             {!isLoading && (projects.some(p => p.status === "completed") || visiblePhases.some((p) => p.status === "ready_for_inspection")) && (
               <div className="grid gap-4 md:grid-cols-2">
-                <DueInspectionsPanel projects={projects} phases={visiblePhases} onOpen={handleOpenProject} />
+                <DueInspectionsPanel
+                  projects={projects}
+                  phases={visiblePhases}
+                  gates={gates}
+                  onOpen={handleOpenProject}
+                  onPass={(gateId, phaseId, projectId, phaseLabel) => setInspectionTarget({ gateId, phaseId, projectId, phaseLabel, mode: "passed" })}
+                  onFail={(gateId, phaseId, projectId, phaseLabel) => setInspectionTarget({ gateId, phaseId, projectId, phaseLabel, mode: "failed" })}
+                />
                 <ArchivePanel projects={projects} onOpen={handleOpenProject} onArchive={(id, name) => setArchiveTarget({ id, name })} />
               </div>
             )}
@@ -433,6 +484,17 @@ const DashboardPage = () => {
           onOpenChange={(o) => { if (!o) setArchiveTarget(null); }}
           projectId={archiveTarget.id}
           projectName={archiveTarget.name}
+        />
+      )}
+      {inspectionTarget && (
+        <InspectionResultDialog
+          open={!!inspectionTarget}
+          onOpenChange={(o) => { if (!o) setInspectionTarget(null); }}
+          gateId={inspectionTarget.gateId}
+          phaseId={inspectionTarget.phaseId}
+          projectId={inspectionTarget.projectId}
+          phaseLabel={inspectionTarget.phaseLabel}
+          mode={inspectionTarget.mode}
         />
       )}
       <BottomSheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen} title="Filters">
