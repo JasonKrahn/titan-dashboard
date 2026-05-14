@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -20,10 +20,19 @@ import {
   getUsers,
 } from "@/lib/api";
 import type { ProjectFilters } from "@/lib/types";
+import { useTypeToSearch } from "@/hooks/useTypeToSearch";
 
 const ArchivePage = () => {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useTypeToSearch({
+    searchInputRef,
+    search,
+    onSearchChange: setSearch,
+  });
+
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
   useEffect(() => {
@@ -104,6 +113,7 @@ const ArchivePage = () => {
           <div className="relative flex-1 min-w-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
+              ref={searchInputRef}
               id="archive-search"
               name="archiveSearch"
               aria-label="Search archived projects"

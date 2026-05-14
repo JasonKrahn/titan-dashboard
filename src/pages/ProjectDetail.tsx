@@ -763,10 +763,12 @@ export default function ProjectDetailPage() {
                       <div className="text-eyebrow font-semibold uppercase tracking-widest text-muted-foreground">
                         {phase ? p.projectNumber : "Pending"}
                       </div>
-                      <h3 className="mt-1 text-base font-semibold leading-tight text-foreground sm:text-sm">{PHASE_LABEL[type]}</h3>
-                      {type === "finishing" && p.finishLevel && (
-                        <div className="mt-1 text-xs font-medium text-primary">Finish level: {p.finishLevel}</div>
-                      )}
+                      <h3 className="mt-1 text-base font-semibold leading-tight text-foreground sm:text-sm">
+                        {PHASE_LABEL[type]}
+                        {type === "finishing" && p.finishLevel && (
+                          <span className="ml-2 text-xs font-medium text-primary">level: {p.finishLevel}</span>
+                        )}
+                      </h3>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-1.5 sm:flex-nowrap sm:justify-end sm:gap-2">

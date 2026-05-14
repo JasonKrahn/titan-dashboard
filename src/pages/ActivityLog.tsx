@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Clock, FileText, Image as ImageIcon, Search } from "lucide-react";
@@ -16,6 +16,7 @@ import { formatAuditEvent, getAuditActionLabel, resolveProjectId } from "@/lib/a
 import { GATE_LABEL, PHASE_LABEL } from "@/lib/derived";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { AuditEvent, Deficiency, Gate, Phase, PhotoEvidence } from "@/lib/types";
+import { useTypeToSearch } from "@/hooks/useTypeToSearch";
 
 const GROUP_ORDER = ["Today", "Yesterday", "This Week", "Earlier"] as const;
 type DateGroup = (typeof GROUP_ORDER)[number];
@@ -199,6 +200,14 @@ function ActivityPhotoStrip({
 
 export default function ActivityLogPage() {
   const [search, setSearch] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useTypeToSearch({
+    searchInputRef,
+    search,
+    onSearchChange: setSearch,
+  });
+
   const [actionFilter, setActionFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [pmFilter, setPmFilter] = useState<string>("all");
@@ -419,6 +428,7 @@ export default function ActivityLogPage() {
           <div className="relative w-full md:max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
+              ref={searchInputRef}
               id="activity-search"
               name="activitySearch"
               aria-label="Search activity events"

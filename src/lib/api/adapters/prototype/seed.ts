@@ -709,7 +709,7 @@ const scenarios: Scenario[] = [
         updatedAt: iso(-days(1)),
       },
       drywall: { status: "not_started", scheduledStart: iso(days(3)), scheduledEnd: iso(days(15)) },
-      finishing: { status: "not_started", scheduledStart: iso(days(16)), scheduledEnd: iso(days(28)) },
+      finishing: { status: "not_started", scheduledStart: iso(days(16)), scheduledEnd: iso(days(27)) },
     },
     gates: {
       "insulation-site_check": {
@@ -739,7 +739,7 @@ const scenarios: Scenario[] = [
         scheduledEnd: new Date(now).toISOString().slice(0, 10),
         updatedAt: iso(-days(5)),
       },
-      finishing: { status: "not_started", scheduledStart: iso(days(3)), scheduledEnd: iso(days(18)) },
+      finishing: { status: "not_started", scheduledStart: iso(days(3)), scheduledEnd: iso(days(17)) },
     },
     gates: {
       "insulation-site_check": { status: "passed", completedByUserId: "user-pm-1", completedAt: iso(-days(29)) },
@@ -760,7 +760,7 @@ const scenarios: Scenario[] = [
         scheduledEnd: iso(days(6)),
         updatedAt: iso(-days(1)),
       },
-      finishing: { status: "not_started", scheduledStart: iso(days(8)), scheduledEnd: iso(days(28)) },
+      finishing: { status: "not_started", scheduledStart: iso(days(8)), scheduledEnd: iso(days(35)) },
     },
     gates: {
       "insulation-site_check": { status: "passed", completedByUserId: "user-pm-2", completedAt: iso(-days(24)) },
@@ -811,7 +811,7 @@ const scenarios: Scenario[] = [
         updatedAt: iso(-days(2)),
       },
       drywall: { status: "not_started", scheduledStart: iso(days(1)), scheduledEnd: iso(days(10)) },
-      finishing: { status: "not_started", scheduledStart: iso(days(11)), scheduledEnd: iso(days(12)) },
+      finishing: { status: "not_started", scheduledStart: iso(days(10)), scheduledEnd: iso(days(11)) },
     },
     gates: {
       "insulation-site_check": { status: "passed", completedByUserId: "user-pm-2", completedAt: iso(-days(30)) },
@@ -835,7 +835,7 @@ const scenarios: Scenario[] = [
         status: "in_progress",
         assignedSubcontractorId: "sub-17",
         scheduledStart: iso(-days(15)),
-        scheduledEnd: iso(days(8)),
+        scheduledEnd: iso(days(7)),
         updatedAt: iso(-days(3)),
       },
     },
@@ -929,7 +929,7 @@ const scenarios: Scenario[] = [
     phases: {
       insulation: { status: "not_started", scheduledStart: iso(days(1)), scheduledEnd: iso(days(12)) },
       drywall: { status: "not_started", scheduledStart: iso(days(13)), scheduledEnd: iso(days(28)) },
-      finishing: { status: "not_started", scheduledStart: iso(days(29)), scheduledEnd: iso(days(44)) },
+      finishing: { status: "not_started", scheduledStart: iso(days(29)), scheduledEnd: iso(days(43)) },
     },
   },
   {
@@ -974,7 +974,7 @@ const scenarios: Scenario[] = [
         updatedAt: iso(-days(20)),
       },
       drywall: { status: "not_started", scheduledStart: iso(days(5)), scheduledEnd: iso(days(18)) },
-      finishing: { status: "not_started", scheduledStart: iso(days(19)), scheduledEnd: iso(days(30)) },
+      finishing: { status: "not_started", scheduledStart: iso(days(19)), scheduledEnd: iso(days(29)) },
     },
     gates: {
       "insulation-site_check": { status: "passed", completedByUserId: "user-pm-2", completedAt: iso(-days(24)) },
@@ -998,7 +998,7 @@ const scenarios: Scenario[] = [
         status: "ready_for_inspection",
         assignedSubcontractorId: "sub-18",
         scheduledStart: iso(-days(9)),
-        scheduledEnd: iso(days(14)),
+        scheduledEnd: iso(days(13)),
         updatedAt: iso(-days(4)),
       },
     },

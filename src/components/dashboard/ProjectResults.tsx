@@ -387,7 +387,7 @@ export function ProjectResults({
                         {row.clientName}
                       </TableCell>
                     )}
-                    <TableCell className="hidden truncate text-muted-foreground lg:table-cell">
+                    <TableCell className="hidden text-muted-foreground lg:table-cell">
                       {row.project.siteAddress}
                     </TableCell>
                     <TableCell>

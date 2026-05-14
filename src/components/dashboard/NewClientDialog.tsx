@@ -219,7 +219,16 @@ export function NewClientDialog({ open, onOpenChange, client, onCreated, onUpdat
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={mutation.isPending || deleteMutation.isPending}>
+            <Button
+              type="submit"
+              disabled={mutation.isPending || deleteMutation.isPending}
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                  e.preventDefault();
+                  (e.currentTarget as HTMLButtonElement).click();
+                }
+              }}
+            >
               {mutation.isPending ? (isEdit ? "Saving…" : "Creating…") : (isEdit ? "Save changes" : "Create client")}
             </Button>
           </DialogFooter>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Mail, MoreHorizontal, Pencil, Phone, Plus, Search, ShieldCheck, Trash2, UserCog } from "lucide-react";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { createUser, deactivateUser, getCurrentUser, getProjects, getUsers, updateUser, type CreateUserInput, type UpdateUserInput } from "@/lib/api";
 import type { Project, User, UserRole } from "@/lib/types";
+import { useTypeToSearch } from "@/hooks/useTypeToSearch";
 
 type RoleFilter = "all" | "admin" | "project_manager" | "inventory_viewer" | "inactive";
 
@@ -64,6 +65,14 @@ function emptyForm() {
 export default function OrganizationMembersPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useTypeToSearch({
+    searchInputRef,
+    search,
+    onSearchChange: setSearch,
+  });
+
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const [form, setForm] = useState<MemberFormState>(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -273,6 +282,7 @@ export default function OrganizationMembersPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
+                ref={searchInputRef}
                 id="organization-member-search"
                 name="organizationMemberSearch"
                 aria-label="Search organization members"
