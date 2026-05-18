@@ -1,0 +1,9 @@
+[policy]
+auto_low_risk = true
+allow_medium = false
+require_approval_for_high = true
+max_changed_files = 8
+max_diff_lines = 400
+
+[validation]
+commands = []

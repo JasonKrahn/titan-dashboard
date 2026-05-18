@@ -1008,12 +1008,10 @@ export default function PhaseDetailPage() {
 
                 <Card className="p-5 shadow-card">
                   <SectionHeading as="h2">Personnel</SectionHeading>
-                  <div className="mt-3 space-y-3">
-                    <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-4 py-3 text-sm">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                        <UserIcon className="h-4 w-4" />
-                      </span>
-                      <div className="min-w-0 flex-1">
+                  <div className="mt-4 space-y-4">
+                    <div className="flex items-start gap-3 text-sm">
+                      <UserIcon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                      <div className="flex-1 space-y-1">
                         <div className="text-xs font-medium text-muted-foreground">Subcontractor</div>
                         <Select
                           value={phase.assignedSubcontractorId || "unassigned"}
@@ -1026,7 +1024,7 @@ export default function PhaseDetailPage() {
                             });
                           }}
                         >
-                          <SelectTrigger id="phase-subcontractor-select" name="phaseSubcontractor" aria-label="Assign subcontractor" className="mt-1 h-8 border border-input bg-background px-3 py-2 text-base md:text-xs font-medium">
+                          <SelectTrigger id="phase-subcontractor-select" name="phaseSubcontractor" aria-label="Assign subcontractor" className="h-9 border-input bg-background px-3 py-2 text-xs font-medium">
                             <SelectValue placeholder="Select subcontractor" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1042,13 +1040,11 @@ export default function PhaseDetailPage() {
                         </Select>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-4 py-3 text-sm">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                        <UserIcon className="h-4 w-4" />
-                      </span>
-                      <div className="min-w-0 flex-1">
+                    <div className="flex items-start gap-3 text-sm">
+                      <UserIcon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                      <div className="flex-1 space-y-1">
                         <div className="text-xs font-medium text-muted-foreground">Project manager</div>
-                        <div className="mt-1 truncate text-sm font-semibold text-foreground">
+                        <div className="text-sm font-medium text-foreground">
                           {detail.assignedProjectManager?.fullName ?? "Unassigned"}
                         </div>
                       </div>
