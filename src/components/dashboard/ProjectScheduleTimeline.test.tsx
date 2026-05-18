@@ -168,4 +168,31 @@ describe("ProjectScheduleTimeline", () => {
     expect(onScheduleChange).not.toHaveBeenCalled();
     expect(screen.getByText(/on or before the project end date/i)).toBeInTheDocument();
   });
+
+  it("renders a forced read-only schedule without drag or mobile editing controls", () => {
+    const onScheduleChange = vi.fn();
+    render(
+      <ProjectScheduleTimeline
+        project={project()}
+        phases={[
+          phase("phase-insulation", "insulation", "2026-05-01", "2026-05-06"),
+        ]}
+        onScheduleChange={onScheduleChange}
+        canEdit={false}
+      />,
+    );
+
+    expect(screen.getAllByText("Read-only").length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText("Resize Insulation end date")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Schedule 1 phases/i }));
+    const insulationCard = screen
+      .getAllByRole("button", { name: /Insulation/i })
+      .find((button) => !button.getAttribute("aria-label")?.startsWith("Resize"));
+    expect(insulationCard).toBeDefined();
+    fireEvent.click(insulationCard!);
+
+    expect(screen.queryByLabelText("Start date")).not.toBeInTheDocument();
+    expect(onScheduleChange).not.toHaveBeenCalled();
+  });
 });

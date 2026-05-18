@@ -48,7 +48,6 @@ import { PageNav } from "@/components/dashboard/PageNav";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { PhaseHealthPill } from "@/components/dashboard/PhaseHealthPill";
 import { SiteCheckDialog } from "@/components/dashboard/SiteCheckDialog";
@@ -67,8 +66,8 @@ import { QuantityStepperModal } from "@/components/dashboard/QuantityStepperModa
 import { getCurrentUser, getProject, getProjectEquipment, getPhaseMaterials, getProjectInventoryPickups, updateProjectEquipmentBatch, updateAtticGate, getPhotoViewUrl, updatePhaseSchedules } from "@/lib/api";
 import { exportProjectZip } from "@/lib/projectExport";
 import { formatDateWithOptions, type PhaseScheduleChange } from "@/lib/schedule";
-import type { EquipmentLog, Gate, InventoryPickup, MaterialLog, Phase, PhotoEvidence } from "@/lib/types";
-import { EQUIPMENT_ITEMS } from "@/lib/inventoryCatalog";
+import type { EquipmentLog, Gate, InventoryPickup, MaterialLog, Phase, PhotoEvidence, ProjectDetail as ProjectDetailData } from "@/lib/types";
+import { EQUIPMENT_ITEMS, PHASE_MATERIAL_CATALOGS } from "@/lib/inventoryCatalog";
 import {
   PHASE_LABEL,
   PHASE_ORDER,
@@ -142,6 +141,8 @@ function formatEquipmentPickupSummary(pickup: InventoryPickup, labelByKey: Map<s
   return parts.length > 0 ? parts.join(", ") : undefined;
 }
 
+type ProjectViewMode = "summary" | "detailed";
+
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -149,12 +150,21 @@ export default function ProjectDetailPage() {
 
   const meQ = useQuery({ queryKey: ["me"], queryFn: getCurrentUser });
   const [isEditingEnabled, setIsEditingEnabled] = useState(false);
-  const isAdmin = meQ.data?.ok && meQ.data.data.role === "admin";
+  const me = meQ.data?.ok ? meQ.data.data : undefined;
+  const isAdmin = me?.role === "admin";
+  const [viewMode, setViewMode] = useState<ProjectViewMode>("detailed");
+  const [defaultedViewUserId, setDefaultedViewUserId] = useState<string | undefined>();
   const canEdit = isAdmin ? isEditingEnabled : true;
 
   useEffect(() => {
     if (meQ.data?.ok && meQ.data.data.role === "inventory_viewer") navigate("/inventory");
   }, [meQ.data, navigate]);
+  useEffect(() => {
+    if (!me || defaultedViewUserId === me.id) return;
+    setDefaultedViewUserId(me.id);
+    setViewMode(me.role === "admin" ? "summary" : "detailed");
+    setIsEditingEnabled(false);
+  }, [defaultedViewUserId, me]);
 
   const projectQ = useQuery({
     queryKey: ["project", id],
@@ -174,6 +184,16 @@ export default function ProjectDetailPage() {
     queryKey: ["project-inventory-pickups", detail?.project.id],
     queryFn: () => getProjectInventoryPickups(detail!.project.id),
     enabled: !!detail?.project.id,
+  });
+  const materialSummaryQ = useQuery({
+    queryKey: ["project-materials", detail?.project.id],
+    queryFn: async () => {
+      const results = await Promise.all(detail!.phases.map((phase) => getPhaseMaterials(phase.id)));
+      const failed = results.find((result) => result.ok === false);
+      if (failed?.ok === false) throw new Error(failed.error.message);
+      return results.flatMap((result) => (result.ok ? result.data : []));
+    },
+    enabled: !!detail?.project.id && isAdmin && viewMode === "summary",
   });
 
   const [siteCheckTarget, setSiteCheckTarget] = useState<{
@@ -321,6 +341,30 @@ export default function ProjectDetailPage() {
     [detail],
   );
   const projectPhotos = useMemo(() => detail?.photoEvidence.filter((p) => p.phaseId) ?? [], [detail]);
+  const allPhotoViewerItems = useMemo<PhotoViewerItem[]>(() => {
+    if (!detail) return [];
+
+    return detail.photoEvidence.map((photo) => {
+      const phase = detail.phases.find((p) => p.id === photo.phaseId);
+      const gate = detail.gates.find((g) => g.id === photo.gateId);
+      const deficiency = detail.deficiencies.find((d) => d.id === photo.deficiencyId);
+      const purposeLabel = PURPOSE_LABEL[photo.purpose] ?? photo.purpose;
+
+      if (deficiency && phase) {
+        return { photo, caption: `Deficiency: ${deficiency.title}, ${purposeLabel}` };
+      }
+      if (gate && phase) {
+        return { photo, caption: `${GATE_LABEL[gate.type] ?? gate.type} · ${PHASE_LABEL[phase.type]}, ${purposeLabel}` };
+      }
+      if (gate) {
+        return { photo, caption: `${GATE_LABEL[gate.type] ?? gate.type}, ${purposeLabel}` };
+      }
+      if (phase) {
+        return { photo, caption: `${PHASE_LABEL[phase.type]}, ${purposeLabel}` };
+      }
+      return { photo, caption: purposeLabel };
+    });
+  }, [detail]);
   const photoViewerItems = useMemo<PhotoViewerItem[]>(() => {
     if (!detail) return [];
 
@@ -550,6 +594,45 @@ export default function ProjectDetailPage() {
     },
   ];
 
+  if (isAdmin && viewMode === "summary") {
+    return (
+      <div className="min-h-screen bg-background">
+        <AppHeader activeSection="dashboard" />
+        <main className="container space-y-6 py-6">
+          <PageNav
+            backFallback="/"
+            backLabel="Back to Projects"
+            items={[
+              { label: "All Projects", to: "/", state: { view: "dashboard" } },
+              { label: detail.client.name, to: "/", state: { clientId: detail.client.id } },
+              { label: p.name },
+            ]}
+          />
+          <AdminProjectSummary
+            detail={detail}
+            equipmentItems={equipmentItems}
+            materialLogs={materialSummaryQ.data ?? []}
+            materialsLoading={materialSummaryQ.isLoading}
+            materialsError={materialSummaryQ.error instanceof Error ? materialSummaryQ.error.message : undefined}
+            onOpenPhoto={(photo) => {
+              setSelectedPhoto(photo);
+              setPhotoViewerOpen(true);
+            }}
+            onViewDetails={() => setViewMode("detailed")}
+          />
+        </main>
+        {selectedPhoto && (
+          <PhotoViewerDialog
+            open={photoViewerOpen}
+            onOpenChange={setPhotoViewerOpen}
+            items={allPhotoViewerItems}
+            initialPhotoId={selectedPhoto.id}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <AppHeader activeSection="dashboard" />
@@ -644,18 +727,6 @@ export default function ProjectDetailPage() {
               {p.finishLevel && <div>Finish level: {p.finishLevel}</div>}
             </div>
           )}
-          {isAdmin && (
-            <div className="mt-2 flex items-center gap-2 border-t border-border pt-2">
-              <Switch
-                checked={isEditingEnabled}
-                onCheckedChange={setIsEditingEnabled}
-                id="admin-edit-toggle-mobile"
-              />
-              <label htmlFor="admin-edit-toggle-mobile" className="text-xs font-medium">
-                Enable Editing
-              </label>
-            </div>
-          )}
         </section>
 
         {/* Mobile sticky tab bar */}
@@ -732,16 +803,9 @@ export default function ProjectDetailPage() {
             {/* KPI chips */}
             <div className="flex flex-wrap gap-3 lg:flex-col lg:items-end">
               {isAdmin && (
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={isEditingEnabled}
-                    onCheckedChange={setIsEditingEnabled}
-                    id="admin-edit-toggle"
-                  />
-                  <label htmlFor="admin-edit-toggle" className="text-sm font-medium">
-                    Enable Editing
-                  </label>
-                </div>
+                <Button variant={canEdit ? "default" : "outline"} size="sm" onClick={() => setIsEditingEnabled((current) => !current)}>
+                  {canEdit ? "Editing Enabled" : "Enable Editing"}
+                </Button>
               )}
               {p.status !== "completed" && p.status !== "archived" && (
                 <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} disabled={!canEdit}>
@@ -1493,6 +1557,344 @@ export default function ProjectDetailPage() {
   );
 }
 
+
+function AdminProjectSummary({
+  detail,
+  equipmentItems,
+  materialLogs,
+  materialsLoading,
+  materialsError,
+  onOpenPhoto,
+  onViewDetails,
+}: {
+  detail: ProjectDetailData;
+  equipmentItems: InventoryDisplayItem[];
+  materialLogs: MaterialLog[];
+  materialsLoading: boolean;
+  materialsError?: string;
+  onOpenPhoto: (photo: PhotoEvidence) => void;
+  onViewDetails: () => void;
+}) {
+  const p = detail.project;
+  const activeDefs = detail.deficiencies.filter((d) => d.status === "open" || d.status === "in_progress");
+  const currentPhase =
+    detail.phases.find((phase) => phase.status === "in_progress") ??
+    detail.phases.find((phase) => phase.status === "ready_for_inspection") ??
+    detail.phases.find((phase) => phase.status === "blocked") ??
+    detail.phases.find((phase) => phase.status !== "closed");
+  const atticGate = detail.gates.find((gate) => gate.type === "attic_check");
+  const visibleMaterialLogs = materialLogs.filter((log) => log.quantity > 0);
+
+  return (
+    <div className="space-y-6">
+      <Card surface="panel" className="rounded-xl p-6">
+        <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
+          <div className="min-w-0">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Executive Summary</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-bold sm:text-3xl">{p.name}</h1>
+              <StatusBadge tone={projectStatusTone(p.status)} label={STATUS_LABEL[p.status]} size="sm" />
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5">
+                <Building2 className="h-4 w-4" />
+                {p.projectNumber}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <MapPin className="h-4 w-4" />
+                {formatAddressShort(p.siteAddress)}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Calendar className="h-4 w-4" />
+                {formatDateWithOptions(p.scheduledStart ?? "", { showYear: true })} - {formatDateWithOptions(p.scheduledEnd ?? "", { showYear: true })}
+              </span>
+            </div>
+            <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+              <SummaryMetric label="Client" value={detail.client.name} />
+              <SummaryMetric label="Project manager" value={detail.assignedProjectManager?.fullName ?? "Unassigned"} />
+              <SummaryMetric label="Current phase" value={currentPhase ? PHASE_LABEL[currentPhase.type] : "No active phase"} />
+            </div>
+          </div>
+          <div className="grid gap-2 rounded-lg border border-border bg-muted/20 p-4 text-sm">
+            <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Executive readout</div>
+            <div className="flex items-center justify-between gap-6">
+              <span>Active deficiencies</span>
+              <span className="font-semibold tabular-nums">{activeDefs.length}</span>
+            </div>
+            <div className="flex items-center justify-between gap-6">
+              <span>Photo evidence</span>
+              <span className="font-semibold tabular-nums">{detail.photoEvidence.length}</span>
+            </div>
+            <div className="flex items-center justify-between gap-6">
+              <span>Attic check</span>
+              <StatusBadge
+                tone={gateStatusTone(atticGate?.status ?? p.atticCheckStatus)}
+                label={STATUS_LABEL[atticGate?.status ?? p.atticCheckStatus] ?? "Not started"}
+                size="xs"
+              />
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <ProjectScheduleTimeline
+        project={p}
+        phases={detail.phases}
+        gates={detail.gates}
+        deficiencies={detail.deficiencies}
+        canEdit={false}
+        onScheduleChange={() => undefined}
+      />
+
+      <section className="grid gap-4 lg:grid-cols-3">
+        {PHASE_ORDER.map((type) => {
+          const phase = detail.phases.find((item) => item.type === type);
+          const gates = phase ? detail.gates.filter((gate) => gate.phaseId === phase.id) : [];
+          const deficiencies = phase ? detail.deficiencies.filter((deficiency) => deficiency.phaseId === phase.id) : [];
+          const health = computePhaseHealth(phase, gates, deficiencies);
+          return (
+            <Card key={type} className="p-4 shadow-card">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <SectionHeading as="h3">{PHASE_LABEL[type]}</SectionHeading>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {formatDateWithOptions(phase?.scheduledStart ?? "", { showYear: true })} - {formatDateWithOptions(phase?.scheduledEnd ?? "", { showYear: true })}
+                  </p>
+                </div>
+                <PhaseHealthPill health={health} size="sm" />
+              </div>
+              <div className="mt-4 space-y-2">
+                {gates.length === 0 ? (
+                  <EmptyInline text="No gates logged" />
+                ) : (
+                  gates.map((gate) => (
+                    <div key={gate.id} className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
+                      <span>{GATE_LABEL[gate.type]}</span>
+                      <StatusBadge tone={gateStatusTone(gate.status)} label={STATUS_LABEL[gate.status]} size="xs" />
+                    </div>
+                  ))
+                )}
+                <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
+                  <span>Deficiencies</span>
+                  <span className="font-semibold tabular-nums">{deficiencies.length}</span>
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <Card className="p-5 shadow-card">
+          <SectionHeading as="h3">Deficiencies</SectionHeading>
+          <div className="mt-3 space-y-2">
+            {activeDefs.length === 0 ? (
+              <EmptyInline text="No active deficiencies" />
+            ) : (
+              activeDefs.map((deficiency) => {
+                const phase = detail.phases.find((item) => item.id === deficiency.phaseId);
+                return (
+                  <div key={deficiency.id} className="rounded-md border border-border bg-muted/20 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium">{deficiency.title}</span>
+                      <SeverityBadge severity={deficiency.severity} size="xs" />
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {phase ? PHASE_LABEL[phase.type] : "Unassigned phase"} · {STATUS_LABEL[deficiency.status] ?? deficiency.status}
+                    </p>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </Card>
+
+        <Card className="p-5 shadow-card">
+          <SectionHeading as="h3">Project Notes</SectionHeading>
+          <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">
+            {p.notes?.trim() ? p.notes : "No project notes recorded."}
+          </p>
+        </Card>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-2">
+        <ReadOnlyInventoryCard title="Equipment" items={equipmentItems} emptyText="No equipment logged" />
+        <Card className="p-5 shadow-card">
+          <SectionHeading as="h3">Materials</SectionHeading>
+          <div className="mt-3 space-y-3">
+            {materialsLoading ? (
+              <Skeleton className="h-20" />
+            ) : materialsError ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Couldn't load materials</AlertTitle>
+                <AlertDescription>{materialsError}</AlertDescription>
+              </Alert>
+            ) : visibleMaterialLogs.length === 0 ? (
+              <EmptyInline text="No materials logged" />
+            ) : (
+              PHASE_ORDER.map((type) => {
+                const phase = detail.phases.find((item) => item.type === type);
+                const phaseLogs = phase ? visibleMaterialLogs.filter((log) => log.phaseId === phase.id) : [];
+                if (phaseLogs.length === 0) return null;
+                const labelByKey = new Map(PHASE_MATERIAL_CATALOGS[type].map((item) => [item.itemKey, item.label]));
+                return (
+                  <div key={type} className="rounded-md border border-border bg-muted/20 p-3">
+                    <div className="text-sm font-semibold">{PHASE_LABEL[type]}</div>
+                    <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                      {phaseLogs.map((log) => (
+                        <li key={log.id} className="flex items-center justify-between gap-2 text-sm">
+                          <span className="truncate text-muted-foreground">{labelByKey.get(log.itemKey) ?? log.itemKey}</span>
+                          <span className="font-semibold tabular-nums">{log.quantity}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </Card>
+      </section>
+
+      <section>
+        <div className="mb-3 flex items-baseline justify-between">
+          <SectionHeading as="h3" className="mb-0">Photo Evidence</SectionHeading>
+          <span className="text-xs text-muted-foreground">{detail.photoEvidence.length} photos</span>
+        </div>
+        {detail.photoEvidence.length === 0 ? (
+          <Card className="border-border bg-card p-8 text-center text-sm text-muted-foreground shadow-card">
+            <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+              <ImageIcon className="h-5 w-5" />
+            </div>
+            No photos in this project yet
+          </Card>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {detail.photoEvidence.map((photo) => (
+              <SummaryPhotoEvidenceCard
+                key={photo.id}
+                photo={photo}
+                phases={detail.phases}
+                gates={detail.gates}
+                deficiencies={detail.deficiencies}
+                onOpen={() => onOpenPhoto(photo)}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <div className="sticky bottom-0 -mx-4 border-t border-border bg-background/95 px-4 py-4 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:pt-2">
+        <Button size="lg" className="w-full sm:w-auto" onClick={onViewDetails}>
+          View Full Project Details
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function SummaryMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-border bg-muted/20 p-3">
+      <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{label}</div>
+      <div className="mt-1 truncate font-medium">{value}</div>
+    </div>
+  );
+}
+
+function ReadOnlyInventoryCard({ title, items, emptyText }: { title: string; items: InventoryDisplayItem[]; emptyText: string }) {
+  return (
+    <Card className="p-5 shadow-card">
+      <SectionHeading as="h3">{title}</SectionHeading>
+      <div className="mt-3">
+        {items.length === 0 ? (
+          <EmptyInline text={emptyText} />
+        ) : (
+          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {items.map((item) => (
+              <li key={item.label} className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/20 p-2.5">
+                <span className="min-w-0 truncate text-sm font-medium">{item.label}</span>
+                <span className="shrink-0 tabular-nums text-sm font-semibold text-foreground">{item.quantity}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function SummaryPhotoEvidenceCard({
+  photo,
+  phases,
+  gates,
+  deficiencies,
+  onOpen,
+}: {
+  photo: PhotoEvidence;
+  phases: { id: string; type: string }[];
+  gates: { id: string; type: string; phaseId?: string }[];
+  deficiencies: { id: string; title: string; phaseId: string }[];
+  onOpen: () => void;
+}) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPhotoViewUrl(photo.id).then((res) => {
+      if (!cancelled && res.ok && res.data.url) {
+        setBlobUrl(res.data.url);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [photo.id]);
+
+  const phase = phases.find((item) => item.id === photo.phaseId);
+  const gate = gates.find((item) => item.id === photo.gateId);
+  const deficiency = deficiencies.find((item) => item.id === photo.deficiencyId);
+  const context = deficiency
+    ? `Deficiency: ${deficiency.title}`
+    : gate && phase
+      ? `${GATE_LABEL[gate.type] ?? gate.type} · ${PHASE_LABEL[phase.type]}`
+      : gate
+        ? GATE_LABEL[gate.type] ?? gate.type
+        : phase
+          ? PHASE_LABEL[phase.type]
+          : "Project";
+
+  return (
+    <Card className="overflow-hidden shadow-card">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="relative aspect-[4/3] w-full overflow-hidden bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {blobUrl ? (
+          <img src={blobUrl} alt={PURPOSE_LABEL[photo.purpose] ?? photo.purpose} className="h-full w-full object-cover transition-transform duration-200 hover:scale-105" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <ImageIcon className="h-7 w-7 text-muted-foreground" />
+          </div>
+        )}
+      </button>
+      <div className="space-y-1.5 p-3 text-sm">
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-medium">{PURPOSE_LABEL[photo.purpose] ?? photo.purpose}</span>
+          <Badge tone={photo.status === "confirmed" ? "success" : photo.status === "failed" ? "danger" : "neutral"} appearance="soft" size="xs">
+            {STATUS_LABEL[photo.status] ?? photo.status.replace(/_/g, " ")}
+          </Badge>
+        </div>
+        <p className="truncate text-xs text-muted-foreground">{context}</p>
+        <p className="text-xs text-muted-foreground">
+          {formatDateWithOptions(photo.createdAt, { showYear: true })}
+          {photo.fileSizeBytes ? ` · ${Math.round(photo.fileSizeBytes / 1024)} KB` : ""}
+        </p>
+      </div>
+    </Card>
+  );
+}
 
 function buildProjectPhaseActions({
   phase,

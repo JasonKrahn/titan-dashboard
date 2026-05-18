@@ -74,6 +74,26 @@ const materialLog = {
   updatedAt: "2026-05-12T00:00:00.000Z",
 };
 
+const adminUser = {
+  id: "user-admin",
+  role: "admin" as const,
+  fullName: "Admin User",
+  email: "admin@titanpm.test",
+  active: true,
+  createdAt: "2026-05-01T00:00:00.000Z",
+  updatedAt: "2026-05-01T00:00:00.000Z",
+};
+
+const projectManagerUser = {
+  id: "user-pm",
+  role: "project_manager" as const,
+  fullName: "Project Manager",
+  email: "pm@titanpm.test",
+  active: true,
+  createdAt: "2026-05-01T00:00:00.000Z",
+  updatedAt: "2026-05-01T00:00:00.000Z",
+};
+
 const detail: ProjectDetail = {
   project: {
     id: "proj-1",
@@ -153,6 +173,14 @@ function renderPage() {
 describe("ProjectDetailPage schedule", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(window, "localStorage", {
+      value: {
+        getItem: vi.fn(() => null),
+        setItem: vi.fn(),
+        removeItem: vi.fn(),
+      },
+      configurable: true,
+    });
     getProject.mockResolvedValue({ ok: true, data: detail });
     getCurrentUser.mockResolvedValue({ ok: false, error: { message: "No current user" } });
     getPhotoViewUrl.mockResolvedValue({ ok: true, data: { url: "https://example.com/photo.jpg" } });
@@ -212,11 +240,115 @@ describe("ProjectDetailPage schedule", () => {
     expect(screen.getByRole("button", { name: "Site Checked" }).closest("a")).toBeNull();
     expect(screen.getByRole("button", { name: "Site Blocked" }).closest("a")).toBeNull();
   });
+
+  it("defaults admins to the executive summary and shows all project photo evidence", async () => {
+    getCurrentUser.mockResolvedValue({ ok: true, data: adminUser });
+    getProject.mockResolvedValue({
+      ok: true,
+      data: {
+        ...detail,
+        project: {
+          ...detail.project,
+          notes: "Client wants daily status updates.",
+        },
+        gates: [
+          {
+            id: "gate-attic",
+            projectId: "proj-1",
+            type: "attic_check",
+            status: "passed",
+            requiredPhotoEvidence: true,
+            createdAt: "2026-05-01T00:00:00.000Z",
+            updatedAt: "2026-05-01T00:00:00.000Z",
+          },
+        ],
+        deficiencies: [
+          {
+            id: "def-1",
+            projectId: "proj-1",
+            phaseId: "phase-insulation",
+            title: "Missing vapor barrier",
+            severity: "high",
+            status: "open",
+            createdAt: "2026-05-02T00:00:00.000Z",
+            updatedAt: "2026-05-02T00:00:00.000Z",
+          },
+        ],
+        photoEvidence: [
+          {
+            id: "photo-attic",
+            projectId: "proj-1",
+            purpose: "attic_check",
+            objectKey: "photo-attic.jpg",
+            mimeType: "image/jpeg",
+            fileSizeBytes: 2048,
+            status: "confirmed",
+            uploadedByUserId: "user-pm",
+            createdAt: "2026-05-03T00:00:00.000Z",
+            updatedAt: "2026-05-03T00:00:00.000Z",
+          },
+          {
+            id: "photo-phase",
+            projectId: "proj-1",
+            phaseId: "phase-insulation",
+            purpose: "general",
+            objectKey: "photo-phase.jpg",
+            mimeType: "image/jpeg",
+            status: "uploaded",
+            uploadedByUserId: "user-pm",
+            createdAt: "2026-05-04T00:00:00.000Z",
+            updatedAt: "2026-05-04T00:00:00.000Z",
+          },
+        ],
+      },
+    });
+
+    renderPage();
+
+    expect(await screen.findByText("Executive Summary")).toBeInTheDocument();
+    expect(screen.getByText("Client wants daily status updates.")).toBeInTheDocument();
+    expect(screen.getByText("Missing vapor barrier")).toBeInTheDocument();
+    expect(screen.getByText("Photo Evidence")).toBeInTheDocument();
+    expect(screen.getByText("2 photos")).toBeInTheDocument();
+    expect(screen.getByText("Attic Check")).toBeInTheDocument();
+    expect(screen.getByText("Project")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Site Checked" })).not.toBeInTheDocument();
+  });
+
+  it("lets admins enter the unchanged operational detail view from the summary", async () => {
+    getCurrentUser.mockResolvedValue({ ok: true, data: adminUser });
+
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: /View Full Project Details/i }));
+
+    expect(await screen.findByRole("heading", { name: "Phases" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Enable Editing" })).toBeInTheDocument();
+    expect(screen.queryByText("Executive Summary")).not.toBeInTheDocument();
+  });
+
+  it("bypasses the executive summary for project managers", async () => {
+    getCurrentUser.mockResolvedValue({ ok: true, data: projectManagerUser });
+
+    renderPage();
+
+    expect(await screen.findByRole("heading", { name: "Phases" })).toBeInTheDocument();
+    expect(screen.queryByText("Executive Summary")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /View Full Project Details/i })).not.toBeInTheDocument();
+  });
 });
 
 describe("ProjectDetailPage equipment", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(window, "localStorage", {
+      value: {
+        getItem: vi.fn(() => null),
+        setItem: vi.fn(),
+        removeItem: vi.fn(),
+      },
+      configurable: true,
+    });
     getProject.mockResolvedValue({ ok: true, data: detail });
     getCurrentUser.mockResolvedValue({ ok: false, error: { message: "No current user" } });
     getPhotoViewUrl.mockResolvedValue({ ok: true, data: { url: "https://example.com/photo.jpg" } });
