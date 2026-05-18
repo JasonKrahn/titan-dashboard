@@ -29,6 +29,7 @@ interface ProjectScheduleTimelineProps {
   onScheduleChange: (changes: PhaseScheduleChange[]) => void;
   saving?: boolean;
   errorMessage?: string | null;
+  canEdit?: boolean;
 }
 
 type DragState = {
@@ -51,6 +52,7 @@ export function ProjectScheduleTimeline({
   onScheduleChange,
   saving,
   errorMessage,
+  canEdit = true,
 }: ProjectScheduleTimelineProps) {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const draftRef = useRef<ScheduleDraftResult | null>(null);
@@ -64,7 +66,7 @@ export function ProjectScheduleTimeline({
   const [mobileError, setMobileError] = useState<string | null>(null);
 
   const orderedPhases = useMemo(() => orderedSchedulePhases(phases), [phases]);
-  const readOnly = project.status === "completed" || project.status === "archived" || saving;
+  const readOnly = project.status === "completed" || project.status === "archived" || saving || !canEdit;
   const projectStart = project.scheduledStart;
   const projectEnd = project.scheduledEnd;
   const totalDays = projectStart && projectEnd ? daysBetween(projectStart, projectEnd) : 1;

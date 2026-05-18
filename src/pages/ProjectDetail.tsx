@@ -48,6 +48,7 @@ import { PageNav } from "@/components/dashboard/PageNav";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { PhaseHealthPill } from "@/components/dashboard/PhaseHealthPill";
 import { SiteCheckDialog } from "@/components/dashboard/SiteCheckDialog";
@@ -147,6 +148,10 @@ export default function ProjectDetailPage() {
   const { toast } = useToast();
 
   const meQ = useQuery({ queryKey: ["me"], queryFn: getCurrentUser });
+  const [isEditingEnabled, setIsEditingEnabled] = useState(false);
+  const isAdmin = meQ.data?.ok && meQ.data.data.role === "admin";
+  const canEdit = isAdmin ? isEditingEnabled : true;
+
   useEffect(() => {
     if (meQ.data?.ok && meQ.data.data.role === "inventory_viewer") navigate("/inventory");
   }, [meQ.data, navigate]);
@@ -486,10 +491,11 @@ export default function ProjectDetailPage() {
         setPhaseDeficiencyTarget,
         setDeficiencyDialogOpen,
         setPhasePhotoTarget,
+        canEdit,
       })
     : [];
   const projectMobileActions: MobileActionItem[] = [
-    ...(p.status !== "completed" && p.status !== "archived"
+    ...(p.status !== "completed" && p.status !== "archived" && canEdit
       ? [
           {
             label: "Upload photo",
@@ -514,7 +520,7 @@ export default function ProjectDetailPage() {
           },
         ]
       : []),
-    ...(p.status === "completed"
+    ...(p.status === "completed" && canEdit
       ? [
           {
             label: "Archive project",
@@ -605,12 +611,12 @@ export default function ProjectDetailPage() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   {p.status !== "completed" && p.status !== "archived" && (
-                    <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                    <DropdownMenuItem onClick={() => setEditOpen(true)} disabled={!canEdit}>
                       <Pencil className="mr-2 h-4 w-4" /> Edit project
                     </DropdownMenuItem>
                   )}
                   {p.status === "completed" && (
-                    <DropdownMenuItem onClick={() => setArchiveOpen(true)}>
+                    <DropdownMenuItem onClick={() => setArchiveOpen(true)} disabled={!canEdit}>
                       <Archive className="mr-2 h-4 w-4" /> Archive
                     </DropdownMenuItem>
                   )}
@@ -636,6 +642,18 @@ export default function ProjectDetailPage() {
                 <span>End {formatDateWithOptions(p.scheduledEnd ?? "")}</span>
               </div>
               {p.finishLevel && <div>Finish level: {p.finishLevel}</div>}
+            </div>
+          )}
+          {isAdmin && (
+            <div className="mt-2 flex items-center gap-2 border-t border-border pt-2">
+              <Switch
+                checked={isEditingEnabled}
+                onCheckedChange={setIsEditingEnabled}
+                id="admin-edit-toggle-mobile"
+              />
+              <label htmlFor="admin-edit-toggle-mobile" className="text-xs font-medium">
+                Enable Editing
+              </label>
             </div>
           )}
         </section>
@@ -713,8 +731,20 @@ export default function ProjectDetailPage() {
 
             {/* KPI chips */}
             <div className="flex flex-wrap gap-3 lg:flex-col lg:items-end">
+              {isAdmin && (
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={isEditingEnabled}
+                    onCheckedChange={setIsEditingEnabled}
+                    id="admin-edit-toggle"
+                  />
+                  <label htmlFor="admin-edit-toggle" className="text-sm font-medium">
+                    Enable Editing
+                  </label>
+                </div>
+              )}
               {p.status !== "completed" && p.status !== "archived" && (
-                <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} disabled={!canEdit}>
                   <Pencil className="mr-1 h-4 w-4" />
                   Edit
                 </Button>
@@ -722,7 +752,7 @@ export default function ProjectDetailPage() {
               {p.status === "completed" && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="default" size="sm" onClick={() => setArchiveOpen(true)}>
+                    <Button variant="default" size="sm" onClick={() => setArchiveOpen(true)} disabled={!canEdit}>
                       <Archive className="mr-1 h-4 w-4" />
                       Archive
                     </Button>
@@ -750,6 +780,7 @@ export default function ProjectDetailPage() {
           saving={scheduleMutation.isPending}
           errorMessage={scheduleError}
           onScheduleChange={(changes) => scheduleMutation.mutate(changes)}
+          canEdit={canEdit}
         />
 
         {/* Phases */}
@@ -827,6 +858,7 @@ export default function ProjectDetailPage() {
                                   phaseLabel: PHASE_LABEL[type],
                                 });
                               }}
+                              disabled={!canEdit}
                             >
                               Site Checked
                             </Button>
@@ -842,6 +874,7 @@ export default function ProjectDetailPage() {
                                   phaseLabel: PHASE_LABEL[type],
                                 });
                               }}
+                              disabled={!canEdit}
                             >
                               Site Blocked
                             </Button>
@@ -860,6 +893,7 @@ export default function ProjectDetailPage() {
                                 phaseLabel: PHASE_LABEL[type],
                               });
                             }}
+                            disabled={!canEdit}
                           >
                             Site Cleared
                           </Button>
@@ -882,6 +916,7 @@ export default function ProjectDetailPage() {
                             });
                             setInspectionMode("passed");
                           }}
+                          disabled={!canEdit}
                         >
                           Passed
                         </Button>
@@ -898,6 +933,7 @@ export default function ProjectDetailPage() {
                             });
                             setInspectionMode("failed");
                           }}
+                          disabled={!canEdit}
                         >
                           Failed
                         </Button>
@@ -965,9 +1001,9 @@ export default function ProjectDetailPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                 {/* Call-in date */}
                 {insulationClosed && drywallStarted ? (
-                  <Popover open={callInOpen} onOpenChange={setCallInOpen}>
+                  <Popover open={callInOpen} onOpenChange={canEdit ? setCallInOpen : undefined}>
                     <PopoverTrigger asChild>
-                      <button className="rounded-md border border-border bg-muted/30 p-2.5 text-left transition-colors hover:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                      <button className="rounded-md border border-border bg-muted/30 p-2.5 text-left transition-colors hover:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 disabled:cursor-not-allowed" disabled={!canEdit}>
                         <div className="flex items-center justify-between text-muted-foreground">
                           <span>Call-in date</span>
                           <Calendar className="h-3 w-3" />
@@ -1028,9 +1064,9 @@ export default function ProjectDetailPage() {
 
                 {/* Install date */}
                 {insulationClosed && drywallStarted ? (
-                  <Popover open={installOpen} onOpenChange={(o) => { setInstallOpen(o); if (!o) setInstallPhoto(null); }}>
+                  <Popover open={installOpen} onOpenChange={canEdit ? (o) => { setInstallOpen(o); if (!o) setInstallPhoto(null); } : undefined}>
                     <PopoverTrigger asChild>
-                      <button className="rounded-md border border-border bg-muted/30 p-2.5 text-left transition-colors hover:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                      <button className="rounded-md border border-border bg-muted/30 p-2.5 text-left transition-colors hover:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 disabled:cursor-not-allowed" disabled={!canEdit}>
                         <div className="flex items-center justify-between text-muted-foreground">
                           <span>Install date</span>
                           <Calendar className="h-3 w-3" />
@@ -1108,14 +1144,15 @@ export default function ProjectDetailPage() {
                 <SectionHeading as="h3">Deficiencies</SectionHeading>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">{activeDefs.length} active</span>
-                  <Button size="sm" className="hidden md:inline-flex" onClick={() => setDeficiencyDialogOpen(true)}>
+                  <Button size="sm" className="hidden md:inline-flex" onClick={() => setDeficiencyDialogOpen(true)} disabled={!canEdit}>
                     Add Deficiency
                   </Button>
                   <button
                     type="button"
                     aria-label="Add deficiency"
                     onClick={() => setDeficiencyDialogOpen(true)}
-                    className="md:hidden inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground"
+                    disabled={!canEdit}
+                    className="md:hidden inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Plus className="h-4 w-4" />
                   </button>
@@ -1158,6 +1195,7 @@ export default function ProjectDetailPage() {
                               setSelectedDeficiencyId(d.id);
                               setDeficiencyDialogOpen(true);
                             }}
+                            disabled={!canEdit}
                           >
                             Resolve
                           </Button>
@@ -1200,7 +1238,7 @@ export default function ProjectDetailPage() {
           <InventoryDisplayCard
             title="Equipment"
             items={equipmentItems}
-            onManage={openEquipmentModal}
+            onManage={canEdit ? openEquipmentModal : undefined}
             emptyText="No equipment logged"
             layout="grid"
             pickupSummaries={equipmentPickupSummaries}
@@ -1212,7 +1250,7 @@ export default function ProjectDetailPage() {
           <section className={mobileTab === "photos" ? "" : "hidden md:block"}>
             <div className="mb-3 flex items-baseline justify-between">
               <SectionHeading as="h3" className="mb-0">Project Photos</SectionHeading>
-              <Button size="sm" className="hidden md:inline-flex" onClick={() => setPhotoUploadOpen(true)}>
+              <Button size="sm" className="hidden md:inline-flex" onClick={() => setPhotoUploadOpen(true)} disabled={!canEdit}>
                 <Camera className="mr-1.5 h-4 w-4" />
                 Upload Photo
               </Button>
@@ -1467,6 +1505,7 @@ function buildProjectPhaseActions({
   setPhaseDeficiencyTarget,
   setDeficiencyDialogOpen,
   setPhasePhotoTarget,
+  canEdit,
 }: {
   phase: Phase;
   siteGate?: Gate;
@@ -1478,6 +1517,7 @@ function buildProjectPhaseActions({
   setPhaseDeficiencyTarget: React.Dispatch<React.SetStateAction<Phase | null>>;
   setDeficiencyDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setPhasePhotoTarget: React.Dispatch<React.SetStateAction<Phase | null>>;
+  canEdit: boolean;
 }): MobileActionItem[] {
   const phaseLabel = PHASE_LABEL[phase.type];
   return [
@@ -1487,7 +1527,7 @@ function buildProjectPhaseActions({
       helperText: "Open detailed phase workspace",
       onClick: () => navigate(`/project/${projectId}/phase/${phase.id}`),
     },
-    ...(siteGate?.status === "not_started"
+    ...(canEdit && siteGate?.status === "not_started"
       ? [
           {
             label: "Site checked",
@@ -1513,7 +1553,7 @@ function buildProjectPhaseActions({
           },
         ]
       : []),
-    ...(siteGate?.status === "blocked"
+    ...(canEdit && siteGate?.status === "blocked"
       ? [
           {
             label: "Site cleared",
@@ -1528,21 +1568,25 @@ function buildProjectPhaseActions({
           },
         ]
       : []),
-    {
-      label: "Add deficiency",
-      icon: <Plus className="h-4 w-4" />,
-      helperText: `Log an issue for ${phaseLabel}`,
-      onClick: () => {
-        setPhaseDeficiencyTarget(phase);
-        setDeficiencyDialogOpen(true);
-      },
-    },
-    {
-      label: "Upload photo",
-      icon: <Upload className="h-4 w-4" />,
-      helperText: `Add evidence for ${phaseLabel}`,
-      onClick: () => setPhasePhotoTarget(phase),
-    },
+    ...(canEdit
+      ? [
+          {
+            label: "Add deficiency",
+            icon: <Plus className="h-4 w-4" />,
+            helperText: `Log an issue for ${phaseLabel}`,
+            onClick: () => {
+              setPhaseDeficiencyTarget(phase);
+              setDeficiencyDialogOpen(true);
+            },
+          },
+          {
+            label: "Upload photo",
+            icon: <Upload className="h-4 w-4" />,
+            helperText: `Add evidence for ${phaseLabel}`,
+            onClick: () => setPhasePhotoTarget(phase),
+          },
+        ]
+      : []),
   ];
 }
 

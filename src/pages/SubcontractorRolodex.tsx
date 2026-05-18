@@ -767,11 +767,11 @@ export default function SubcontractorRolodexPage() {
                       </div>
 
                       <div className="mt-4 flex items-center justify-between gap-3 border-y border-border/60 py-3">
-                        <div className="min-w-0 text-xs text-muted-foreground">
+                        <div className="min-w-0 flex-1 text-xs text-muted-foreground">
                           <p className="truncate">{s.phone ?? "No phone"}</p>
                           <p className="mt-1 truncate">{s.email ?? "No email"}</p>
                         </div>
-                        {renderContactActions(s)}
+                        <div className="flex-shrink-0">{renderContactActions(s)}</div>
                       </div>
 
                       <div className="mt-4 space-y-3">
@@ -815,17 +815,18 @@ export default function SubcontractorRolodexPage() {
                 })}
               </div>
             ) : (
-              <Card surface="panel" className="hidden md:block">
-                <Table className="table-fixed">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[24%]">Subcontractor</TableHead>
-                      <TableHead className="w-[12%]">Trade</TableHead>
-                      <TableHead className="w-[16%]">Contact</TableHead>
-                      <TableHead className="w-[10%] text-right">Status</TableHead>
-                      <TableHead className="w-[10%] text-right">Assigned</TableHead>
-                      <TableHead className="w-[20%]">Next finish</TableHead>
-                      <TableHead className="w-[8%] text-right">Actions</TableHead>
+              <Card surface="panel" className="hidden md:block overflow-x-auto">
+                <div style={{ width: '1300px' }}>
+                  <Table className="table-fixed">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead style={{ width: '240px' }}>Subcontractor</TableHead>
+                        <TableHead style={{ width: '110px' }}>Trade</TableHead>
+                        <TableHead style={{ width: '160px' }}>Contact</TableHead>
+                        <TableHead style={{ width: '90px' }} className="text-right">Status</TableHead>
+                        <TableHead style={{ width: '80px' }} className="text-right">Assigned</TableHead>
+                        <TableHead style={{ width: '220px' }}>Next finish</TableHead>
+                        <TableHead style={{ width: '400px' }} className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -855,11 +856,11 @@ export default function SubcontractorRolodexPage() {
                             </span>
                           </TableCell>
                           <TableCell className="text-right font-semibold tabular-nums">{assignments.length}</TableCell>
-                          <TableCell className="truncate text-xs text-muted-foreground">
+                          <TableCell className="min-w-0 truncate overflow-hidden text-xs text-muted-foreground">
                             {primaryAssignment ? (
                               <Link
                                 to={`/project/${primaryAssignment.project.id}/phase/${primaryAssignment.phase.id}`}
-                                className="hover:underline text-primary"
+                                className="hover:underline text-primary block truncate"
                                 aria-label={`Open ${primaryAssignment.project.name} ${phaseLabel(primaryAssignment.phase)} phase`}
                               >
                                 {formatDateWithOptions(primaryAssignment.phase.scheduledEnd, { showYear: true })} · {primaryAssignment.project.name}
@@ -868,8 +869,8 @@ export default function SubcontractorRolodexPage() {
                               "No scheduled finish"
                             )}
                           </TableCell>
-                          <TableCell>
-                            <div className="flex justify-end gap-1">
+                          <TableCell className="whitespace-nowrap overflow-hidden">
+                            <div className="flex justify-end gap-1 flex-shrink-0">
                               {renderContactActions(s, true)}
                               <Button variant="ghost" size="icon" className="h-9 w-9" aria-label={`Edit ${s.displayName}`} onClick={() => handleEdit(s)}>
                                 <Pencil className="h-4 w-4" />
@@ -890,6 +891,7 @@ export default function SubcontractorRolodexPage() {
                     })}
                   </TableBody>
                 </Table>
+                </div>
               </Card>
             )}
           </>
