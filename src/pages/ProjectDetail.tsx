@@ -63,6 +63,7 @@ import { DeficiencyDialog } from "@/components/dashboard/DeficiencyDialog";
 import { PhotoUploadDialog } from "@/components/dashboard/PhotoUploadDialog";
 import { InventoryDisplayCard, type InventoryDisplayItem, type InventoryPickupSummaryItem } from "@/components/dashboard/InventoryDisplayCard";
 import { QuantityStepperModal } from "@/components/dashboard/QuantityStepperModal";
+import { useShortcutActions } from "@/components/dashboard/ShortcutActionsContext";
 import { getCurrentUser, getProject, getProjectEquipment, getPhaseMaterials, getProjectInventoryPickups, updateProjectEquipmentBatch, updateAtticGate, getPhotoViewUrl, updatePhaseSchedules } from "@/lib/api";
 import { exportProjectZip } from "@/lib/projectExport";
 import { formatDateWithOptions, type PhaseScheduleChange } from "@/lib/schedule";
@@ -155,6 +156,7 @@ export default function ProjectDetailPage() {
   const [viewMode, setViewMode] = useState<ProjectViewMode>("detailed");
   const [defaultedViewUserId, setDefaultedViewUserId] = useState<string | undefined>();
   const canEdit = isAdmin ? isEditingEnabled : true;
+  const { registerEditAction } = useShortcutActions();
 
   useEffect(() => {
     if (meQ.data?.ok && meQ.data.data.role === "inventory_viewer") navigate("/inventory");
@@ -165,7 +167,6 @@ export default function ProjectDetailPage() {
     setViewMode(me.role === "admin" ? "summary" : "detailed");
     setIsEditingEnabled(false);
   }, [defaultedViewUserId, me]);
-
   const projectQ = useQuery({
     queryKey: ["project", id],
     queryFn: () => getProject(id!),
@@ -195,6 +196,18 @@ export default function ProjectDetailPage() {
     },
     enabled: !!detail?.project.id && isAdmin && viewMode === "summary",
   });
+
+  useEffect(() => {
+    if (canEdit && detail?.project.status !== "archived" && detail?.project.status !== "completed") {
+      registerEditAction(() => setEditOpen(true));
+    } else {
+      registerEditAction(null);
+    }
+
+    return () => {
+      registerEditAction(null);
+    };
+  }, [canEdit, detail?.project.status, registerEditAction]);
 
   const [siteCheckTarget, setSiteCheckTarget] = useState<{
     gateId: string;
@@ -336,6 +349,13 @@ export default function ProjectDetailPage() {
     [detail],
   );
   const atticGate = useMemo(() => detail?.gates.find((g) => g.type === "attic_check"), [detail]);
+  const atticSubcontractor = useMemo(
+    () =>
+      atticGate?.callInSubcontractorId
+        ? detail?.subcontractors.find((subcontractor) => subcontractor.id === atticGate.callInSubcontractorId)
+        : undefined,
+    [atticGate, detail],
+  );
   const hasAtticPhoto = useMemo(
     () => detail?.photoEvidence.some((p) => p.purpose === "attic_check" && p.status === "confirmed") ?? false,
     [detail],
@@ -1036,34 +1056,119 @@ export default function ProjectDetailPage() {
           </div>
         </section>
 
-        {/* Two-column: Attic & Deficiencies */}
-        <section className={`grid gap-6 md:grid-cols-2 ${mobileTab === "overview" || mobileTab === "deficiencies" ? "" : "hidden md:grid"}`}>
-          <Card id="attic-gate" className="p-3 shadow-card sm:p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <SectionHeading as="h3">Attic Check</SectionHeading>
-                {insulationClosed && drywallStarted && (
-                  <Badge tone="ready" appearance="soft" size="sm">Ready</Badge>
+        {/* Project context */}
+        <section className="grid gap-6 lg:grid-cols-2">
+          <Card
+            id="deficiencies"
+            className={`${mobileTab === "overview" || mobileTab === "deficiencies" ? "" : "hidden md:block"} p-3 shadow-card sm:p-5`}
+          >
+            {p.status !== "completed" && p.status !== "archived" && (
+              <div className="mb-3 flex items-center justify-between">
+                <SectionHeading as="h3">Deficiencies</SectionHeading>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">{activeDefs.length} active</span>
+                  <Button size="sm" className="hidden md:inline-flex" onClick={() => setDeficiencyDialogOpen(true)} disabled={!canEdit}>
+                    Add Deficiency
+                  </Button>
+                  <button
+                    type="button"
+                    aria-label="Add deficiency"
+                    onClick={() => setDeficiencyDialogOpen(true)}
+                    disabled={!canEdit}
+                    className="md:hidden inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+            {p.status === "completed" || p.status === "archived" ? (
+              <div className="mb-3">
+                <SectionHeading as="h3">Deficiencies</SectionHeading>
+              </div>
+            ) : activeDefs.length === 0 ? (
+              <EmptyInline text="No active deficiencies" />
+            ) : (
+              <div className="space-y-1.5 sm:space-y-2">
+                {activeDefs.map((d) => {
+                  const phase = detail.phases.find((ph) => ph.id === d.phaseId);
+                  return (
+                    <div
+                      key={d.id}
+                      onClick={() => navigate(`/project/${p.id}/phase/${d.phaseId}?tab=deficiencies`)}
+                      className="flex items-start justify-between gap-2 rounded-md border border-border bg-muted/20 p-2 sm:p-2.5 cursor-pointer hover:bg-muted/30 transition-colors"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{d.title}</p>
+                        <div className="mt-1 flex items-center gap-1.5">
+                          <span className="text-xs text-muted-foreground">{phase ? PHASE_LABEL[phase.type] : "—"}</span>
+                          <SeverityBadge severity={d.severity} size="xs" />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {p.status !== "completed" && p.status !== "archived" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeficiencyDialogMode("resolve");
+                              setSelectedDeficiencyId(d.id);
+                              setDeficiencyDialogOpen(true);
+                            }}
+                            disabled={!canEdit}
+                          >
+                            Resolve
+                          </Button>
+                        )}
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+
+          {detail && (
+            <div id="project-notes" className={mobileTab === "notes" ? "" : "hidden md:block"}>
+              <ProjectNotes
+                projectId={detail.project.id}
+                notes={detail.project.notes}
+                notesLastEditedBy={detail.project.notesLastEditedBy}
+                notesLastEditedAt={detail.project.notesLastEditedAt}
+                editorName={detail.assignedProjectManager?.fullName}
+              />
+            </div>
+          )}
+        </section>
+
+        <section className={mobileTab === "overview" ? "" : "hidden md:block"}>
+          <Card id="attic-gate" className="p-3 shadow-card sm:p-4">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.35fr)_minmax(0,0.8fr)] lg:items-start">
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <SectionHeading as="h3">Attic Check</SectionHeading>
+                  {insulationClosed && drywallStarted && (
+                    <Badge tone="ready" appearance="soft" size="sm">Ready</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Camera className={`h-4 w-4 ${hasAtticPhoto ? "text-status-closed" : "text-status-ready"}`} />
+                  <span>
+                    {hasAtticPhoto ? "Photo evidence confirmed" : "Photo evidence not yet uploaded"}
+                  </span>
+                </div>
+                {!(insulationClosed && drywallStarted) && (
+                  <div className="flex items-center gap-1.5 rounded-md border border-border bg-muted/20 px-2.5 py-2 text-xs text-muted-foreground">
+                    <Lock className="h-3.5 w-3.5 shrink-0" />
+                    <span>Available after insulation phase is closed and drywall site check is passed</span>
+                  </div>
                 )}
               </div>
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-sm">
-                <Camera className={`h-4 w-4 ${hasAtticPhoto ? "text-status-closed" : "text-status-ready"}`} />
-                <span>
-                  {hasAtticPhoto ? "Photo evidence confirmed" : "Photo evidence not yet uploaded"}
-                </span>
-              </div>
 
-              {!(insulationClosed && drywallStarted) && (
-                <div className="flex items-center gap-1.5 rounded-md border border-border bg-muted/20 px-2.5 py-2 text-xs text-muted-foreground">
-                  <Lock className="h-3.5 w-3.5 shrink-0" />
-                  <span>Available after insulation phase is closed and drywall site check is passed</span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                {/* Call-in date */}
+              <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
                 {insulationClosed && drywallStarted ? (
                   <Popover open={callInOpen} onOpenChange={canEdit ? setCallInOpen : undefined}>
                     <PopoverTrigger asChild>
@@ -1126,7 +1231,6 @@ export default function ProjectDetailPage() {
                   </div>
                 )}
 
-                {/* Install date */}
                 {insulationClosed && drywallStarted ? (
                   <Popover open={installOpen} onOpenChange={canEdit ? (o) => { setInstallOpen(o); if (!o) setInstallPhoto(null); } : undefined}>
                     <PopoverTrigger asChild>
@@ -1190,87 +1294,13 @@ export default function ProjectDetailPage() {
                 )}
               </div>
 
-              {atticGate?.callInSubcontractorId && (() => {
-                const sub = detail?.subcontractors.find((s) => s.id === atticGate.callInSubcontractorId);
-                return sub ? (
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <User className="h-3.5 w-3.5" />
-                    <span>{sub.displayName}{sub.companyName ? ` · ${sub.companyName}` : ""}</span>
-                  </div>
-                ) : null;
-              })()}
-            </div>
-          </Card>
-
-          <Card id="deficiencies" className="p-3 shadow-card sm:p-5">
-            {p.status !== "completed" && p.status !== "archived" && (
-              <div className="mb-3 flex items-center justify-between">
-                <SectionHeading as="h3">Deficiencies</SectionHeading>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">{activeDefs.length} active</span>
-                  <Button size="sm" className="hidden md:inline-flex" onClick={() => setDeficiencyDialogOpen(true)} disabled={!canEdit}>
-                    Add Deficiency
-                  </Button>
-                  <button
-                    type="button"
-                    aria-label="Add deficiency"
-                    onClick={() => setDeficiencyDialogOpen(true)}
-                    disabled={!canEdit}
-                    className="md:hidden inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
+              {atticSubcontractor ? (
+                <div className="flex items-center gap-1.5 rounded-md border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                  <User className="h-3.5 w-3.5 shrink-0" />
+                  <span>{atticSubcontractor.displayName}{atticSubcontractor.companyName ? ` · ${atticSubcontractor.companyName}` : ""}</span>
                 </div>
-              </div>
-            )}
-            {p.status === "completed" || p.status === "archived" ? (
-              <div className="mb-3">
-                <SectionHeading as="h3">Deficiencies</SectionHeading>
-              </div>
-            ) : null}
-            {activeDefs.length === 0 ? (
-              <EmptyInline text="No active deficiencies" />
-            ) : (
-              <div className="space-y-1.5 sm:space-y-2">
-                {activeDefs.map((d) => {
-                  const phase = detail.phases.find((ph) => ph.id === d.phaseId);
-                  return (
-                    <div
-                      key={d.id}
-                      onClick={() => navigate(`/project/${p.id}/phase/${d.phaseId}?tab=deficiencies`)}
-                      className="flex items-start justify-between gap-2 rounded-md border border-border bg-muted/20 p-2 sm:p-2.5 cursor-pointer hover:bg-muted/30 transition-colors"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{d.title}</p>
-                        <div className="mt-1 flex items-center gap-1.5">
-                          <span className="text-xs text-muted-foreground">{phase ? PHASE_LABEL[phase.type] : "—"}</span>
-                          <SeverityBadge severity={d.severity} size="xs" />
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {p.status !== "completed" && p.status !== "archived" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 px-2 text-xs"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeficiencyDialogMode("resolve");
-                              setSelectedDeficiencyId(d.id);
-                              setDeficiencyDialogOpen(true);
-                            }}
-                            disabled={!canEdit}
-                          >
-                            Resolve
-                          </Button>
-                        )}
-                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+              ) : null}
+            </div>
           </Card>
         </section>
 
@@ -1283,19 +1313,6 @@ export default function ProjectDetailPage() {
               This project cannot be completed until the attic install date and photo evidence have been submitted.
             </AlertDescription>
           </Alert>
-        )}
-
-        {/* Project Notes */}
-        {detail && (
-          <div id="project-notes" className={mobileTab === "notes" ? "" : "hidden md:block"}>
-            <ProjectNotes
-              projectId={detail.project.id}
-              notes={detail.project.notes}
-              notesLastEditedBy={detail.project.notesLastEditedBy}
-              notesLastEditedAt={detail.project.notesLastEditedAt}
-              editorName={detail.assignedProjectManager?.fullName}
-            />
-          </div>
         )}
 
         <section className={mobileTab === "overview" ? "" : "hidden md:block"}>
@@ -1583,6 +1600,9 @@ function AdminProjectSummary({
     detail.phases.find((phase) => phase.status === "blocked") ??
     detail.phases.find((phase) => phase.status !== "closed");
   const atticGate = detail.gates.find((gate) => gate.type === "attic_check");
+  const atticSubcontractor = atticGate?.callInSubcontractorId
+    ? detail.subcontractors.find((subcontractor) => subcontractor.id === atticGate.callInSubcontractorId)
+    : undefined;
   const visibleMaterialLogs = materialLogs.filter((log) => log.quantity > 0);
 
   return (
@@ -1684,7 +1704,7 @@ function AdminProjectSummary({
         })}
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+      <section className="grid gap-6 lg:grid-cols-2">
         <Card className="p-5 shadow-card">
           <SectionHeading as="h3">Deficiencies</SectionHeading>
           <div className="mt-3 space-y-2">
@@ -1714,6 +1734,43 @@ function AdminProjectSummary({
           <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">
             {p.notes?.trim() ? p.notes : "No project notes recorded."}
           </p>
+        </Card>
+
+        <Card id="attic-check-details" className="p-4 shadow-card lg:col-span-2">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,0.65fr)_minmax(0,1.35fr)] lg:items-start">
+            <div className="flex items-center justify-between gap-3 lg:block">
+              <SectionHeading as="h3">Attic Check Details</SectionHeading>
+              <StatusBadge
+                tone={gateStatusTone(atticGate?.status ?? p.atticCheckStatus)}
+                label={STATUS_LABEL[atticGate?.status ?? p.atticCheckStatus] ?? "Not started"}
+                size="xs"
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <SummaryMetric
+                label="Call-in date"
+                value={atticGate?.callInDate ? formatDateWithOptions(atticGate.callInDate, { showYear: true }) : "Not set"}
+              />
+              <SummaryMetric
+                label="Install date"
+                value={atticGate?.installDate ? formatDateWithOptions(atticGate.installDate, { showYear: true }) : "Not set"}
+              />
+              <SummaryMetric
+                label="Subcontractor"
+                value={
+                  atticSubcontractor
+                    ? `${atticSubcontractor.displayName}${atticSubcontractor.companyName ? ` · ${atticSubcontractor.companyName}` : ""}`
+                    : "Unassigned"
+                }
+              />
+              {atticGate?.notes?.trim() ? (
+                <div className="rounded-md border border-border bg-muted/20 p-3 sm:col-span-3">
+                  <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Notes</div>
+                  <div className="mt-1 whitespace-pre-wrap text-sm text-foreground/90">{atticGate.notes.trim()}</div>
+                </div>
+              ) : null}
+            </div>
+          </div>
         </Card>
       </section>
 

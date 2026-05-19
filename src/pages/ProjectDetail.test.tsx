@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -206,6 +206,13 @@ describe("ProjectDetailPage schedule", () => {
     expect(await screen.findByRole("heading", { name: "Phases" })).toBeInTheDocument();
   });
 
+  it("keeps the operational project detail page on the original empty-state layout", async () => {
+    renderPage();
+
+    expect(await screen.findByText("No active deficiencies")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Attic Check Details" })).not.toBeInTheDocument();
+  });
+
   it("keeps the project photo upload header action desktop-only", async () => {
     renderPage();
 
@@ -258,6 +265,21 @@ describe("ProjectDetailPage schedule", () => {
             type: "attic_check",
             status: "passed",
             requiredPhotoEvidence: true,
+            callInDate: "2026-05-02T00:00:00.000Z",
+            installDate: "2026-05-09T00:00:00.000Z",
+            callInSubcontractorId: "sub-attic",
+            notes: "Attic access confirmed for the morning shift.",
+            createdAt: "2026-05-01T00:00:00.000Z",
+            updatedAt: "2026-05-01T00:00:00.000Z",
+          },
+        ],
+        subcontractors: [
+          {
+            id: "sub-attic",
+            displayName: "Dale Insulation",
+            companyName: "Thermal Shield",
+            trade: "insulation",
+            active: true,
             createdAt: "2026-05-01T00:00:00.000Z",
             updatedAt: "2026-05-01T00:00:00.000Z",
           },
@@ -313,6 +335,18 @@ describe("ProjectDetailPage schedule", () => {
     expect(screen.getByText("Attic Check")).toBeInTheDocument();
     expect(screen.getByText("Project")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Site Checked" })).not.toBeInTheDocument();
+    const atticDetailsCard = document.getElementById("attic-check-details");
+    expect(atticDetailsCard).not.toBeNull();
+    const atticDetails = within(atticDetailsCard!);
+    expect(await screen.findByRole("heading", { name: "Attic Check Details" })).toBeInTheDocument();
+    expect(atticDetails.getByText("May 1, 2026")).toBeInTheDocument();
+    expect(atticDetails.getByText("May 8, 2026")).toBeInTheDocument();
+    expect(atticDetails.getByText("Dale Insulation · Thermal Shield")).toBeInTheDocument();
+    expect(atticDetails.getByText("Attic access confirmed for the morning shift.")).toBeInTheDocument();
+    const deficienciesHeading = screen.getByRole("heading", { name: "Deficiencies" });
+    const projectNotesHeading = screen.getByRole("heading", { name: "Project Notes" });
+    expect(deficienciesHeading.compareDocumentPosition(projectNotesHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(projectNotesHeading.compareDocumentPosition(atticDetailsCard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("lets admins enter the unchanged operational detail view from the summary", async () => {

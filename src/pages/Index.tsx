@@ -17,6 +17,7 @@ import { ArchiveProjectDialog } from "@/components/dashboard/ArchiveProjectDialo
 import { InspectionResultDialog } from "@/components/dashboard/InspectionResultDialog";
 import { NewClientDialog } from "@/components/dashboard/NewClientDialog";
 import { NewProjectDialog } from "@/components/dashboard/NewProjectDialog";
+import { useShortcutActions } from "@/components/dashboard/ShortcutActionsContext";
 import {
   getAllDeficiencies,
   getAllGates,
@@ -52,6 +53,7 @@ const DashboardPage = () => {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [activeStatFilter, setActiveStatFilter] = useState<"active" | "blocked" | "inspections" | null>(null);
   const [defaultedUserId, setDefaultedUserId] = useState<string | undefined>();
+  const { registerNewItemAction, registerEditAction } = useShortcutActions();
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 200);
@@ -151,6 +153,35 @@ const DashboardPage = () => {
   const handleEditClient = (id: string) => {
     setEditClientId(id);
   };
+
+  useEffect(() => {
+    if (activeView === "dashboard") {
+      registerNewItemAction(() => {
+        setNewProjectClientId(undefined);
+        setNewProjectOpen(true);
+      });
+    } else if (activeView === "clients" && isAdmin) {
+      registerNewItemAction(() => setNewClientOpen(true));
+    } else if (activeView === "client-projects" && selectedClient) {
+      registerNewItemAction(() => {
+        setNewProjectClientId(selectedClient.id);
+        setNewProjectOpen(true);
+      });
+    } else {
+      registerNewItemAction(null);
+    }
+
+    if (activeView === "client-projects" && selectedClient) {
+      registerEditAction(() => setEditClientId(selectedClient.id));
+    } else {
+      registerEditAction(null);
+    }
+
+    return () => {
+      registerNewItemAction(null);
+      registerEditAction(null);
+    };
+  }, [activeView, isAdmin, registerEditAction, registerNewItemAction, selectedClient]);
 
   const handleStatFilterSelect = (filter: "active" | "blocked" | "inspections" | null) => {
     if (filter === activeStatFilter) {

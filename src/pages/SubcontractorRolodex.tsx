@@ -45,6 +45,7 @@ import { Badge } from "@/components/ui/badge";
 import { TradeBadge } from "@/components/ui/trade-badge";
 import { useToast } from "@/hooks/use-toast";
 import { useTypeToSearch } from "@/hooks/useTypeToSearch";
+import { useShortcutActions } from "@/components/dashboard/ShortcutActionsContext";
 import { Fab } from "@/components/ui/fab";
 import {
   buildSubcontractorRows,
@@ -223,6 +224,7 @@ export default function SubcontractorRolodexPage() {
   const [sortOption, setSortOption] = useState<SortOption>("name");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [mobileActionSubcontractorId, setMobileActionSubcontractorId] = useState<string | null>(null);
+  const { registerNewItemAction } = useShortcutActions();
 
   useEffect(() => {
     localStorage.setItem("subcontractorViewMode", viewMode);
@@ -257,6 +259,13 @@ export default function SubcontractorRolodexPage() {
   });
 
   const clearForm = () => setFormData(resetForm());
+
+  useEffect(() => {
+    registerNewItemAction(() => setIsAddDialogOpen(true));
+    return () => {
+      registerNewItemAction(null);
+    };
+  }, [registerNewItemAction]);
 
   const createMutation = useMutation({
     mutationFn: createSubcontractorContact,

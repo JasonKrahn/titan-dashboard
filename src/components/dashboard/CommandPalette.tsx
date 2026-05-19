@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { CommandDialog, CommandInput, CommandList, CommandItem, CommandGroup } from "@/components/ui/command";
-import { FolderKanban, Building2, Users, Activity, Settings } from "lucide-react";
+import { FolderKanban, Building2, Users, Activity } from "lucide-react";
 
 interface CommandPaletteProps {
   open: boolean;
@@ -10,8 +10,8 @@ interface CommandPaletteProps {
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const navigate = useNavigate();
 
-  const handleNavigate = (path: string) => {
-    navigate(path);
+  const handleNavigate = (path: string, options?: Parameters<typeof navigate>[1]) => {
+    navigate(path, options);
     onOpenChange(false);
   };
 
@@ -20,11 +20,11 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       <CommandInput placeholder="Type a command or search..." />
       <CommandList>
         <CommandGroup heading="Navigation">
-          <CommandItem onSelect={() => handleNavigate("/")}>
+          <CommandItem onSelect={() => handleNavigate("/", { state: { view: "dashboard" } })}>
             <FolderKanban className="mr-2 h-4 w-4" />
             <span>Projects</span>
           </CommandItem>
-          <CommandItem onSelect={() => handleNavigate("/?view=clients")}>
+          <CommandItem onSelect={() => handleNavigate("/", { state: { view: "clients" } })}>
             <Building2 className="mr-2 h-4 w-4" />
             <span>Clients</span>
           </CommandItem>
@@ -35,10 +35,6 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           <CommandItem onSelect={() => handleNavigate("/activity")}>
             <Activity className="mr-2 h-4 w-4" />
             <span>Activity Log</span>
-          </CommandItem>
-          <CommandItem onSelect={() => handleNavigate("/settings")}>
-            <Settings className="mr-2 h-4 w-4" />
-            <span>Settings</span>
           </CommandItem>
         </CommandGroup>
       </CommandList>

@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, useNavigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ReportBugButton } from "@/components/dashboard/ReportBugButton";
 import { KeyboardShortcutsHelp } from "@/components/dashboard/KeyboardShortcutsHelp";
 import { CommandPalette } from "@/components/dashboard/CommandPalette";
+import { ShortcutActionsProvider, useShortcutActions } from "@/components/dashboard/ShortcutActionsContext";
 import { useGlobalKeyboard } from "@/hooks/useGlobalKeyboard";
 import Index from "./pages/Index.tsx";
 import ProjectDetail from "./pages/ProjectDetail.tsx";
@@ -23,43 +24,15 @@ const queryClient = new QueryClient();
 
 function AppContent() {
   const navigate = useNavigate();
-  const location = useLocation();
   const [helpOpen, setHelpOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const { triggerNewItemAction, triggerEditAction } = useShortcutActions();
 
   // Focus search input on current page
   const focusSearchInput = () => {
     const searchInput = document.querySelector('input[type="search"]') as HTMLInputElement | null;
     if (searchInput) {
       searchInput.focus();
-    }
-  };
-
-  // Context-aware new item
-  const handleNewItem = () => {
-    if (location.pathname === "/" || location.pathname.startsWith("/?view=")) {
-      // On dashboard, trigger new project dialog
-      const newProjectButton = document.querySelector('[aria-label*="New Project"]') as HTMLButtonElement | null;
-      if (newProjectButton) {
-        newProjectButton.click();
-      }
-    } else if (location.pathname.startsWith("/subs")) {
-      // On subcontractors page, trigger new subcontractor dialog
-      const newSubButton = document.querySelector('button:has([class*="Plus"])') as HTMLButtonElement | null;
-      if (newSubButton) {
-        newSubButton.click();
-      }
-    }
-  };
-
-  // Context-aware edit
-  const handleEdit = () => {
-    if (location.pathname.startsWith("/project/")) {
-      // On project detail, trigger edit dialog
-      const editButton = document.querySelector('button:has([class*="Pencil"])') as HTMLButtonElement | null;
-      if (editButton) {
-        editButton.click();
-      }
     }
   };
 
@@ -88,23 +61,23 @@ function AppContent() {
     },
     {
       key: "n",
-      callback: handleNewItem,
+      callback: triggerNewItemAction,
       description: "New item (context-aware)",
     },
     {
       key: "e",
-      callback: handleEdit,
+      callback: triggerEditAction,
       description: "Edit (context-aware)",
     },
   ], [
     {
       sequence: ["g", "p"],
-      callback: () => navigate("/"),
+      callback: () => navigate("/", { state: { view: "dashboard" } }),
       description: "Go to projects",
     },
     {
       sequence: ["g", "c"],
-      callback: () => navigate("/?view=clients"),
+      callback: () => navigate("/", { state: { view: "clients" } }),
       description: "Go to clients",
     },
     {
@@ -146,9 +119,11 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
-        <AppContent />
-      </BrowserRouter>
+      <ShortcutActionsProvider>
+        <BrowserRouter>
+          <AppContent />
+        </BrowserRouter>
+      </ShortcutActionsProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

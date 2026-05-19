@@ -31,6 +31,7 @@ import { MobileActionSheet, type MobileActionItem } from "@/components/ui/mobile
 import { AppHeader } from "@/components/dashboard/AppHeader";
 import { ActivityList } from "@/components/dashboard/ActivityList";
 import { PageNav } from "@/components/dashboard/PageNav";
+import { useShortcutActions } from "@/components/dashboard/ShortcutActionsContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
@@ -108,6 +109,7 @@ export default function PhaseDetailPage() {
   const detail = phaseQ.data?.ok ? phaseQ.data.data : undefined;
   const error = phaseQ.data?.ok === false ? phaseQ.data.error : undefined;
   const qc = useQueryClient();
+  const { registerEditAction } = useShortcutActions();
 
   const materialsQ = useQuery({
     queryKey: ["phase-materials", detail?.phase.id],
@@ -356,6 +358,17 @@ export default function PhaseDetailPage() {
 
     saveMaterialsMutation.mutate({ phaseId: phase.id, projectId: project.id, changes });
   };
+  useEffect(() => {
+    if (detail && detail.phase.status !== "closed") {
+      registerEditAction(() => setScheduleOpen(true));
+    } else {
+      registerEditAction(null);
+    }
+
+    return () => {
+      registerEditAction(null);
+    };
+  }, [detail?.phase.status, registerEditAction]);
   const showReadyButton =
     !!inspectionGate &&
     (phase.status === "in_progress" || (phase.status === "blocked" && inspectionGate.status === "failed")) &&
