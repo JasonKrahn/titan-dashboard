@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, useEffect } from "react";
-import { useNavigate, useParams, Link } from "react-router-dom";
+import { useLocation, useNavigate, useParams, Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
@@ -26,16 +26,9 @@ import {
 } from "lucide-react";
 import { formatAddressShort } from "@/lib/address";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Fab } from "@/components/ui/fab";
 import { MobileActionSheet, type MobileActionItem } from "@/components/ui/mobile-action-sheet";
 import { EmptyInline } from "@/components/ui/empty-inline";
 import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -45,6 +38,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AppHeader } from "@/components/dashboard/AppHeader";
 import { PageNav } from "@/components/dashboard/PageNav";
+import { Fab } from "@/components/ui/fab";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -64,10 +58,10 @@ import { PhotoUploadDialog } from "@/components/dashboard/PhotoUploadDialog";
 import { InventoryDisplayCard, type InventoryDisplayItem, type InventoryPickupSummaryItem } from "@/components/dashboard/InventoryDisplayCard";
 import { QuantityStepperModal } from "@/components/dashboard/QuantityStepperModal";
 import { useShortcutActions } from "@/components/dashboard/ShortcutActionsContext";
-import { getCurrentUser, getProject, getProjectEquipment, getPhaseMaterials, getProjectInventoryPickups, updateProjectEquipmentBatch, updateAtticGate, getPhotoViewUrl, updatePhaseSchedules } from "@/lib/api";
+import { getCurrentUser, getProject, getProjectEquipment, getPhaseMaterials, getPhase, getProjectInventoryPickups, updateProjectEquipmentBatch, updateAtticGate, getPhotoViewUrl, updatePhaseSchedules } from "@/lib/api";
 import { exportProjectZip } from "@/lib/projectExport";
 import { formatDateWithOptions, type PhaseScheduleChange } from "@/lib/schedule";
-import type { EquipmentLog, Gate, InventoryPickup, MaterialLog, Phase, PhotoEvidence, ProjectDetail as ProjectDetailData } from "@/lib/types";
+import type { EquipmentLog, Gate, InventoryPickup, MaterialLog, Phase, PhaseChecklistItem, PhotoEvidence, ProjectDetail as ProjectDetailData } from "@/lib/types";
 import { EQUIPMENT_ITEMS, PHASE_MATERIAL_CATALOGS } from "@/lib/inventoryCatalog";
 import {
   PHASE_LABEL,
@@ -143,9 +137,19 @@ function formatEquipmentPickupSummary(pickup: InventoryPickup, labelByKey: Map<s
 }
 
 type ProjectViewMode = "summary" | "detailed";
+type ProjectMobileTab = "overview" | "deficiencies" | "notes" | "photos" | "activity";
+
+function isProjectMobileTab(value: unknown): value is ProjectMobileTab {
+  return value === "overview"
+    || value === "deficiencies"
+    || value === "notes"
+    || value === "photos"
+    || value === "activity";
+}
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -292,10 +296,11 @@ export default function ProjectDetailPage() {
     if (!detail) return;
     setExporting(true);
     try {
-      const [equipmentResult, pickupsResult, materialResults] = await Promise.all([
+      const [equipmentResult, pickupsResult, materialResults, phaseDetailResults] = await Promise.all([
         getProjectEquipment(detail.project.id),
         getProjectInventoryPickups(detail.project.id),
         Promise.all(detail.phases.map((phase) => getPhaseMaterials(phase.id))),
+        Promise.all(detail.phases.map((phase) => getPhase(phase.id))),
       ]);
       const failedMaterialResult = materialResults.find((result) => result.ok === false);
       if (failedMaterialResult?.ok === false) {
@@ -323,10 +328,12 @@ export default function ProjectDetailPage() {
         return;
       }
       const materialLogs: MaterialLog[] = materialResults.flatMap((result) => (result.ok ? result.data : []));
+      const checklistItems: PhaseChecklistItem[] = phaseDetailResults.flatMap((result) => (result.ok ? result.data.checklistItems : []));
       await exportProjectZip(detail, detail.client, detail.assignedProjectManager, {
         equipmentLogs: equipmentResult.data,
         inventoryPickups: pickupsResult.data,
         materialLogs,
+        checklistItems,
       });
     } catch (error) {
       toast({
@@ -342,7 +349,14 @@ export default function ProjectDetailPage() {
   const [mobileInfoOpen, setMobileInfoOpen] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const [phaseActionsTarget, setPhaseActionsTarget] = useState<Phase | null>(null);
-  const [mobileTab, setMobileTab] = useState<"overview" | "deficiencies" | "notes" | "photos" | "activity">("overview");
+  const [mobileTab, setMobileTab] = useState<ProjectMobileTab>("overview");
+
+  useEffect(() => {
+    const initialMobileTab = (location.state as { initialMobileTab?: unknown } | null)?.initialMobileTab;
+    if (!isProjectMobileTab(initialMobileTab)) return;
+    setMobileTab(initialMobileTab);
+    window.history.replaceState({}, "");
+  }, [location.state]);
 
   const activeDefs = useMemo(
     () => detail?.deficiencies.filter((d) => d.status === "open" || d.status === "in_progress") ?? [],
@@ -360,7 +374,10 @@ export default function ProjectDetailPage() {
     () => detail?.photoEvidence.some((p) => p.purpose === "attic_check" && p.status === "confirmed") ?? false,
     [detail],
   );
-  const projectPhotos = useMemo(() => detail?.photoEvidence.filter((p) => p.phaseId) ?? [], [detail]);
+  const projectPhotos = useMemo(
+    () => detail?.photoEvidence ?? [],
+    [detail],
+  );
   const allPhotoViewerItems = useMemo<PhotoViewerItem[]>(() => {
     if (!detail) return [];
 
@@ -399,6 +416,9 @@ export default function ProjectDetailPage() {
       }
       if (gate && phase) {
         return { photo, caption: `${GATE_LABEL[gate.type] ?? gate.type} · ${PHASE_LABEL[phase.type]}, ${purposeLabel}` };
+      }
+      if (gate) {
+        return { photo, caption: `${GATE_LABEL[gate.type] ?? gate.type}, ${purposeLabel}` };
       }
       if (phase) {
         return { photo, caption: `${PHASE_LABEL[phase.type]}, ${purposeLabel}` };
@@ -584,16 +604,6 @@ export default function ProjectDetailPage() {
           },
         ]
       : []),
-    ...(p.status === "completed" && canEdit
-      ? [
-          {
-            label: "Archive project",
-            icon: <Archive className="h-4 w-4" />,
-            helperText: "Move completed work out of active views",
-            onClick: () => setArchiveOpen(true),
-          },
-        ]
-      : []),
     {
       label: "Deficiencies",
       icon: <AlertTriangle className="h-4 w-4" />,
@@ -612,6 +622,26 @@ export default function ProjectDetailPage() {
       helperText: "Review recent project changes",
       onClick: () => setMobileTab("activity"),
     },
+    ...(p.status === "completed" && canEdit
+      ? [
+          {
+            label: "Archive project",
+            icon: <Archive className="h-4 w-4" />,
+            helperText: "Move completed work out of active views",
+            onClick: () => setArchiveOpen(true),
+          },
+        ]
+      : []),
+    ...(p.status === "archived"
+      ? [
+          {
+            label: "Export project",
+            icon: <Download className="h-4 w-4" />,
+            helperText: "Download the archived project package",
+            onClick: handleExport,
+          },
+        ]
+      : []),
   ];
 
   if (isAdmin && viewMode === "summary") {
@@ -638,6 +668,8 @@ export default function ProjectDetailPage() {
               setSelectedPhoto(photo);
               setPhotoViewerOpen(true);
             }}
+            onExport={handleExport}
+            exporting={exporting}
             onViewDetails={() => setViewMode("detailed")}
           />
         </main>
@@ -702,34 +734,14 @@ export default function ProjectDetailPage() {
               >
                 <ChevronDown className={`h-4 w-4 transition-transform ${mobileInfoOpen ? "rotate-180" : ""}`} />
               </button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    aria-label="More"
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-border text-muted-foreground"
-                  >
-                    <MoreVertical className="h-4 w-4" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {p.status !== "completed" && p.status !== "archived" && (
-                    <DropdownMenuItem onClick={() => setEditOpen(true)} disabled={!canEdit}>
-                      <Pencil className="mr-2 h-4 w-4" /> Edit project
-                    </DropdownMenuItem>
-                  )}
-                  {p.status === "completed" && (
-                    <DropdownMenuItem onClick={() => setArchiveOpen(true)} disabled={!canEdit}>
-                      <Archive className="mr-2 h-4 w-4" /> Archive
-                    </DropdownMenuItem>
-                  )}
-                  {p.status === "archived" && (
-                    <DropdownMenuItem onClick={handleExport} disabled={exporting}>
-                      <Download className="mr-2 h-4 w-4" /> {exporting ? "Exporting…" : "Export"}
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <button
+                type="button"
+                aria-label="Open project actions"
+                onClick={() => setMobileActionsOpen(true)}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-border text-muted-foreground"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </button>
             </div>
           </div>
           {mobileInfoOpen && (
@@ -830,7 +842,7 @@ export default function ProjectDetailPage() {
               {p.status !== "completed" && p.status !== "archived" && (
                 <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} disabled={!canEdit}>
                   <Pencil className="mr-1 h-4 w-4" />
-                  Edit
+                  Edit Project
                 </Button>
               )}
               {p.status === "completed" && (
@@ -884,7 +896,7 @@ export default function ProjectDetailPage() {
                 const siteGate = phase ? phaseGates.find((g) => g.type === "site_check") : undefined;
                 const inspectionGate = phase ? phaseGates.find((g) => g.type === "inspection") : undefined;
                 const hasSiteActions = !!(phase && siteGate && (siteGate.status === "not_started" || siteGate.status === "blocked"));
-                const hasInspectionActions = !!(phase && phase.status === "ready_for_inspection" && inspectionGate);
+                const hasInspectionActions = !!(phase && phase.status === "ready_for_inspection" && inspectionGate && openCount === 0);
 
                 const phaseSummary = (
                   <div className="relative flex min-h-[92px] flex-col gap-2.5 px-3 py-3 pl-4 pr-10 sm:grid sm:min-h-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-3 sm:px-4 sm:py-4 sm:pl-5 sm:pr-10">
@@ -1065,21 +1077,7 @@ export default function ProjectDetailPage() {
             {p.status !== "completed" && p.status !== "archived" && (
               <div className="mb-3 flex items-center justify-between">
                 <SectionHeading as="h3">Deficiencies</SectionHeading>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">{activeDefs.length} active</span>
-                  <Button size="sm" className="hidden md:inline-flex" onClick={() => setDeficiencyDialogOpen(true)} disabled={!canEdit}>
-                    Add Deficiency
-                  </Button>
-                  <button
-                    type="button"
-                    aria-label="Add deficiency"
-                    onClick={() => setDeficiencyDialogOpen(true)}
-                    disabled={!canEdit}
-                    className="md:hidden inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
-                </div>
+                <span className="text-xs text-muted-foreground">{activeDefs.length} active</span>
               </div>
             )}
             {p.status === "completed" || p.status === "archived" ? (
@@ -1110,7 +1108,7 @@ export default function ProjectDetailPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-7 px-2 text-xs"
+                            className="h-9 sm:h-7 px-3 sm:px-2 text-xs"
                             onClick={(e) => {
                               e.stopPropagation();
                               setDeficiencyDialogMode("resolve");
@@ -1127,6 +1125,22 @@ export default function ProjectDetailPage() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+            {p.status !== "completed" && p.status !== "archived" && (
+              <div className="mt-4 flex justify-start">
+                <Button size="sm" className="hidden md:inline-flex" onClick={() => setDeficiencyDialogOpen(true)} disabled={!canEdit}>
+                  Add Deficiency
+                </Button>
+                <button
+                  type="button"
+                  aria-label="Add deficiency"
+                  onClick={() => setDeficiencyDialogOpen(true)}
+                  disabled={!canEdit}
+                  className="md:hidden inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
               </div>
             )}
           </Card>
@@ -1156,147 +1170,160 @@ export default function ProjectDetailPage() {
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <Camera className={`h-4 w-4 ${hasAtticPhoto ? "text-status-closed" : "text-status-ready"}`} />
-                  <span>
-                    {hasAtticPhoto ? "Photo evidence confirmed" : "Photo evidence not yet uploaded"}
-                  </span>
+                  {hasAtticPhoto ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const atticPhoto = detail?.photoEvidence.find(
+                          (p) => p.purpose === "attic_check" && p.status === "confirmed",
+                        );
+                        if (atticPhoto) {
+                          setSelectedPhoto(atticPhoto);
+                          setPhotoViewerOpen(true);
+                        }
+                      }}
+                      className="text-sm font-medium text-foreground hover:underline"
+                    >
+                      Photo evidence confirmed
+                    </button>
+                  ) : (
+                    <span>Photo evidence not yet uploaded</span>
+                  )}
                 </div>
                 {!(insulationClosed && drywallStarted) && (
-                  <div className="flex items-center gap-1.5 rounded-md border border-border bg-muted/20 px-2.5 py-2 text-xs text-muted-foreground">
-                    <Lock className="h-3.5 w-3.5 shrink-0" />
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Lock className="h-4 w-4 shrink-0" />
                     <span>Available after insulation phase is closed and drywall site check is passed</span>
                   </div>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
-                {insulationClosed && drywallStarted ? (
-                  <Popover open={callInOpen} onOpenChange={canEdit ? setCallInOpen : undefined}>
-                    <PopoverTrigger asChild>
-                      <button className="rounded-md border border-border bg-muted/30 p-2.5 text-left transition-colors hover:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 disabled:cursor-not-allowed" disabled={!canEdit}>
-                        <div className="flex items-center justify-between text-muted-foreground">
-                          <span>Call-in date</span>
-                          <Calendar className="h-3 w-3" />
-                        </div>
-                        <div className="mt-0.5 font-medium">
-                          {atticGate?.callInDate
-                            ? new Date(atticGate.callInDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
-                            : "Select date"}
-                        </div>
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarPicker
-                        mode="single"
-                        selected={callInDate}
-                        onSelect={setCallInDate}
-                        initialFocus
-                      />
-                      <div className="border-t border-border p-3 space-y-2">
-                        {(() => {
-                          const insulators = detail?.subcontractors.filter((s) => s.trade === "insulation" && s.active) ?? [];
-                          return insulators.length > 0 ? (
-                            <div>
-                              <p className="mb-1 text-xs text-muted-foreground">Insulator (optional)</p>
-                              <Select value={callInSubId} onValueChange={setCallInSubId}>
-                                <SelectTrigger className="h-8 text-base md:text-xs">
-                                  <SelectValue placeholder="Select insulator" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="none">None</SelectItem>
-                                  {insulators.map((s) => (
-                                    <SelectItem key={s.id} value={s.id}>
-                                      {s.displayName}{s.companyName ? ` · ${s.companyName}` : ""}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          ) : null;
-                        })()}
-                        <Button
-                          size="sm"
-                          className="w-full"
-                          disabled={!callInDate || atticSaving}
-                          onClick={saveCallIn}
-                        >
-                          {atticSaving ? "Saving…" : "Save"}
-                        </Button>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                ) : (
-                  <div className="rounded-md border border-border bg-muted/30 p-2.5 opacity-50">
-                    <div className="text-muted-foreground">Call-in date</div>
-                    <div className="mt-0.5 font-medium">{atticGate?.callInDate ? new Date(atticGate.callInDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—"}</div>
-                  </div>
-                )}
-
-                {insulationClosed && drywallStarted ? (
-                  <Popover open={installOpen} onOpenChange={canEdit ? (o) => { setInstallOpen(o); if (!o) setInstallPhoto(null); } : undefined}>
-                    <PopoverTrigger asChild>
-                      <button className="rounded-md border border-border bg-muted/30 p-2.5 text-left transition-colors hover:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 disabled:cursor-not-allowed" disabled={!canEdit}>
-                        <div className="flex items-center justify-between text-muted-foreground">
-                          <span>Install date</span>
-                          <Calendar className="h-3 w-3" />
-                        </div>
-                        <div className="mt-0.5 font-medium">
-                          {atticGate?.installDate
-                            ? new Date(atticGate.installDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
-                            : "Select date"}
-                        </div>
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarPicker
-                        mode="single"
-                        selected={installDate}
-                        onSelect={setInstallDate}
-                        initialFocus
-                      />
-                      <div className="border-t border-border p-3 space-y-2">
-                        <div>
-                          <p className="mb-1 text-xs text-muted-foreground">Photo evidence <span className="text-destructive">*required</span></p>
-                          <input
-                            ref={photoInputRef}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => setInstallPhoto(e.target.files?.[0] ?? null)}
+              <div className="space-y-4 text-sm">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Call-in date</span>
+                    {insulationClosed && drywallStarted ? (
+                      <Popover open={callInOpen} onOpenChange={canEdit ? setCallInOpen : undefined}>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" size="sm" disabled={!canEdit} className="h-8 px-2 text-xs">
+                            {atticGate?.callInDate
+                              ? new Date(atticGate.callInDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+                              : "Select date"}
+                            <Calendar className="ml-1.5 h-3.5 w-3.5" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarPicker
+                            mode="single"
+                            selected={callInDate}
+                            onSelect={setCallInDate}
+                            initialFocus
                           />
-                          <button
-                            type="button"
-                            onClick={() => photoInputRef.current?.click()}
-                            className="flex w-full items-center gap-2 rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted/60"
-                          >
-                            {installPhoto ? (
-                              <><CheckCircle2 className="h-3.5 w-3.5 text-status-closed shrink-0" /><span className="truncate">{installPhoto.name}</span></>
-                            ) : (
-                              <><Upload className="h-3.5 w-3.5 shrink-0" /><span>Upload photo</span></>
-                            )}
-                          </button>
-                        </div>
-                        <Button
-                          size="sm"
-                          className="w-full"
-                          disabled={!installDate || !installPhoto || atticSaving}
-                          onClick={saveInstall}
-                        >
-                          {atticSaving ? "Saving…" : "Save"}
-                        </Button>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                ) : (
-                  <div className="rounded-md border border-border bg-muted/30 p-2.5 opacity-50">
-                    <div className="text-muted-foreground">Install date</div>
-                    <div className="mt-0.5 font-medium">{atticGate?.installDate ? new Date(atticGate.installDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—"}</div>
+                          <div className="border-t border-border p-3 space-y-2">
+                            {(() => {
+                              const insulators = detail?.subcontractors.filter((s) => s.trade === "insulation" && s.active) ?? [];
+                              return insulators.length > 0 ? (
+                                <div>
+                                  <p className="mb-1 text-xs text-muted-foreground">Insulator (optional)</p>
+                                  <Select value={callInSubId} onValueChange={setCallInSubId}>
+                                    <SelectTrigger className="h-8 text-base md:text-xs">
+                                      <SelectValue placeholder="Select insulator" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="none">None</SelectItem>
+                                      {insulators.map((s) => (
+                                        <SelectItem key={s.id} value={s.id}>
+                                          {s.displayName}{s.companyName ? ` · ${s.companyName}` : ""}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              ) : null;
+                            })()}
+                            <Button
+                              size="sm"
+                              className="w-full"
+                              disabled={!callInDate || atticSaving}
+                              onClick={saveCallIn}
+                            >
+                              {atticSaving ? "Saving…" : "Save"}
+                            </Button>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    ) : (
+                      <span className="font-medium text-muted-foreground">
+                        {atticGate?.callInDate ? new Date(atticGate.callInDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—"}
+                      </span>
+                    )}
                   </div>
-                )}
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Install date</span>
+                    {insulationClosed && drywallStarted ? (
+                      <Popover open={installOpen} onOpenChange={canEdit ? (o) => { setInstallOpen(o); if (!o) setInstallPhoto(null); } : undefined}>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" size="sm" disabled={!canEdit} className="h-8 px-2 text-xs">
+                            {atticGate?.installDate
+                              ? new Date(atticGate.installDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+                              : "Select date"}
+                            <Calendar className="ml-1.5 h-3.5 w-3.5" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarPicker
+                            mode="single"
+                            selected={installDate}
+                            onSelect={setInstallDate}
+                            initialFocus
+                          />
+                          <div className="border-t border-border p-3 space-y-2">
+                            <div>
+                              <p className="mb-1 text-xs text-muted-foreground">Photo evidence <span className="text-destructive">*required</span></p>
+                              <input
+                                ref={photoInputRef}
+                                type="file"
+                                accept="image/*"
+                                multiple={false}
+                                className="hidden"
+                                onChange={(e) => setInstallPhoto(e.target.files?.[0] ?? null)}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => photoInputRef.current?.click()}
+                                className="flex w-full items-center gap-2 rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted/60"
+                              >
+                                {installPhoto ? (
+                                  <><CheckCircle2 className="h-3.5 w-3.5 text-status-closed shrink-0" /><span className="truncate">{installPhoto.name}</span></>
+                                ) : (
+                                  <><Upload className="h-3.5 w-3.5 shrink-0" /><span>Upload photo</span></>
+                                )}
+                              </button>
+                            </div>
+                            <Button
+                              size="sm"
+                              className="w-full"
+                              disabled={!installDate || !installPhoto || atticSaving}
+                              onClick={saveInstall}
+                            >
+                              {atticSaving ? "Saving…" : "Save"}
+                            </Button>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    ) : (
+                      <span className="font-medium text-muted-foreground">
+                        {atticGate?.installDate ? new Date(atticGate.installDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—"}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {atticSubcontractor ? (
-                <div className="flex items-center gap-1.5 rounded-md border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                  <User className="h-3.5 w-3.5 shrink-0" />
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <User className="h-4 w-4 shrink-0" />
                   <span>{atticSubcontractor.displayName}{atticSubcontractor.companyName ? ` · ${atticSubcontractor.companyName}` : ""}</span>
                 </div>
               ) : null}
@@ -1329,12 +1356,14 @@ export default function ProjectDetailPage() {
         {/* Project Photos */}
         {detail && (
           <section className={mobileTab === "photos" ? "" : "hidden md:block"}>
-            <div className="mb-3 flex items-baseline justify-between">
+            <div className="mb-3 flex flex-col gap-2">
               <SectionHeading as="h3" className="mb-0">Project Photos</SectionHeading>
-              <Button size="sm" className="hidden md:inline-flex" onClick={() => setPhotoUploadOpen(true)} disabled={!canEdit}>
-                <Camera className="mr-1.5 h-4 w-4" />
-                Upload Photo
-              </Button>
+              <div className="flex justify-start">
+                <Button size="sm" className="hidden md:inline-flex" onClick={() => setPhotoUploadOpen(true)} disabled={!canEdit}>
+                  <Camera className="mr-1.5 h-4 w-4" />
+                  Upload Photos
+                </Button>
+              </div>
             </div>
             {projectPhotos.length === 0 ? (
               <>
@@ -1422,19 +1451,17 @@ export default function ProjectDetailPage() {
         )}
       </main>
 
-      {/* Mobile actions */}
-      {projectMobileActions.length > 0 && (
-        <Fab
-          label="Project actions"
-          icon={<Plus className="h-6 w-6" />}
-          onClick={() => setMobileActionsOpen(true)}
-        />
-      )}
+      <Fab
+        label="Project actions"
+        icon={<Plus className="h-6 w-6" />}
+        onClick={() => setMobileActionsOpen(true)}
+      />
       <MobileActionSheet
         open={mobileActionsOpen}
         onOpenChange={setMobileActionsOpen}
         title="Project actions"
         actions={projectMobileActions}
+        variant="project"
       />
       <MobileActionSheet
         open={!!phaseActionsTarget}
@@ -1497,7 +1524,7 @@ export default function ProjectDetailPage() {
           open={editOpen}
           onOpenChange={setEditOpen}
           project={detail.project}
-          currentUser={detail.assignedProjectManager}
+          currentUser={me}
           onUpdated={() => qc.invalidateQueries({ queryKey: ["project", id] })}
           onDeleted={() => navigate("/")}
         />
@@ -1568,6 +1595,7 @@ export default function ProjectDetailPage() {
           defaultPhaseId={activePhase?.id}
           projectId={p.id}
           deficiencies={detail.deficiencies}
+          allowAllPhases
         />
       )}
     </div>
@@ -1582,6 +1610,8 @@ function AdminProjectSummary({
   materialsLoading,
   materialsError,
   onOpenPhoto,
+  onExport,
+  exporting,
   onViewDetails,
 }: {
   detail: ProjectDetailData;
@@ -1590,6 +1620,8 @@ function AdminProjectSummary({
   materialsLoading: boolean;
   materialsError?: string;
   onOpenPhoto: (photo: PhotoEvidence) => void;
+  onExport: () => void;
+  exporting: boolean;
   onViewDetails: () => void;
 }) {
   const p = detail.project;
@@ -1603,6 +1635,7 @@ function AdminProjectSummary({
   const atticSubcontractor = atticGate?.callInSubcontractorId
     ? detail.subcontractors.find((subcontractor) => subcontractor.id === atticGate.callInSubcontractorId)
     : undefined;
+  const atticPhoto = detail.photoEvidence.find((p) => p.purpose === "attic_check" && p.status === "confirmed") ?? null;
   const visibleMaterialLogs = materialLogs.filter((log) => log.quantity > 0);
 
   return (
@@ -1614,6 +1647,12 @@ function AdminProjectSummary({
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-bold sm:text-3xl">{p.name}</h1>
               <StatusBadge tone={projectStatusTone(p.status)} label={STATUS_LABEL[p.status]} size="sm" />
+              {p.status === "archived" && (
+                <Button variant="outline" size="sm" onClick={onExport} disabled={exporting}>
+                  <Download className="mr-1 h-4 w-4" />
+                  {exporting ? "Exporting…" : "Export"}
+                </Button>
+              )}
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
               <span className="inline-flex items-center gap-1.5">
@@ -1652,6 +1691,12 @@ function AdminProjectSummary({
                 label={STATUS_LABEL[atticGate?.status ?? p.atticCheckStatus] ?? "Not started"}
                 size="xs"
               />
+            </div>
+            <div className="mt-4">
+              <Button variant="outline" onClick={onViewDetails}>
+                View Full Project Details
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
             </div>
           </div>
         </div>
@@ -1767,6 +1812,18 @@ function AdminProjectSummary({
                 <div className="rounded-md border border-border bg-muted/20 p-3 sm:col-span-3">
                   <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Notes</div>
                   <div className="mt-1 whitespace-pre-wrap text-sm text-foreground/90">{atticGate.notes.trim()}</div>
+                </div>
+              ) : null}
+              {atticPhoto ? (
+                <div className="sm:col-span-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => onOpenPhoto(atticPhoto)}
+                    className="w-full"
+                  >
+                    View Attic Evidence
+                  </Button>
                 </div>
               ) : null}
             </div>

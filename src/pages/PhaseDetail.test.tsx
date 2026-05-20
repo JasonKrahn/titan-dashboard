@@ -75,7 +75,7 @@ const detail: PhaseDetail = {
     clientId: "client-1",
     projectNumber: "ACM-1002",
     name: "Acme Cedar Point Villas",
-    siteAddress: "220 Cedar Point Drive",
+    siteAddress: "7 Skylark Lane",
     status: "active",
     atticCheckStatus: "not_started",
     scheduledStart: "2026-04-21T00:00:00.000Z",
@@ -284,11 +284,11 @@ describe("PhaseDetailPage mobile and tablet overview order", () => {
     await screen.findByRole("heading", { name: "Insulation" });
 
     const gates = screen.getByTestId("phase-narrow-gates");
-    const photoButton = within(gates).getByRole("button", { name: /1 photo/i });
+    const photoBadge = within(gates).getByRole("button", { name: /1 photo/i });
 
     expect(gates).toHaveTextContent("Site check");
     expect(gates).toHaveTextContent("Inspection");
-    expect(photoButton.parentElement?.closest("button")).toBeNull();
+    expect(photoBadge.parentElement?.closest("button")).toBeNull();
   });
 });
 

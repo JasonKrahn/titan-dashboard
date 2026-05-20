@@ -78,7 +78,7 @@ const projects: Project[] = [
     clientId: "client-1",
     projectNumber: "TP-001",
     name: "Oak Bend",
-    siteAddress: "1 Main St",
+    siteAddress: "123 Main St, Winnipeg, MB R3C 1A3",
     status: "active",
     assignedProjectManagerId: "pm-1",
     atticCheckStatus: "not_started",

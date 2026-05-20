@@ -20,12 +20,13 @@ interface SiteCheckDialogProps {
 export function SiteCheckDialog({ open, onOpenChange, gateId, phaseId, projectId, phaseLabel }: SiteCheckDialogProps) {
   const qc = useQueryClient();
   const [notes, setNotes] = useState("");
-  const [photo, setPhoto] = useState<File | null>(null);
+  const [photos, setPhotos] = useState<File[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const reset = () => {
     setNotes("");
-    setPhoto(null);
+    setPhotos([]);
+    if (fileRef.current) fileRef.current.value = "";
   };
 
   const mutation = useMutation({
@@ -50,7 +51,7 @@ export function SiteCheckDialog({ open, onOpenChange, gateId, phaseId, projectId
       phaseId,
       projectId,
       notes: notes.trim() || undefined,
-      photo: photo ?? undefined,
+      photos,
     });
   };
 
@@ -76,8 +77,9 @@ export function SiteCheckDialog({ open, onOpenChange, gateId, phaseId, projectId
               id="sc-photo"
               type="file"
               accept="image/*"
+              multiple
               className="hidden"
-              onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+              onChange={(e) => setPhotos(Array.from(e.target.files ?? []))}
             />
             <Button
               type="button"
@@ -85,10 +87,10 @@ export function SiteCheckDialog({ open, onOpenChange, gateId, phaseId, projectId
               className="justify-start gap-2"
               onClick={() => fileRef.current?.click()}
             >
-              {photo ? (
+              {photos.length > 0 ? (
                 <>
                   <Camera className="h-4 w-4" />
-                  {photo.name}
+                  {photos.length === 1 ? photos[0].name : `${photos.length} photos selected`}
                 </>
               ) : (
                 <>
@@ -97,13 +99,13 @@ export function SiteCheckDialog({ open, onOpenChange, gateId, phaseId, projectId
                 </>
               )}
             </Button>
-            {photo && (
+            {photos.length > 0 && (
               <button
                 type="button"
                 className="text-xs text-muted-foreground underline text-left"
-                onClick={() => { setPhoto(null); if (fileRef.current) fileRef.current.value = ""; }}
+                onClick={() => { setPhotos([]); if (fileRef.current) fileRef.current.value = ""; }}
               >
-                Remove photo
+                Remove {photos.length === 1 ? "photo" : "photos"}
               </button>
             )}
           </div>

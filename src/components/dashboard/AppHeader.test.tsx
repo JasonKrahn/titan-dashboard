@@ -111,8 +111,15 @@ beforeEach(() => {
 });
 
 describe("AppHeader admin tools", () => {
-  it("links admins to the inventory tracker", async () => {
+  it("hides inventory links by default when inventory setting is disabled", async () => {
     renderHeader({ currentUser: admin });
+
+    const links = screen.queryAllByRole("link", { name: /Inventory/i });
+    expect(links).toHaveLength(0);
+  });
+
+  it("shows inventory links when the inventory setting is enabled", async () => {
+    renderHeader({ currentUser: { ...admin, inventoryEnabled: true } });
 
     const links = await screen.findAllByRole("link", { name: /Inventory/i });
     expect(links).toHaveLength(2);

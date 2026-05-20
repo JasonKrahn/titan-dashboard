@@ -123,6 +123,19 @@ export const photoBlobUrls = new Map<string, string>([
   ["photo-completed-4458", imgRoot4458],
   ["photo-pending-active-insulation-poly", imgInsulation3480],
   ["photo-uploaded-ready-finishing", imgFinishingSiteCheck],
+  // Randall Homes deficiency photos
+  ["photo-randall-baffle-before", imgReworkBefore],
+  ["photo-randall-baffle-after", imgReworkAfter],
+  ["photo-randall-screw-before", imgFailedInspection],
+  ["photo-randall-screw-after", imgCompletedInspection],
+  ["photo-randall-skim-before", imgBoarding3659],
+  ["photo-randall-skim-after", imgBoarding3908],
+  // Randall Homes general phase photos
+  ["photo-randall-insulation-general", imgInsulationSiteCheck],
+  ["photo-randall-drywall-general", imgDrywallSiteCheck],
+  ["photo-randall-finishing-general", imgFinishingGeneral],
+  // Randall Homes attic photo
+  ["photo-randall-attic", imgReadyCompleteAttic],
 ]);
 
 export interface UploadPhotoEvidenceInput {
@@ -292,6 +305,9 @@ export async function updateUser(userId: string, input: UpdateUserInput): Promis
   if (me.role === "admin" && input.role !== undefined) user.role = input.role;
   if (user.role === "admin" && input.adminOverviewEnabled !== undefined) {
     user.adminOverviewEnabled = input.adminOverviewEnabled;
+  }
+  if (user.role === "admin" && input.inventoryEnabled !== undefined) {
+    user.inventoryEnabled = input.inventoryEnabled;
   }
   user.updatedAt = nowIso;
 
@@ -1300,6 +1316,7 @@ export interface UpdateUserInput {
   email?: string;
   role?: UserRole;
   adminOverviewEnabled?: boolean;
+  inventoryEnabled?: boolean;
 }
 
 export async function createClient(input: CreateClientInput): Promise<ApiResult<ClientRecord>> {
@@ -1438,6 +1455,7 @@ export interface CompleteSiteCheckInput {
   projectId: string;
   notes?: string;
   photo?: File;
+  photos?: File[];
 }
 
 export interface BlockSiteCheckInput {
@@ -1506,8 +1524,10 @@ export async function completeSiteCheck(input: CompleteSiteCheckInput): Promise<
   }
 
   // Store photo evidence if provided
-  if (input.photo) {
-    const photoId = `photo-${Date.now()}`;
+  const photos = input.photos && input.photos.length > 0 ? input.photos : input.photo ? [input.photo] : [];
+  const basePhotoId = `photo-${Date.now()}`;
+  photos.forEach((photoFile, index) => {
+    const photoId = index === 0 ? basePhotoId : `${basePhotoId}-${index + 1}`;
     seedPhotos.push({
       id: photoId,
       projectId: input.projectId,
@@ -1515,15 +1535,15 @@ export async function completeSiteCheck(input: CompleteSiteCheckInput): Promise<
       gateId: input.gateId,
       purpose: "site_check",
       objectKey: `site-checks/${photoId}.jpg`,
-      mimeType: input.photo.type || "image/jpeg",
-      fileSizeBytes: input.photo.size,
+      mimeType: photoFile.type || "image/jpeg",
+      fileSizeBytes: photoFile.size,
       status: "confirmed",
       uploadedByUserId: me.id,
       createdAt: nowIso,
       updatedAt: nowIso,
     });
-    photoBlobUrls.set(photoId, URL.createObjectURL(input.photo));
-  }
+    photoBlobUrls.set(photoId, URL.createObjectURL(photoFile));
+  });
 
   // Audit event
   seedAuditEvents.unshift({
@@ -1740,8 +1760,12 @@ export async function completeInspection(input: CompleteInspectionInput): Promis
   }
 
   // Store photo evidence if provided
-  if (input.photo) {
-    const photoId = `photo-${Date.now()}`;
+  const inspectionPhotos = !input.passed
+    ? input.photo ? [input.photo] : []
+    : input.photos && input.photos.length > 0 ? input.photos : input.photo ? [input.photo] : [];
+  const basePhotoId = `photo-${Date.now()}`;
+  inspectionPhotos.forEach((photoFile, index) => {
+    const photoId = index === 0 ? basePhotoId : `${basePhotoId}-${index + 1}`;
     seedPhotos.push({
       id: photoId,
       projectId: input.projectId,
@@ -1749,15 +1773,15 @@ export async function completeInspection(input: CompleteInspectionInput): Promis
       gateId: input.gateId,
       purpose: "inspection",
       objectKey: `inspections/${photoId}.jpg`,
-      mimeType: input.photo.type || "image/jpeg",
-      fileSizeBytes: input.photo.size,
+      mimeType: photoFile.type || "image/jpeg",
+      fileSizeBytes: photoFile.size,
       status: "confirmed",
       uploadedByUserId: me.id,
       createdAt: nowIso,
       updatedAt: nowIso,
     });
-    photoBlobUrls.set(photoId, URL.createObjectURL(input.photo));
-  }
+    photoBlobUrls.set(photoId, URL.createObjectURL(photoFile));
+  });
 
   // Create deficiency if failed
   if (!input.passed && input.deficiencyTitle && input.deficiencyDescription && input.deficiencySeverity) {
@@ -2321,6 +2345,16 @@ export async function updateAtticGate(input: UpdateAtticGateInput): Promise<ApiR
 
   // Store photo evidence if provided
   if (input.photo) {
+    // Delete existing attic_check photo for this gate to prevent duplicates
+    const existingPhotoIndex = seedPhotos.findIndex(
+      (ph) => ph.gateId === gate.id && ph.purpose === "attic_check",
+    );
+    if (existingPhotoIndex !== -1) {
+      const existingPhoto = seedPhotos[existingPhotoIndex];
+      seedPhotos.splice(existingPhotoIndex, 1);
+      photoBlobUrls.delete(existingPhoto.id);
+    }
+
     const photoId = `photo-${Date.now()}`;
     seedPhotos.push({
       id: photoId,

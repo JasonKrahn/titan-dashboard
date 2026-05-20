@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { AlertOctagon, Archive, ArrowDown, ArrowUp, Grid2X2, List, Pencil, UserCircle } from "lucide-react";
+import { AlertOctagon, AlertTriangle, Archive, ArrowDown, ArrowUp, ArrowUpRight, Clock, Grid2X2, Image as ImageIcon, List, MoreVertical, Pencil, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { IconWell } from "@/components/ui/icon-well";
+import { MobileActionSheet, type MobileActionItem } from "@/components/ui/mobile-action-sheet";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,6 +21,7 @@ import {
   PHASE_ORDER,
   STATUS_LABEL,
   computePhaseHealth,
+  firstPhaseWithOpenDeficiencies,
   initials,
   openDeficiencyCount,
   phaseHealthDotClass,
@@ -33,6 +35,8 @@ import { cn } from "@/lib/utils";
 import { sortProjectRows, type ProjectRow, type ProjectSortKey, type ProjectSortState } from "./ProjectResultsSort";
 
 export type ProjectDisplayMode = "list" | "cards";
+type ProjectMobileTab = "deficiencies" | "photos" | "activity";
+type ProjectOpenState = { initialMobileTab?: ProjectMobileTab; phaseId?: string; tab?: string };
 
 interface ProjectResultsProps {
   title: string;
@@ -45,7 +49,7 @@ interface ProjectResultsProps {
   loading?: boolean;
   includeClientColumn?: boolean;
   emptyState: ReactNode;
-  onOpenProject?: (id: string) => void;
+  onOpenProject?: (id: string, state?: ProjectOpenState) => void;
   onArchiveProject?: (id: string, name: string) => void;
   onEditProject?: (id: string) => void;
   displayMode?: ProjectDisplayMode;
@@ -139,6 +143,7 @@ export function ProjectResults({
   const displayMode = externalDisplayMode ?? internalDisplayMode;
   const setDisplayMode = externalOnDisplayModeChange ?? setInternalDisplayMode;
   const [sort, setSort] = useState<ProjectSortState>({ key: "updated", direction: "desc" });
+  const [mobileActionProjectId, setMobileActionProjectId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!externalDisplayMode) {
@@ -159,12 +164,70 @@ export function ProjectResults({
           pmName: pm?.fullName ?? "Unassigned",
           phaseSummary: phaseSummary(project, phases, gates, deficiencies),
           openIssues: openDeficiencyCount(project.id, deficiencies),
+          targetPhaseId: firstPhaseWithOpenDeficiencies(project.id, deficiencies),
         };
       }),
     [clients, deficiencies, phases, projects, users],
   );
 
   const sortedRows = useMemo(() => sortProjectRows(rows, sort), [rows, sort]);
+  const mobileActionRow = sortedRows.find((row) => row.project.id === mobileActionProjectId) ?? null;
+  const mobileProjectActions: MobileActionItem[] = mobileActionRow
+    ? [
+        ...(onOpenProject
+          ? [
+              {
+                label: "Open project",
+                icon: <ArrowUpRight className="h-4 w-4" />,
+                helperText: "Go to the full project detail page",
+                onClick: () => onOpenProject(mobileActionRow.project.id),
+              },
+            ]
+          : []),
+        ...(mobileActionRow.project.status !== "completed" && mobileActionRow.project.status !== "archived" && onEditProject
+          ? [
+              {
+                label: "Edit project",
+                icon: <Pencil className="h-4 w-4" />,
+                helperText: "Update project details",
+                onClick: () => onEditProject(mobileActionRow.project.id),
+              },
+            ]
+          : []),
+        ...(onOpenProject
+          ? [
+              {
+                label: "Deficiencies",
+                icon: <AlertTriangle className="h-4 w-4" />,
+                helperText: "Jump to active project issues",
+                onClick: () => onOpenProject(mobileActionRow.project.id, { initialMobileTab: "deficiencies" }),
+              },
+              {
+                label: "Photos",
+                icon: <ImageIcon className="h-4 w-4" />,
+                helperText: "Review project photo evidence",
+                onClick: () => onOpenProject(mobileActionRow.project.id, { initialMobileTab: "photos" }),
+              },
+              {
+                label: "Activity",
+                icon: <Clock className="h-4 w-4" />,
+                helperText: "Review recent project changes",
+                onClick: () => onOpenProject(mobileActionRow.project.id, { initialMobileTab: "activity" }),
+              },
+            ]
+          : []),
+        ...(mobileActionRow.project.status === "completed" && onArchiveProject
+          ? [
+              {
+                label: "Archive project",
+                icon: <Archive className="h-4 w-4" />,
+                helperText: "Move completed work out of active views",
+                onClick: () => onArchiveProject(mobileActionRow.project.id, mobileActionRow.project.name),
+              },
+            ]
+          : []),
+      ]
+    : [];
 
   const handleSort = (key: ProjectSortKey) => {
     setSort((current) =>
@@ -258,6 +321,7 @@ export function ProjectResults({
               onOpen={onOpenProject}
               onArchive={onArchiveProject}
               onEdit={onEditProject}
+              onOpenActions={(id) => setMobileActionProjectId(id)}
             />
           ))}
         </div>
@@ -266,12 +330,12 @@ export function ProjectResults({
           <ul className="mobile-list md:hidden">
             {sortedRows.map((row) => (
               <li key={row.project.id}>
-                <button
-                  type="button"
-                  onClick={() => onOpenProject?.(row.project.id)}
-                  className="flex w-full items-start gap-2 px-3 py-2.5 text-left active:bg-muted/40"
-                >
-                  <div className="min-w-0 flex-1">
+                <div className="flex items-start gap-2 px-3 py-2.5">
+                  <button
+                    type="button"
+                    onClick={() => onOpenProject?.(row.project.id)}
+                    className="min-w-0 flex-1 text-left active:bg-muted/40"
+                  >
                     <div className="flex items-center gap-2">
                       <span className="truncate text-sm font-semibold">{row.project.name}</span>
                       <span className="shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -293,8 +357,16 @@ export function ProjectResults({
                         {formatDateWithOptions(row.project.scheduledEnd ?? "")}
                       </span>
                     </div>
-                  </div>
-                </button>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Open actions for ${row.project.name}`}
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    onClick={() => setMobileActionProjectId(row.project.id)}
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -336,12 +408,11 @@ export function ProjectResults({
                       Updated
                     </SortButton>
                   </TableHead>
-                  <TableHead className="hidden xl:table-cell w-[4%]">
+                  <TableHead className="hidden xl:table-cell w-[5%]">
                     <SortButton sortKey="pm" sort={sort} onSort={handleSort}>
                       PM
                     </SortButton>
                   </TableHead>
-                  {onArchiveProject && <TableHead className="w-auto px-2" />}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -355,7 +426,7 @@ export function ProjectResults({
                           onClick={() => onOpenProject?.(row.project.id)}
                         >
                           <div className="truncate font-mono text-xs text-muted-foreground">{row.project.projectNumber}</div>
-                          <div className="truncate font-semibold leading-tight text-foreground group-hover:text-primary">
+                          <div className="font-semibold leading-tight text-foreground group-hover:text-primary">
                             {row.project.name}
                           </div>
                           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
@@ -394,17 +465,27 @@ export function ProjectResults({
                       {STATUS_LABEL[row.project.status]}
                     </TableCell>
                     <TableCell className="hidden xl:table-cell">
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-col items-start gap-1">
                         {row.phaseSummary.map((item) => (
                           <div key={item.type} className="flex items-center gap-1.5" title={`${PHASE_LABEL[item.type]}: ${item.label} (${item.reason})`}>
                             <span className={cn("h-1.5 w-1.5 rounded-full", phaseHealthDotClass(item.tone))} />
-                            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{item.abbrev}</span>
+                            <span className="text-[10px] font-medium tracking-wide text-muted-foreground">{PHASE_LABEL[item.type]}</span>
                           </div>
                         ))}
                       </div>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
-                      {row.openIssues > 0 ? (
+                      {row.openIssues > 0 && row.targetPhaseId ? (
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1.5 text-xs font-medium text-status-blocked hover:underline cursor-pointer transition-colors"
+                          onClick={() => onOpenProject?.(row.project.id, { phaseId: row.targetPhaseId, tab: "deficiencies" })}
+                          aria-label={`View ${row.openIssues} open deficiencies for ${row.project.name}`}
+                        >
+                          <AlertOctagon className="h-3.5 w-3.5" />
+                          {row.openIssues} open
+                        </button>
+                      ) : row.openIssues > 0 ? (
                         <span className="inline-flex items-center gap-1.5 text-xs font-medium text-status-blocked">
                           <AlertOctagon className="h-3.5 w-3.5" />
                           {row.openIssues} open
@@ -425,21 +506,6 @@ export function ProjectResults({
                         <UserCircle className="h-5 w-5 text-muted-foreground" />
                       )}
                     </TableCell>
-                    {onArchiveProject && (
-                      <TableCell className="px-2 text-right">
-                        {row.project.status === "completed" && (
-                          <button
-                            type="button"
-                            title="Archive project"
-                            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-border bg-muted/30 px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                            onClick={() => onArchiveProject(row.project.id, row.project.name)}
-                          >
-                            <Archive className="h-3.5 w-3.5" />
-                            Archive
-                          </button>
-                        )}
-                      </TableCell>
-                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -447,6 +513,15 @@ export function ProjectResults({
           </Card>
         </>
       )}
+      <MobileActionSheet
+        open={!!mobileActionRow}
+        onOpenChange={(open) => {
+          if (!open) setMobileActionProjectId(null);
+        }}
+        title="Project actions"
+        actions={mobileProjectActions}
+        variant="project"
+      />
     </section>
   );
 }

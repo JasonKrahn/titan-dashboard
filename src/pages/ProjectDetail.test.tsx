@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import ProjectDetailPage from "./ProjectDetail";
 import type { InventoryPickup, ProjectDetail } from "@/lib/types";
 
-const { getProject, getCurrentUser, getPhotoViewUrl, getUsers, setCurrentUser, getProjectEquipment, getPhaseMaterials, getProjectInventoryPickups, updateProjectEquipmentBatch, exportProjectZip } = vi.hoisted(() => ({
+const { getProject, getCurrentUser, getPhotoViewUrl, getUsers, setCurrentUser, getProjectEquipment, getPhaseMaterials, getPhase, getProjectInventoryPickups, updateProjectEquipmentBatch, exportProjectZip } = vi.hoisted(() => ({
   getProject: vi.fn(),
   getCurrentUser: vi.fn(),
   getPhotoViewUrl: vi.fn(),
@@ -13,6 +13,7 @@ const { getProject, getCurrentUser, getPhotoViewUrl, getUsers, setCurrentUser, g
   setCurrentUser: vi.fn(),
   getProjectEquipment: vi.fn(),
   getPhaseMaterials: vi.fn(),
+  getPhase: vi.fn(),
   getProjectInventoryPickups: vi.fn(),
   updateProjectEquipmentBatch: vi.fn(),
   exportProjectZip: vi.fn(),
@@ -29,6 +30,7 @@ vi.mock("@/lib/api", async () => {
     setCurrentUser,
     getProjectEquipment,
     getPhaseMaterials,
+    getPhase,
     getProjectInventoryPickups,
     updateProjectEquipmentBatch,
     updateAtticGate: vi.fn(),
@@ -100,7 +102,7 @@ const detail: ProjectDetail = {
     clientId: "client-1",
     projectNumber: "TP-2026-001",
     name: "Oak Bend",
-    siteAddress: "14 Oak Bend Way",
+    siteAddress: "99 Mill Rock Road",
     status: "active",
     scheduledStart: "2026-05-01",
     scheduledEnd: "2026-05-31",
@@ -154,14 +156,14 @@ const detail: ProjectDetail = {
   auditEvents: [],
 };
 
-function renderPage() {
+function renderPage(initialState?: { initialMobileTab?: "overview" | "deficiencies" | "notes" | "photos" | "activity" }) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={["/project/proj-1"]}>
+      <MemoryRouter initialEntries={[{ pathname: "/project/proj-1", state: initialState }]}>
         <Routes>
           <Route path="/project/:id" element={<ProjectDetailPage />} />
         </Routes>
@@ -187,6 +189,7 @@ describe("ProjectDetailPage schedule", () => {
     getUsers.mockResolvedValue({ ok: true, data: [] });
     getProjectEquipment.mockResolvedValue({ ok: true, data: equipmentLogs });
     getPhaseMaterials.mockResolvedValue({ ok: true, data: [materialLog] });
+    getPhase.mockResolvedValue({ ok: true, data: { phase: {}, project: {}, gates: [], deficiencies: [], photoEvidence: [], subcontractors: [], auditEvents: [], checklistItems: [] } });
     getProjectInventoryPickups.mockResolvedValue({ ok: true, data: [] });
     exportProjectZip.mockResolvedValue(undefined);
     updateProjectEquipmentBatch.mockResolvedValue({
@@ -218,6 +221,123 @@ describe("ProjectDetailPage schedule", () => {
 
     expect(await screen.findByRole("heading", { name: "Project Photos" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Upload Photo" })).toHaveClass("hidden", "md:inline-flex");
+  });
+
+  it("opens the mobile project action sheet from the floating project action button with the fixed action order", async () => {
+    renderPage();
+
+    expect(await screen.findByRole("heading", { name: "Phases" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Project actions" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Project actions" });
+    const labels = within(dialog)
+      .getAllByRole("button")
+      .map((button) => button.textContent?.replace(/\s+/g, " ").trim())
+      .filter(Boolean);
+
+    expect(labels).toEqual([
+      "Upload photoAdd photo evidence to this project",
+      "Add deficiencyLog an issue against this project",
+      "Edit projectUpdate project details",
+      "DeficienciesJump to active project issues",
+      "PhotosReview project photo evidence",
+      "ActivityReview recent project changes",
+    ]);
+  });
+
+  it("honors the initial mobile tab route state", async () => {
+    renderPage({ initialMobileTab: "photos" });
+
+    await screen.findByRole("heading", { name: "Project Photos" });
+
+    expect(screen.getByRole("button", { name: "Photos" })).toHaveClass("bg-primary");
+    expect(screen.getByRole("button", { name: "Overview" })).not.toHaveClass("bg-primary");
+  });
+
+  it("shows attic evidence without a phase in Project Photos and the viewer", async () => {
+    getProject.mockResolvedValue({
+      ok: true,
+      data: {
+        ...detail,
+        gates: [
+          {
+            id: "gate-attic",
+            projectId: "proj-1",
+            type: "attic_check",
+            status: "passed",
+            requiredPhotoEvidence: true,
+            createdAt: "2026-05-01T00:00:00.000Z",
+            updatedAt: "2026-05-01T00:00:00.000Z",
+          },
+        ],
+        deficiencies: [
+          {
+            id: "def-1",
+            projectId: "proj-1",
+            phaseId: "phase-insulation",
+            title: "Missing vapor barrier",
+            severity: "medium",
+            status: "open",
+            createdAt: "2026-05-01T00:00:00.000Z",
+            updatedAt: "2026-05-01T00:00:00.000Z",
+          },
+        ],
+        photoEvidence: [
+          {
+            id: "photo-attic",
+            projectId: "proj-1",
+            gateId: "gate-attic",
+            purpose: "attic_check",
+            objectKey: "attic.jpg",
+            mimeType: "image/jpeg",
+            status: "confirmed",
+            uploadedByUserId: "user-pm",
+            createdAt: "2026-05-03T00:00:00.000Z",
+            updatedAt: "2026-05-03T00:00:00.000Z",
+          },
+          {
+            id: "photo-general",
+            projectId: "proj-1",
+            phaseId: "phase-insulation",
+            purpose: "general",
+            objectKey: "general.jpg",
+            mimeType: "image/jpeg",
+            status: "confirmed",
+            uploadedByUserId: "user-pm",
+            createdAt: "2026-05-04T00:00:00.000Z",
+            updatedAt: "2026-05-04T00:00:00.000Z",
+          },
+          {
+            id: "photo-deficiency-before",
+            projectId: "proj-1",
+            phaseId: "phase-insulation",
+            deficiencyId: "def-1",
+            purpose: "deficiency_before",
+            objectKey: "before.jpg",
+            mimeType: "image/jpeg",
+            status: "confirmed",
+            uploadedByUserId: "user-pm",
+            createdAt: "2026-05-05T00:00:00.000Z",
+            updatedAt: "2026-05-05T00:00:00.000Z",
+          },
+        ],
+      },
+    });
+
+    renderPage();
+
+    const heading = await screen.findByRole("heading", { name: "Project Photos" });
+    const photosSection = heading.closest("section") as HTMLElement;
+    expect(within(photosSection).getAllByText("Attic Check").length).toBeGreaterThan(0);
+    expect(within(photosSection).getByText("General")).toBeInTheDocument();
+    expect(within(photosSection).queryByText("Before")).not.toBeInTheDocument();
+
+    fireEvent.click(await within(photosSection).findByRole("button", { name: "Attic Check" }));
+
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(await screen.findByText("Photo 1 of 2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next photo" })).toBeInTheDocument();
   });
 
   it("keeps phase actions separate from phase navigation links", async () => {
@@ -370,6 +490,38 @@ describe("ProjectDetailPage schedule", () => {
     expect(screen.queryByText("Executive Summary")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /View Full Project Details/i })).not.toBeInTheDocument();
   });
+
+  it("exports directly from the archived admin executive summary", async () => {
+    getCurrentUser.mockResolvedValue({ ok: true, data: adminUser });
+    getProject.mockResolvedValue({
+      ok: true,
+      data: {
+        ...detail,
+        project: {
+          ...detail.project,
+          status: "archived",
+        },
+      },
+    });
+
+    renderPage();
+
+    expect(await screen.findByText("Executive Summary")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+
+    await waitFor(() => {
+      expect(exportProjectZip).toHaveBeenCalledTimes(1);
+    }, { timeout: 3000 });
+    expect(exportProjectZip).toHaveBeenCalledWith(
+      expect.objectContaining({ project: expect.objectContaining({ status: "archived" }) }),
+      detail.client,
+      undefined,
+      expect.objectContaining({
+        equipmentLogs,
+        inventoryPickups: [],
+      }),
+    );
+  });
 });
 
 describe("ProjectDetailPage equipment", () => {
@@ -389,6 +541,7 @@ describe("ProjectDetailPage equipment", () => {
     getUsers.mockResolvedValue({ ok: true, data: [] });
     getProjectEquipment.mockResolvedValue({ ok: true, data: equipmentLogs });
     getPhaseMaterials.mockResolvedValue({ ok: true, data: [materialLog] });
+    getPhase.mockResolvedValue({ ok: true, data: { phase: {}, project: {}, gates: [], deficiencies: [], photoEvidence: [], subcontractors: [], auditEvents: [], checklistItems: [] } });
     getProjectInventoryPickups.mockResolvedValue({ ok: true, data: [] });
     exportProjectZip.mockResolvedValue(undefined);
     updateProjectEquipmentBatch.mockResolvedValue({
@@ -466,6 +619,9 @@ describe("ProjectDetailPage equipment", () => {
     expect(getPhaseMaterials).toHaveBeenCalledWith("phase-insulation");
     expect(getPhaseMaterials).toHaveBeenCalledWith("phase-drywall");
     expect(getPhaseMaterials).toHaveBeenCalledWith("phase-finishing");
+    expect(getPhase).toHaveBeenCalledWith("phase-insulation");
+    expect(getPhase).toHaveBeenCalledWith("phase-drywall");
+    expect(getPhase).toHaveBeenCalledWith("phase-finishing");
     expect(exportProjectZip).toHaveBeenCalledWith(
       expect.objectContaining({ project: expect.objectContaining({ status: "archived" }) }),
       detail.client,
@@ -474,6 +630,7 @@ describe("ProjectDetailPage equipment", () => {
         equipmentLogs,
         inventoryPickups: [equipmentPickup],
         materialLogs: [materialLog, materialLog, materialLog],
+        checklistItems: [],
       },
     );
   });

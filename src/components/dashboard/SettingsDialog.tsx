@@ -31,7 +31,7 @@ export function SettingsDialog({ open, onOpenChange, user, onUpdated }: Settings
         fullName: user.fullName,
         phone: user.phone,
         email: user.email,
-        ...(user.role === "admin" ? { adminOverviewEnabled: user.adminOverviewEnabled === true } : {}),
+        ...(user.role === "admin" ? { adminOverviewEnabled: user.adminOverviewEnabled === true, inventoryEnabled: user.inventoryEnabled === true } : {}),
       });
     } else {
       setForm(empty);
@@ -173,17 +173,30 @@ export function SettingsDialog({ open, onOpenChange, user, onUpdated }: Settings
           </div>
 
           {user.role === "admin" && (
-            <div className="flex items-center justify-between py-2">
-              <div className="space-y-0.5">
-                <Label htmlFor="admin-overview">Admin overview</Label>
-                <p className="text-xs text-muted-foreground">Show Admin Overview in Admin Tools</p>
+            <>
+              <div className="flex items-center justify-between py-2">
+                <div className="space-y-0.5">
+                  <Label htmlFor="admin-overview">Admin overview</Label>
+                  <p className="text-xs text-muted-foreground">Show Admin Overview in Admin Tools</p>
+                </div>
+                <Switch
+                  id="admin-overview"
+                  checked={form.adminOverviewEnabled === true}
+                  onCheckedChange={(enabled) => setField("adminOverviewEnabled", enabled)}
+                />
               </div>
-              <Switch
-                id="admin-overview"
-                checked={form.adminOverviewEnabled === true}
-                onCheckedChange={(enabled) => setField("adminOverviewEnabled", enabled)}
-              />
-            </div>
+              <div className="flex items-center justify-between py-2">
+                <div className="space-y-0.5">
+                  <Label htmlFor="inventory">Inventory</Label>
+                  <p className="text-xs text-muted-foreground">Show Inventory page and inventory manager role</p>
+                </div>
+                <Switch
+                  id="inventory"
+                  checked={form.inventoryEnabled === true}
+                  onCheckedChange={(enabled) => setField("inventoryEnabled", enabled)}
+                />
+              </div>
+            </>
           )}
 
           <DialogFooter className="pt-2">

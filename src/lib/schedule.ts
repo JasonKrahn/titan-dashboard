@@ -36,10 +36,13 @@ export function toScheduleDate(ms: number): string {
 
 export function formatDateWithOptions(value: string, options: { showYear?: boolean } = {}): string {
   if (!value) return "—";
-  return new Date(value).toLocaleDateString(undefined, {
+  const ms = parseScheduleDate(value);
+  const date = new Date(ms);
+  return date.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
     year: options.showYear ? "numeric" : undefined,
+    timeZone: "UTC",
   });
 }
 

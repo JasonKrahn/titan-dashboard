@@ -70,7 +70,7 @@ const project: Project = {
   clientId: "client-1",
   projectNumber: "TP-2026-001",
   name: "Acme Cedar Point Villas",
-  siteAddress: "100 Main St",
+  siteAddress: "123 Main St, Winnipeg, MB R3C 1A3",
   status: "active",
   assignedProjectManagerId: "user-1",
   atticCheckStatus: "not_started",

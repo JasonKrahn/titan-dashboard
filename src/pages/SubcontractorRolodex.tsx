@@ -3,9 +3,6 @@ import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUpRight,
-  BriefcaseBusiness,
-  Building2,
-  CalendarClock,
   Grid2X2,
   List,
   Mail,
@@ -37,6 +34,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Textarea } from "@/components/ui/textarea";
 import { getSubcontractorContacts, getAllPhases, getProjects, createSubcontractorContact, updateSubcontractorContact, deleteSubcontractorContact } from "@/lib/api";
 import { formatDateWithOptions } from "@/lib/schedule";
@@ -66,7 +64,6 @@ const TRADE_LABEL: Record<string, string> = {
 
 type ViewMode = "cards" | "list";
 type SortOption = "name" | "company" | "trade" | "active" | "assigned" | "next";
-type StatFilter = Pick<SubcontractorRowFilters, "status" | "assignment">;
 
 interface SubcontractorFormState {
   displayName: string;
@@ -389,27 +386,9 @@ export default function SubcontractorRolodexPage() {
 
   const mobileActionSubcontractor = rows.find((row) => row.id === mobileActionSubcontractorId);
 
-  const stats = useMemo(() => {
-    const active = subs.filter((sub) => isActive(sub.id)).length;
-    const assigned = subs.filter((sub) => (assignmentSummary.get(sub.id)?.assignmentCount ?? 0) > 0).length;
-    return {
-      total: subs.length,
-      active,
-      assigned,
-      unassigned: subs.length - assigned,
-    };
-  }, [assignmentSummary, subs]);
-
   const handleFilterChange = <K extends keyof SubcontractorRowFilters>(key: K, value: SubcontractorRowFilters[K]) => {
     setFilters((current) => ({ ...current, [key]: value }));
   };
-
-  const applyStatFilter = (nextFilters: StatFilter) => {
-    setFilters((current) => ({ ...current, ...nextFilters }));
-  };
-
-  const isStatFilterActive = (targetFilters: StatFilter) =>
-    filters.status === targetFilters.status && filters.assignment === targetFilters.assignment;
 
   const validateForm = () => {
     if (!formData.displayName || !formData.trade || !formData.companyName || !formData.phone || !formData.email) {
@@ -560,13 +539,6 @@ export default function SubcontractorRolodexPage() {
     );
   }
 
-  const statCards: Array<{ label: string; value: number; icon: typeof Building2; filters: StatFilter }> = [
-    { label: "Total subs", value: stats.total, icon: Building2, filters: { status: "all", assignment: "all" } },
-    { label: "Active", value: stats.active, icon: Wrench, filters: { status: "active", assignment: "all" } },
-    { label: "Assigned", value: stats.assigned, icon: BriefcaseBusiness, filters: { status: "all", assignment: "assigned" } },
-    { label: "Unassigned", value: stats.unassigned, icon: CalendarClock, filters: { status: "all", assignment: "unassigned" } },
-  ];
-
   return (
     <div className="min-h-screen bg-background">
       <AppHeader activeSection="subs" />
@@ -585,33 +557,6 @@ export default function SubcontractorRolodexPage() {
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {statCards.map((item) => {
-              const isSelected = isStatFilterActive(item.filters);
-              return (
-                <Card
-                  key={item.label}
-                  surface="panel"
-                  className={`transition-colors ${isSelected ? "border-primary/70 ring-1 ring-primary/30" : ""}`}
-                >
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between gap-3 p-4 text-left"
-                    aria-pressed={isSelected}
-                    onClick={() => applyStatFilter(item.filters)}
-                  >
-                    <span>
-                      <span className="block text-xs font-medium text-muted-foreground">{item.label}</span>
-                      <span className="mt-1 block text-2xl font-semibold tabular-nums">{item.value}</span>
-                    </span>
-                    <IconWell tone="primary" size="lg" shape="square" className="border-transparent">
-                      <item.icon className="h-4 w-4" />
-                    </IconWell>
-                  </button>
-                </Card>
-              );
-            })}
-          </div>
         </section>
 
         <Card surface="panel" className="p-3">
@@ -712,46 +657,59 @@ export default function SubcontractorRolodexPage() {
           </Card>
         ) : (
           <>
-            <ul className="mobile-list md:hidden">
-              {rows.map((s) => {
-                const assignmentCount = assignmentSummary.get(s.id)?.assignmentCount ?? 0;
-                return (
-                  <li key={s.id}>
-                    <div className="flex items-center gap-2 px-3 py-2.5 active:bg-muted/40">
-                      <button
-                        type="button"
-                        onClick={() => setMobileActionSubcontractorId(s.id)}
-                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                      >
-                        <IconWell tone="primary" size="md" shape="square">
-                          <Wrench className="h-4 w-4" />
-                        </IconWell>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className={`inline-block h-1.5 w-1.5 rounded-full ${isActive(s.id) ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
-                            <span className="truncate text-sm font-semibold">{s.displayName}</span>
+            <TooltipProvider>
+              <ul className="mobile-list md:hidden">
+                {rows.map((s) => {
+                  const assignmentCount = assignmentSummary.get(s.id)?.assignmentCount ?? 0;
+                  return (
+                    <li key={s.id}>
+                      <div className="flex items-center gap-2 px-3 py-2.5 active:bg-muted/40">
+                        <button
+                          type="button"
+                          onClick={() => setMobileActionSubcontractorId(s.id)}
+                          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                        >
+                          <IconWell tone="primary" size="md" shape="square">
+                            <Wrench className="h-4 w-4" />
+                          </IconWell>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className={`inline-block h-1.5 w-1.5 rounded-full ${isActive(s.id) ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
+                              {s.notes ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="truncate text-sm font-semibold">{s.companyName ?? s.displayName}</span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="max-w-xs">{s.notes}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              ) : (
+                                <span className="truncate text-sm font-semibold">{s.companyName ?? s.displayName}</span>
+                              )}
+                            </div>
+                            <div className="truncate text-xs text-muted-foreground">
+                              {s.displayName}
+                            </div>
                           </div>
-                          <div className="truncate text-xs text-muted-foreground">
-                            {s.companyName ?? s.phone ?? s.email ?? "No contact"}
-                          </div>
-                        </div>
-                        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums">
-                          {assignmentCount} assigned
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground active:bg-muted/60"
-                        aria-label={`Actions for ${s.displayName}`}
-                        onClick={() => setMobileActionSubcontractorId(s.id)}
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+                          <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums">
+                            {assignmentCount} assigned
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground active:bg-muted/60"
+                          aria-label={`Actions for ${s.displayName}`}
+                          onClick={() => setMobileActionSubcontractorId(s.id)}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </TooltipProvider>
 
             {viewMode === "cards" ? (
               <div className="hidden md:grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -764,8 +722,8 @@ export default function SubcontractorRolodexPage() {
                           <IconWell tone="primary" size="lg" shape="panel" className="mb-3">
                             <Wrench className="h-4 w-4" />
                           </IconWell>
-                          <h3 className="truncate text-base font-semibold">{s.displayName}</h3>
-                          <p className="mt-1 truncate text-sm text-muted-foreground">{s.companyName ?? "No company"}</p>
+                          <h3 className="truncate text-base font-semibold">{s.companyName ?? s.displayName}</h3>
+                          <p className="mt-1 truncate text-sm text-muted-foreground">{s.displayName}</p>
                         </div>
                         <div className="flex shrink-0 flex-col items-end gap-2">
                           <TradeBadge trade={s.trade} size="sm" />
@@ -824,18 +782,18 @@ export default function SubcontractorRolodexPage() {
                 })}
               </div>
             ) : (
-              <Card surface="panel" className="hidden md:block overflow-x-auto">
-                <div style={{ width: '1300px' }}>
+              <Card surface="panel" className="hidden md:block">
+                <TooltipProvider>
                   <Table className="table-fixed">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead style={{ width: '240px' }}>Subcontractor</TableHead>
-                        <TableHead style={{ width: '110px' }}>Trade</TableHead>
-                        <TableHead style={{ width: '160px' }}>Contact</TableHead>
-                        <TableHead style={{ width: '90px' }} className="text-right">Status</TableHead>
-                        <TableHead style={{ width: '80px' }} className="text-right">Assigned</TableHead>
-                        <TableHead style={{ width: '220px' }}>Next finish</TableHead>
-                        <TableHead style={{ width: '400px' }} className="text-right">Actions</TableHead>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[34%] lg:w-[28%] xl:w-[24%]">Subcontractor</TableHead>
+                      <TableHead className="w-[14%] lg:w-[12%] xl:w-[10%]">Trade</TableHead>
+                      <TableHead className="hidden lg:table-cell lg:w-[17%] xl:w-[15%]">Contact</TableHead>
+                      <TableHead className="w-[15%] text-right lg:w-[11%] xl:w-[9%]">Status</TableHead>
+                      <TableHead className="w-[12%] text-right lg:w-[9%] xl:w-[8%]">Assigned</TableHead>
+                      <TableHead className="hidden xl:table-cell xl:w-[18%]">Next finish</TableHead>
+                      <TableHead className="w-[25%] px-2 text-right lg:w-[23%] xl:w-[16%]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -846,14 +804,26 @@ export default function SubcontractorRolodexPage() {
                         <TableRow key={s.id}>
                           <TableCell>
                             <div className="min-w-0">
-                              <div className="truncate font-semibold text-foreground">{s.displayName}</div>
-                              <div className="truncate text-xs text-muted-foreground">{s.companyName ?? "No company"}</div>
+                              {s.notes ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="truncate font-semibold text-foreground">{s.companyName ?? s.displayName}</div>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="max-w-xs">{s.notes}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              ) : (
+                                <div className="truncate font-semibold text-foreground">{s.companyName ?? s.displayName}</div>
+                              )}
+                              <div className="truncate text-xs text-muted-foreground">{s.displayName}</div>
+                              <div className="truncate text-xs text-muted-foreground lg:hidden">{s.phone ?? s.email ?? "No contact"}</div>
                             </div>
                           </TableCell>
                           <TableCell>
                             <TradeBadge trade={s.trade} size="sm" />
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="hidden lg:table-cell">
                             <div className="min-w-0 text-xs text-muted-foreground">
                               <div className="truncate">{s.phone ?? "-"}</div>
                               <div className="truncate">{s.email ?? "-"}</div>
@@ -865,7 +835,7 @@ export default function SubcontractorRolodexPage() {
                             </span>
                           </TableCell>
                           <TableCell className="text-right font-semibold tabular-nums">{assignments.length}</TableCell>
-                          <TableCell className="min-w-0 truncate overflow-hidden text-xs text-muted-foreground">
+                          <TableCell className="hidden min-w-0 truncate overflow-hidden text-xs text-muted-foreground xl:table-cell">
                             {primaryAssignment ? (
                               <Link
                                 to={`/project/${primaryAssignment.project.id}/phase/${primaryAssignment.phase.id}`}
@@ -878,8 +848,8 @@ export default function SubcontractorRolodexPage() {
                               "No scheduled finish"
                             )}
                           </TableCell>
-                          <TableCell className="whitespace-nowrap overflow-hidden">
-                            <div className="flex justify-end gap-1 flex-shrink-0">
+                          <TableCell className="px-2 text-right">
+                            <div className="flex justify-end gap-1">
                               {renderContactActions(s, true)}
                               <Button variant="ghost" size="icon" className="h-9 w-9" aria-label={`Edit ${s.displayName}`} onClick={() => handleEdit(s)}>
                                 <Pencil className="h-4 w-4" />
@@ -900,7 +870,7 @@ export default function SubcontractorRolodexPage() {
                     })}
                   </TableBody>
                 </Table>
-                </div>
+                </TooltipProvider>
               </Card>
             )}
           </>

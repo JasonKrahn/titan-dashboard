@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { unblockSiteCheck, type UnblockSiteCheckInput } from "@/lib/api";
+import type { PhotoEvidence } from "@/lib/types";
 
 interface SiteUnblockDialogProps {
   open: boolean;
@@ -11,10 +12,14 @@ interface SiteUnblockDialogProps {
   phaseId: string;
   projectId: string;
   phaseLabel: string;
+  photoEvidence: PhotoEvidence[];
 }
 
-export function SiteUnblockDialog({ open, onOpenChange, gateId, phaseId, projectId, phaseLabel }: SiteUnblockDialogProps) {
+export function SiteUnblockDialog({ open, onOpenChange, gateId, phaseId, projectId, phaseLabel, photoEvidence }: SiteUnblockDialogProps) {
   const qc = useQueryClient();
+
+  const gatePhotos = photoEvidence.filter((p) => p.gateId === gateId);
+  const hasBeforePhoto = gatePhotos.length > 0;
 
   const mutation = useMutation({
     mutationFn: (input: UnblockSiteCheckInput) => unblockSiteCheck(input),
@@ -48,11 +53,20 @@ export function SiteUnblockDialog({ open, onOpenChange, gateId, phaseId, project
           </DialogDescription>
         </DialogHeader>
 
+        {hasBeforePhoto && (
+          <div className="bg-destructive/10 border border-destructive/20 rounded-md p-3">
+            <p className="text-sm text-destructive font-medium">After photo required</p>
+            <p className="text-xs text-destructive/80 mt-1">
+              This gate already has photo evidence. Please upload an after photo before clearing the site check.
+            </p>
+          </div>
+        )}
+
         <DialogFooter className="pt-4">
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="button" disabled={mutation.isPending} onClick={handleConfirm}>
+          <Button type="button" disabled={mutation.isPending || hasBeforePhoto} onClick={handleConfirm}>
             {mutation.isPending ? "Clearing…" : "Site Cleared"}
           </Button>
         </DialogFooter>

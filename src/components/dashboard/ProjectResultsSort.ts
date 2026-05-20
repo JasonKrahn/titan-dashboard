@@ -17,6 +17,7 @@ export interface ProjectRow {
   pmName: string;
   phaseSummary: PhaseSummaryItem[];
   openIssues: number;
+  targetPhaseId: string | null;
 }
 
 function compareValue(a: string | number, b: string | number) {

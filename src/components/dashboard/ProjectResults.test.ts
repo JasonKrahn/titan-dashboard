@@ -9,7 +9,7 @@ function row(overrides: Partial<ProjectRow>): ProjectRow {
       clientId: "client",
       projectNumber: "TP-2025-000",
       name: "Project",
-      siteAddress: "100 Main St",
+      siteAddress: "123 Main St, Winnipeg, MB R3C 1A3",
       status: "active",
       atticCheckStatus: "not_started",
       createdAt: "2026-05-01T10:00:00.000Z",

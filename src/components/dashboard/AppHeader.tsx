@@ -93,6 +93,7 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, 
   const section = activeSection ?? sectionFromPath(location.pathname);
   const isAdmin = resolvedUser?.role === "admin";
   const showAdminOverview = resolvedUser?.adminOverviewEnabled === true;
+  const showInventory = resolvedUser?.inventoryEnabled === true;
   const adminToolsActive = (showAdminOverview && section === "command") || section === "activity" || section === "organization" || section === "inventory";
 
   const goToDashboardView = (view: DashboardViewTarget) => {
@@ -153,7 +154,7 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, 
           </button>
 
           <div className="hidden min-w-0 flex-1 items-center gap-2 lg:flex">
-            {me?.role === "inventory_viewer" ? (
+            {me?.role === "inventory_viewer" && showInventory ? (
               <Link to="/inventory" className={dashboardNavClass(section === "inventory")}>
                 <Package className="h-4 w-4" />
                 Inventory
@@ -174,11 +175,18 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, 
                 >
                   All Projects
                 </button>
+                <div className="w-px bg-border mx-1" />
                 <Link
                   to="/archive"
                   className={dashboardNavClass(section === "archive")}
                 >
                   Archive
+                </Link>
+                <Link
+                  to="/subs"
+                  className={dashboardNavClass(section === "subs")}
+                >
+                  Subcontractors
                 </Link>
               </SegmentedControl>
             )}
@@ -191,12 +199,14 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, 
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className={adminToolsMenuContentClass}>
-                  <DropdownMenuItem asChild className={adminToolsMenuItemClass}>
-                    <Link to="/inventory">
-                      <Package className="h-4 w-4" />
-                      Inventory
-                    </Link>
-                  </DropdownMenuItem>
+                  {showInventory && (
+                    <DropdownMenuItem asChild className={adminToolsMenuItemClass}>
+                      <Link to="/inventory">
+                        <Package className="h-4 w-4" />
+                        Inventory
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem asChild className={adminToolsMenuItemClass}>
                     <Link to="/organization">
                       <UserCog className="h-4 w-4" />
@@ -223,18 +233,6 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, 
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-2">
-            {(me?.role === "admin" || me?.role === "project_manager") && (
-              <Link
-                to="/subs"
-                className={cn(
-                  "inline-flex h-11 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-medium text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground lg:h-10",
-                  section === "subs" && "border-primary/60 bg-primary text-primary-foreground shadow-glow"
-                )}
-              >
-                <Users className="h-4 w-4" />
-                <span className="hidden md:inline">Subcontractors</span>
-              </Link>
-            )}
             {resolvedUser?.role === "project_manager" && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -317,7 +315,7 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, 
 
         <nav className="overflow-hidden border-t border-border/60 py-1.5 lg:hidden">
           <div className="-mx-3 flex max-w-[calc(100%+1.5rem)] items-center gap-1.5 overflow-x-auto px-3 pb-1 scrollbar-hide snap-x">
-            {me?.role === "inventory_viewer" ? (
+            {me?.role === "inventory_viewer" && showInventory ? (
               <Link
                 to="/inventory"
                 className={mobileDashboardNavClass(section === "inventory")}
@@ -341,12 +339,20 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, 
                 >
                   All Projects
                 </button>
+                <div className="w-px bg-border mx-1" />
                 <Link
                   to="/archive"
                   className={mobileDashboardNavClass(section === "archive")}
                 >
                   <Archive className="h-4 w-4" />
                   Archive
+                </Link>
+                <Link
+                  to="/subs"
+                  className={mobileDashboardNavClass(section === "subs")}
+                >
+                  <Users className="h-4 w-4" />
+                  Subs
                 </Link>
               </>
             )}
@@ -359,12 +365,14 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, 
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className={adminToolsMenuContentClass}>
-                  <DropdownMenuItem asChild className={adminToolsMenuItemClass}>
-                    <Link to="/inventory">
-                      <Package className="h-4 w-4" />
-                      Inventory
-                    </Link>
-                  </DropdownMenuItem>
+                  {showInventory && (
+                    <DropdownMenuItem asChild className={adminToolsMenuItemClass}>
+                      <Link to="/inventory">
+                        <Package className="h-4 w-4" />
+                        Inventory
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem asChild className={adminToolsMenuItemClass}>
                     <Link to="/organization">
                       <UserCog className="h-4 w-4" />
@@ -387,18 +395,6 @@ export function AppHeader({ activeSection, onSelectDashboardView, onUserSwitch, 
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
-            )}
-            {(me?.role === "admin" || me?.role === "project_manager") && (
-              <Link
-                to="/subs"
-                className={cn(
-                  "inline-flex h-11 shrink-0 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-medium text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground",
-                  section === "subs" && "border-primary/60 bg-primary text-primary-foreground shadow-glow"
-                )}
-              >
-                <Users className="h-4 w-4" />
-                Subs
-              </Link>
             )}
           </div>
         </nav>

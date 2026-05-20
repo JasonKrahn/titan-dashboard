@@ -140,7 +140,13 @@ const ArchivePage = () => {
               onClear={() => setSearch("")}
             />
           }
-          onOpenProject={(id) => navigate(`/project/${id}`)}
+          onOpenProject={(id, state) => {
+            if (state?.phaseId && state?.tab) {
+              navigate(`/project/${id}/phase/${state.phaseId}?tab=${state.tab}`);
+            } else {
+              navigate(`/project/${id}`);
+            }
+          }}
         />
 
         <p className="text-[11px] text-muted-foreground/70 text-center pt-4">

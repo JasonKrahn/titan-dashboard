@@ -14,7 +14,7 @@ function project(overrides: Partial<Project> & { id: string; status: Project["st
     clientId: "client-1",
     projectNumber: `TP-${overrides.id}`,
     name: overrides.id,
-    siteAddress: "100 Main St",
+    siteAddress: "123 Main St, Winnipeg, MB R3C 1A3",
     atticCheckStatus: "passed",
     createdAt: daysAgo(20),
     updatedAt: daysAgo(2),

@@ -32,6 +32,7 @@ import type { ProjectFilters } from "@/lib/types";
 
 type ActiveView = "clients" | "client-projects" | "dashboard";
 type DashboardRouteState = { clientId?: string; view?: DashboardViewTarget } | null;
+type ProjectDetailRouteState = { initialMobileTab?: "deficiencies" | "photos" | "activity" };
 
 const DashboardPage = () => {
   const navigate = useNavigate();
@@ -97,8 +98,8 @@ const DashboardPage = () => {
     queryFn: () => getProjects(nonArchivedFilters),
   });
   const allProjectsQ = useQuery({
-    queryKey: ["projects", "all-visible", meQ.data?.ok ? meQ.data.data.id : null],
-    queryFn: () => getProjects(),
+    queryKey: ["projects", "all-visible", nonArchivedFilters, meQ.data?.ok ? meQ.data.data.id : null],
+    queryFn: () => getProjects(nonArchivedFilters),
   });
 
   const me = meQ.data?.ok ? meQ.data.data : undefined;
@@ -119,8 +120,12 @@ const DashboardPage = () => {
 
   const isAdmin = me?.role === "admin";
 
-  const handleOpenProject = (id: string) => {
-    navigate(`/project/${id}`);
+  const handleOpenProject = (id: string, state?: ProjectDetailRouteState & { phaseId?: string; tab?: string }) => {
+    if (state?.phaseId && state?.tab) {
+      navigate(`/project/${id}/phase/${state.phaseId}?tab=${state.tab}`);
+    } else {
+      navigate(`/project/${id}`, state ? { state } : undefined);
+    }
   };
 
   const handleSelectDashboardView = (view: DashboardViewTarget) => {
@@ -350,6 +355,7 @@ const DashboardPage = () => {
             onOpenProject={handleOpenProject}
             onArchiveProject={(id, name) => setArchiveTarget({ id, name })}
             onEditProject={(id) => setEditProjectId(id)}
+            isAdmin={isAdmin}
           />
         ) : activeView === "clients" || activeView === "client-projects" ? (
           <ClientDirectory
@@ -431,10 +437,10 @@ const DashboardPage = () => {
                   phases={visiblePhases}
                   gates={gates}
                   onOpen={handleOpenProject}
-                  onPass={(gateId, phaseId, projectId, phaseLabel) => setInspectionTarget({ gateId, phaseId, projectId, phaseLabel, mode: "passed" })}
-                  onFail={(gateId, phaseId, projectId, phaseLabel) => setInspectionTarget({ gateId, phaseId, projectId, phaseLabel, mode: "failed" })}
+                  onPass={!isAdmin ? (gateId, phaseId, projectId, phaseLabel) => setInspectionTarget({ gateId, phaseId, projectId, phaseLabel, mode: "passed" }) : undefined}
+                  onFail={!isAdmin ? (gateId, phaseId, projectId, phaseLabel) => setInspectionTarget({ gateId, phaseId, projectId, phaseLabel, mode: "failed" }) : undefined}
                 />
-                <ArchivePanel projects={projects} onOpen={handleOpenProject} onArchive={(id, name) => setArchiveTarget({ id, name })} />
+                <ArchivePanel projects={projects} onOpen={handleOpenProject} onArchive={!isAdmin ? (id, name) => setArchiveTarget({ id, name }) : undefined} />
               </div>
             )}
 
@@ -459,7 +465,7 @@ const DashboardPage = () => {
                 />
               }
               onOpenProject={handleOpenProject}
-              onArchiveProject={(id, name) => setArchiveTarget({ id, name })}
+              onArchiveProject={!isAdmin ? (id, name) => setArchiveTarget({ id, name }) : undefined}
               onEditProject={(id) => setEditProjectId(id)}
             />
           </>

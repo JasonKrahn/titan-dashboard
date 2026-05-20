@@ -18,6 +18,7 @@ interface RoleSwitcherProps {
 }
 
 export function RoleSwitcher({ current, users, onSwitch }: RoleSwitcherProps) {
+  const filteredUsers = users.filter((u) => u.role !== "inventory_viewer" || current.inventoryEnabled === true);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-2.5 py-1.5 transition-colors hover:bg-accent lg:min-h-10">
@@ -37,7 +38,7 @@ export function RoleSwitcher({ current, users, onSwitch }: RoleSwitcherProps) {
           <UserCog className="h-3.5 w-3.5" /> Demo: switch role
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {users.map((u) => (
+        {filteredUsers.map((u) => (
           <DropdownMenuItem key={u.id} onClick={() => onSwitch(u.id)} className="flex items-center gap-2">
             <IconWell tone="muted" size="sm" shape="pill" className="border-transparent text-xs">
               {initials(u.fullName)}

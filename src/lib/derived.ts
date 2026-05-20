@@ -70,6 +70,11 @@ export function openDeficiencyCount(projectId: string, defs: Deficiency[]): numb
   return defs.filter((d) => d.projectId === projectId && (d.status === "open" || d.status === "in_progress")).length;
 }
 
+export function firstPhaseWithOpenDeficiencies(projectId: string, defs: Deficiency[]): string | null {
+  const firstDef = defs.find((d) => d.projectId === projectId && (d.status === "open" || d.status === "in_progress"));
+  return firstDef?.phaseId ?? null;
+}
+
 
 
 export type PhaseHealthTone = StatusTone | "attention";

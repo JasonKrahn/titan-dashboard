@@ -9,6 +9,8 @@ import { KeyboardShortcutsHelp } from "@/components/dashboard/KeyboardShortcutsH
 import { CommandPalette } from "@/components/dashboard/CommandPalette";
 import { ShortcutActionsProvider, useShortcutActions } from "@/components/dashboard/ShortcutActionsContext";
 import { useGlobalKeyboard } from "@/hooks/useGlobalKeyboard";
+import { useQuery } from "@tanstack/react-query";
+import { getCurrentUser } from "@/lib/api";
 import Index from "./pages/Index.tsx";
 import ProjectDetail from "./pages/ProjectDetail.tsx";
 import PhaseDetail from "./pages/PhaseDetail.tsx";
@@ -27,6 +29,8 @@ function AppContent() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const { triggerNewItemAction, triggerEditAction } = useShortcutActions();
+  const meQ = useQuery({ queryKey: ["me"], queryFn: getCurrentUser });
+  const me = meQ.data?.ok ? meQ.data.data : undefined;
 
   // Focus search input on current page
   const focusSearchInput = () => {
@@ -103,7 +107,7 @@ function AppContent() {
         <Route path="/activity" element={<ActivityLog />} />
         <Route path="/command" element={<AdminCommandCenter />} />
         <Route path="/archive" element={<Archive />} />
-        <Route path="/inventory" element={<InventoryTracker />} />
+        {me?.inventoryEnabled === true && <Route path="/inventory" element={<InventoryTracker />} />}
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>

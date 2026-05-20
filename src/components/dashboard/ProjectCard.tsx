@@ -1,4 +1,4 @@
-import { AlertOctagon, Archive, ArrowUpRight, Camera, MapPin, Pencil } from "lucide-react";
+import { AlertOctagon, Archive, ArrowUpRight, Camera, MapPin, MoreVertical, Pencil } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { IconWell } from "@/components/ui/icon-well";
 import { StatusBadge } from "./StatusBadge";
@@ -33,6 +33,7 @@ interface ProjectCardProps {
   onOpen?: (id: string) => void;
   onArchive?: (id: string, name: string) => void;
   onEdit?: (id: string) => void;
+  onOpenActions?: (id: string) => void;
 }
 
 const GATE_LABEL = {
@@ -68,6 +69,7 @@ export function ProjectCard({
   onOpen,
   onArchive,
   onEdit,
+  onOpenActions,
 }: ProjectCardProps) {
   const phasesByType = projectPhases(project.id, phases);
   const projectGates = gates.filter((g) => g.projectId === project.id);
@@ -109,11 +111,24 @@ export function ProjectCard({
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <StatusBadge tone={projectStatusTone(project.status)} label={STATUS_LABEL[project.status]} size="sm" />
+          {onOpenActions && (
+            <button
+              type="button"
+              aria-label={`Open actions for ${project.name}`}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenActions(project.id);
+              }}
+            >
+              <MoreVertical className="h-4 w-4" />
+            </button>
+          )}
           {project.status !== "completed" && project.status !== "archived" && onEdit && (
             <button
               type="button"
               title="Edit project"
-              className="rounded-md p-1 text-muted-foreground opacity-100 transition-colors hover:bg-muted hover:text-foreground md:opacity-0 md:group-hover:opacity-100"
+              className="hidden rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:inline-flex md:opacity-0 md:group-hover:opacity-100"
               onClick={(e) => { e.stopPropagation(); onEdit(project.id); }}
             >
               <Pencil className="h-3.5 w-3.5" />
@@ -160,7 +175,7 @@ export function ProjectCard({
             <button
               type="button"
               title="Archive project"
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="hidden items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:inline-flex"
               onClick={(e) => { e.stopPropagation(); onArchive(project.id, project.name); }}
             >
               <Archive className="h-3.5 w-3.5" />

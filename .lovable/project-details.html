@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Project TP-2026-015 — Randall Homes Sage Creek Closeout Export</title>
+  <style>
+    :root {
+      --bg: hsl(222 22% 7%);
+      --fg: hsl(210 20% 96%);
+      --card: hsl(222 18% 11%);
+      --surface-elevated: hsl(222 18% 13%);
+      --border: hsl(222 14% 18%);
+      --border-strong: hsl(222 16% 22%);
+      --primary: hsl(220 95% 53%);
+      --muted-fg: hsl(215 16% 62%);
+      --header-bg: hsl(222 18% 9%);
+    }
+    @media print {
+      :root {
+        --bg: #ffffff;
+        --fg: hsl(222 22% 12%);
+        --card: #ffffff;
+        --surface-elevated: hsl(220 20% 99%);
+        --border: hsl(220 13% 87%);
+        --border-strong: hsl(220 13% 82%);
+        --primary: hsl(220 95% 43%);
+        --muted-fg: hsl(215 16% 45%);
+        --header-bg: hsl(220 13% 96%);
+      }
+      .no-print { display: none; }
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      padding: 0 0 3rem;
+    }
+    header.report-header {
+      background: var(--header-bg);
+      border-bottom: 1px solid var(--border-strong);
+      padding: 1.5rem 2rem;
+    }
+    header.report-header h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    header.report-header .meta {
+      font-size: 0.75rem;
+      color: var(--muted-fg);
+      margin-top: 0.25rem;
+    }
+    main { max-width: 1200px; margin: 0 auto; padding: 1.5rem 2rem; }
+    section { margin-bottom: 2.5rem; }
+    h2 {
+      font-size: 0.625rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted-fg);
+      margin-bottom: 0.625rem;
+    }
+    .table-wrap { overflow-x: auto; border-radius: 0.5rem; border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      background: var(--surface-elevated);
+      color: var(--muted-fg);
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-align: left;
+      padding: 0.5rem 0.75rem;
+      white-space: nowrap;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      background: var(--card);
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8125rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+      word-break: break-word;
+    }
+    tr:last-child td { border-bottom: none; }
+    code { font-size: 0.75rem; font-family: ui-monospace, monospace; color: var(--muted-fg); }
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 1rem;
+    }
+    .photo-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      overflow: hidden;
+    }
+    .photo-card a { display: block; }
+    .photo-card img {
+      width: 100%;
+      aspect-ratio: 4/3;
+      object-fit: cover;
+      display: block;
+    }
+    .photo-card .photo-meta {
+      padding: 0.5rem 0.625rem;
+      font-size: 0.6875rem;
+      color: var(--muted-fg);
+      line-height: 1.4;
+    }
+    .photo-card .photo-meta strong { color: var(--fg); font-size: 0.75rem; }
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header class="report-header">
+    <h1>Randall Homes Sage Creek Closeout</h1>
+    <div class="meta">TP-2026-015 · 62 Sage Creek Close, Winnipeg, MB R3X 1A5 · Exported 2026-05-19</div>
+  </header>
+  <main>
+    <section id="project-details">
+  <h2>Project Details</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Project ID</th><th>Project Number</th><th>Name</th><th>Client ID</th><th>Client</th><th>Project Manager ID</th><th>Project Manager</th><th>Status</th><th>Site Address</th><th>Attic Check Status</th><th>Finish Level</th><th>Scheduled Start</th><th>Scheduled End</th><th>Completed At</th><th>Notes</th><th>Notes Last Edited By</th><th>Notes Last Edited At</th><th>Created At</th><th>Updated At</th></tr></thead>
+    <tbody><tr><td>proj-randall-perfect-archive</td><td>TP-2026-015</td><td>Randall Homes Sage Creek Closeout</td><td>client-3</td><td>Randall Homes</td><td>user-pm-1</td><td>Robert Thompson</td><td>archived</td><td>62 Sage Creek Close, Winnipeg, MB R3X 1A5</td><td>passed</td><td>4</td><td>2026-02-03</td><td>2026-03-20</td><td>2026-03-20T17:00:00.000Z</td><td>Final walkthrough completed March 18. Client sign-off received March 19. All requirements met; project archived for historical reference and audit trail review.</td><td>user-pm-1</td><td>2026-03-20T17:00:00.000Z</td><td>2026-01-15T00:00:00.000Z</td><td>2026-03-20T17:00:00.000Z</td></tr></tbody>
+  </table></div>
+</section>
+    <section id="client-details">
+  <h2>Client Details</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Client ID</th><th>Name</th><th>Primary Contact</th><th>Phone</th><th>Email</th><th>Billing Address</th><th>Notes</th><th>Archived</th><th>Created At</th><th>Updated At</th></tr></thead>
+    <tbody><tr><td>client-3</td><td>Randall Homes</td><td>William Brown</td><td>555-0103</td><td>william@randallhomes.com</td><td>456 Pembina Hwy, Building B, Winnipeg, MB R3T 2H5</td><td>Prefers sustainable materials</td><td>✗</td><td>2026-03-20T14:55:11.696Z</td><td>2026-05-09T14:55:11.696Z</td></tr></tbody>
+  </table></div>
+</section>
+    <section id="phases">
+  <h2>Phases</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Phase ID</th><th>Type</th><th>Status</th><th>Scheduled Start</th><th>Scheduled End</th><th>Closed At</th><th>Assigned Subcontractor ID</th><th>Created At</th><th>Updated At</th></tr></thead>
+    <tbody><tr><td>proj-randall-perfect-archive-phase-insulation</td><td>insulation</td><td>closed</td><td>2026-02-03</td><td>2026-02-14</td><td>2026-02-14T16:00:00.000Z</td><td>sub-5</td><td>2026-02-28T14:55:11.696Z</td><td>2026-02-14T16:00:00.000Z</td></tr><tr><td>proj-randall-perfect-archive-phase-drywall</td><td>drywall</td><td>closed</td><td>2026-02-17</td><td>2026-03-03</td><td>2026-03-03T17:00:00.000Z</td><td>sub-12</td><td>2026-02-28T14:55:11.696Z</td><td>2026-03-03T17:00:00.000Z</td></tr><tr><td>proj-randall-perfect-archive-phase-finishing</td><td>finishing</td><td>closed</td><td>2026-03-04</td><td>2026-03-18</td><td>2026-03-18T16:30:00.000Z</td><td>sub-15</td><td>2026-02-28T14:55:11.696Z</td><td>2026-03-18T16:30:00.000Z</td></tr></tbody>
+  </table></div>
+</section>
+    <section id="gates">
+  <h2>Gates</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Gate ID</th><th>Phase ID</th><th>Type</th><th>Status</th><th>Completed By User ID</th><th>Completed At</th><th>Required Photo Evidence</th><th>Notes</th><th>Call-In Date</th><th>Install Date</th><th>Call-In Subcontractor ID</th><th>Created At</th><th>Updated At</th></tr></thead>
+    <tbody><tr><td>proj-randall-perfect-archive-gate-insulation-site-check</td><td>proj-randall-perfect-archive-phase-insulation</td><td>site_check</td><td>passed</td><td>user-pm-1</td><td>2026-02-03T10:00:00.000Z</td><td>✗</td><td>Site prep complete; attic baffles staged.</td><td></td><td></td><td></td><td>2026-02-28T14:55:11.696Z</td><td>2026-02-03T10:00:00.000Z</td></tr><tr><td>proj-randall-perfect-archive-gate-insulation-inspection</td><td>proj-randall-perfect-archive-phase-insulation</td><td>inspection</td><td>passed</td><td>user-pm-1</td><td>2026-02-14T14:00:00.000Z</td><td>✗</td><td>Passed final inspection; one minor baffle correction noted and closed.</td><td></td><td></td><td></td><td>2026-02-28T14:55:11.696Z</td><td>2026-02-14T14:00:00.000Z</td></tr><tr><td>proj-randall-perfect-archive-gate-drywall-site-check</td><td>proj-randall-perfect-archive-phase-drywall</td><td>site_check</td><td>passed</td><td>user-pm-1</td><td>2026-02-17T09:00:00.000Z</td><td>✗</td><td>Backing and blocking verified; material on site.</td><td></td><td></td><td></td><td>2026-02-28T14:55:11.696Z</td><td>2026-02-17T09:00:00.000Z</td></tr><tr><td>proj-randall-perfect-archive-gate-drywall-inspection</td><td>proj-randall-perfect-archive-phase-drywall</td><td>inspection</td><td>passed</td><td>user-pm-1</td><td>2026-03-03T15:00:00.000Z</td><td>✗</td><td>Clean inspection; screw pattern corrected in stairwell per deficiency closeout.</td><td></td><td></td><td></td><td>2026-02-28T14:55:11.696Z</td><td>2026-03-03T15:00:00.000Z</td></tr><tr><td>proj-randall-perfect-archive-gate-finishing-site-check</td><td>proj-randall-perfect-archive-phase-finishing</td><td>site_check</td><td>passed</td><td>user-pm-1</td><td>2026-03-04T08:30:00.000Z</td><td>✗</td><td>Trim and paint staging complete; HVAC protection in place.</td><td></td><td></td><td></td><td>2026-02-28T14:55:11.696Z</td><td>2026-03-04T08:30:00.000Z</td></tr><tr><td>proj-randall-perfect-archive-gate-finishing-inspection</td><td>proj-randall-perfect-archive-phase-finishing</td><td>inspection</td><td>passed</td><td>user-pm-1</td><td>2026-03-18T14:00:00.000Z</td><td>✗</td><td>Ceiling skim corrections verified and closed. Client prewalk approved.</td><td></td><td></td><td></td><td>2026-02-28T14:55:11.696Z</td><td>2026-03-18T14:00:00.000Z</td></tr><tr><td>proj-randall-perfect-archive-gate-attic</td><td></td><td>attic_check</td><td>passed</td><td>user-pm-1</td><td>2026-03-19T11:00:00.000Z</td><td>✓</td><td>Attic hatch installed; photo evidence confirmed. Final card complete.</td><td>2026-03-15T09:00:00.000Z</td><td>2026-03-19T11:00:00.000Z</td><td>sub-5</td><td>2026-02-28T14:55:11.696Z</td><td>2026-03-19T11:00:00.000Z</td></tr></tbody>
+  </table></div>
+</section>
+    <section id="deficiencies">
+  <h2>Deficiencies</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Deficiency ID</th><th>Phase ID</th><th>Title</th><th>Description</th><th>Severity</th><th>Status</th><th>Assigned Subcontractor ID</th><th>Resolved At</th><th>Resolved By User ID</th><th>Created At</th><th>Updated At</th></tr></thead>
+    <tbody><tr><td>def-randall-baffle</td><td>proj-randall-perfect-archive-phase-insulation</td><td>Missed baffle bay above ensuite</td><td>Attic baffle missing above ensuite shower area. Corrected and verified before final insulation inspection.</td><td>medium</td><td>closed</td><td>sub-5</td><td>2026-02-13T16:00:00.000Z</td><td>user-pm-1</td><td>2026-02-10T10:00:00.000Z</td><td>2026-02-14T10:00:00.000Z</td></tr><tr><td>def-randall-screw</td><td>proj-randall-perfect-archive-phase-drywall</td><td>Stairwell screw-pattern correction</td><td>Stairwell drywall screw pattern did not meet spec in upper flight. Reworked and re-inspected.</td><td>medium</td><td>closed</td><td>sub-12</td><td>2026-03-02T17:00:00.000Z</td><td>user-pm-1</td><td>2026-03-01T09:00:00.000Z</td><td>2026-03-03T10:00:00.000Z</td></tr><tr><td>def-randall-skim</td><td>proj-randall-perfect-archive-phase-finishing</td><td>Ceiling skim/touch-up correction</td><td>Living room ceiling required additional skim coat and touch-up after initial finish review. Corrected and signed off.</td><td>low</td><td>closed</td><td>sub-15</td><td>2026-03-17T15:00:00.000Z</td><td>user-pm-1</td><td>2026-03-15T11:00:00.000Z</td><td>2026-03-18T10:00:00.000Z</td></tr></tbody>
+  </table></div>
+</section>
+    <section id="photo-evidence">
+  <h2>Photo Evidence</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Photo ID</th><th>Phase ID</th><th>Gate ID</th><th>Deficiency ID</th><th>Purpose</th><th>Object Key</th><th>Content Hash</th><th>MIME Type</th><th>File Size Bytes</th><th>Status</th><th>Uploaded By User ID</th><th>Created At</th><th>Updated At</th></tr></thead>
+    <tbody><tr>
+        <td><a href="photos/insulation/photo-randall-baffle-before-deficiency_before.jpeg" target="_blank">photo-randall-baffle-before</a></td>
+        <td>proj-randall-perfect-archive-phase-insulation</td>
+        <td>proj-randall-perfect-archive-gate-insulation-inspection</td>
+        <td>def-randall-baffle</td>
+        <td>deficiency_before</td>
+        <td>seed/randall-perfect/baffle-before.jpg</td>
+        <td>seed-randall-baffle-before</td>
+        <td>image/jpeg</td>
+        <td>685000</td>
+        <td>confirmed</td>
+        <td>user-pm-1</td>
+        <td>2026-02-10T10:00:00.000Z</td>
+        <td>2026-02-10T10:00:00.000Z</td>
+      </tr><tr>
+        <td><a href="photos/insulation/photo-randall-baffle-after-deficiency_after.jpeg" target="_blank">photo-randall-baffle-after</a></td>
+        <td>proj-randall-perfect-archive-phase-insulation</td>
+        <td></td>
+        <td>def-randall-baffle</td>
+        <td>deficiency_after</td>
+        <td>seed/randall-perfect/baffle-after.jpg</td>
+        <td>seed-randall-baffle-after</td>
+        <td>image/jpeg</td>
+        <td>682000</td>
+        <td>confirmed</td>
+        <td>user-pm-1</td>
+        <td>2026-02-13T16:00:00.000Z</td>
+        <td>2026-02-13T16:00:00.000Z</td>
+      </tr><tr>
+        <td><a href="photos/drywall/photo-randall-screw-before-deficiency_before.jpeg" target="_blank">photo-randall-screw-before</a></td>
+        <td>proj-randall-perfect-archive-phase-drywall</td>
+        <td>proj-randall-perfect-archive-gate-drywall-inspection</td>
+        <td>def-randall-screw</td>
+        <td>deficiency_before</td>
+        <td>seed/randall-perfect/screw-before.jpg</td>
+        <td>seed-randall-screw-before</td>
+        <td>image/jpeg</td>
+        <td>712000</td>
+        <td>confirmed</td>
+        <td>user-pm-1</td>
+        <td>2026-03-01T09:00:00.000Z</td>
+        <td>2026-03-01T09:00:00.000Z</td>
+      </tr><tr>
+        <td><a href="photos/drywall/photo-randall-screw-after-deficiency_after.jpeg" target="_blank">photo-randall-screw-after</a></td>
+        <td>proj-randall-perfect-archive-phase-drywall</td>
+        <td></td>
+        <td>def-randall-screw</td>
+        <td>deficiency_after</td>
+        <td>seed/randall-perfect/screw-after.jpg</td>
+        <td>seed-randall-screw-after</td>
+        <td>image/jpeg</td>
+        <td>708000</td>
+        <td>confirmed</td>
+        <td>user-pm-1</td>
+        <td>2026-03-02T17:00:00.000Z</td>
+        <td>2026-03-02T17:00:00.000Z</td>
+      </tr><tr>
+        <td><a href="photos/finishing/photo-randall-skim-before-deficiency_before.jpeg" target="_blank">photo-randall-skim-before</a></td>
+        <td>proj-randall-perfect-archive-phase-finishing</td>
+        <td>proj-randall-perfect-archive-gate-finishing-inspection</td>
+        <td>def-randall-skim</td>
+        <td>deficiency_before</td>
+        <td>seed/randall-perfect/skim-before.jpg</td>
+        <td>seed-randall-skim-before</td>
+        <td>image/jpeg</td>
+        <td>695000</td>
+        <td>confirmed</td>
+        <td>user-pm-1</td>
+        <td>2026-03-15T11:00:00.000Z</td>
+        <td>2026-03-15T11:00:00.000Z</td>
+      </tr><tr>
+        <td><a href="photos/finishing/photo-randall-skim-after-deficiency_after.jpeg" target="_blank">photo-randall-skim-after</a></td>
+        <td>proj-randall-perfect-archive-phase-finishing</td>
+        <td></td>
+        <td>def-randall-skim</td>
+        <td>deficiency_after</td>
+        <td>seed/randall-perfect/skim-after.jpg</td>
+        <td>seed-randall-skim-after</td>
+        <td>image/jpeg</td>
+        <td>691000</td>
+        <td>confirmed</td>
+        <td>user-pm-1</td>
+        <td>2026-03-17T15:00:00.000Z</td>
+        <td>2026-03-17T15:00:00.000Z</td>
+      </tr><tr>
+        <td><a href="photos/insulation/photo-randall-insulation-general-general.jpeg" target="_blank">photo-randall-insulation-general</a></td>
+        <td>proj-randall-perfect-archive-phase-insulation</td>
+        <td></td>
+        <td></td>
+        <td>general</td>
+        <td>seed/randall-perfect/insulation-general.jpg</td>
+        <td>seed-randall-insulation</td>
+        <td>image/jpeg</td>
+        <td>645000</td>
+        <td>confirmed</td>
+        <td>user-pm-1</td>
+        <td>2026-02-05T14:00:00.000Z</td>
+        <td>2026-02-05T14:00:00.000Z</td>
+      </tr><tr>
+        <td><a href="photos/drywall/photo-randall-drywall-general-general.jpeg" target="_blank">photo-randall-drywall-general</a></td>
+        <td>proj-randall-perfect-archive-phase-drywall</td>
+        <td></td>
+        <td></td>
+        <td>general</td>
+        <td>seed/randall-perfect/drywall-general.jpg</td>
+        <td>seed-randall-drywall</td>
+        <td>image/jpeg</td>
+        <td>638000</td>
+        <td>confirmed</td>
+        <td>user-pm-1</td>
+        <td>2026-02-20T13:00:00.000Z</td>
+        <td>2026-02-20T13:00:00.000Z</td>
+      </tr><tr>
+        <td><a href="photos/finishing/photo-randall-finishing-general-general.jpeg" target="_blank">photo-randall-finishing-general</a></td>
+        <td>proj-randall-perfect-archive-phase-finishing</td>
+        <td></td>
+        <td></td>
+        <td>general</td>
+        <td>seed/randall-perfect/finishing-general.jpg</td>
+        <td>seed-randall-finishing</td>
+        <td>image/jpeg</td>
+        <td>655000</td>
+        <td>confirmed</td>
+        <td>user-pm-1</td>
+        <td>2026-03-10T15:00:00.000Z</td>
+        <td>2026-03-10T15:00:00.000Z</td>
+      </tr><tr>
+        <td><a href="photos/attic-check/photo-randall-attic-attic_check.jpeg" target="_blank">photo-randall-attic</a></td>
+        <td></td>
+        <td>proj-randall-perfect-archive-gate-attic</td>
+        <td></td>
+        <td>attic_check</td>
+        <td>seed/randall-perfect/attic.jpg</td>
+        <td>seed-randall-attic</td>
+        <td>image/jpeg</td>
+        <td>612000</td>
+        <td>confirmed</td>
+        <td>user-pm-1</td>
+        <td>2026-03-19T11:00:00.000Z</td>
+        <td>2026-03-19T11:00:00.000Z</td>
+      </tr></tbody>
+  </table></div>
+</section>
+    <section id="photo-gallery">
+  <h2>Photo Gallery</h2>
+  <div class="gallery-grid"><div class="photo-card">
+  <a href="photos/insulation/photo-randall-baffle-before-deficiency_before.jpeg" target="_blank">
+    <img src="photos/insulation/photo-randall-baffle-before-deficiency_before.jpeg" alt="deficiency_before" loading="lazy">
+  </a>
+  <div class="photo-meta">
+    <strong>deficiency_before</strong><br>
+    insulation · 2026-02-10
+  </div>
+</div>
+<div class="photo-card">
+  <a href="photos/insulation/photo-randall-baffle-after-deficiency_after.jpeg" target="_blank">
+    <img src="photos/insulation/photo-randall-baffle-after-deficiency_after.jpeg" alt="deficiency_after" loading="lazy">
+  </a>
+  <div class="photo-meta">
+    <strong>deficiency_after</strong><br>
+    insulation · 2026-02-13
+  </div>
+</div>
+<div class="photo-card">
+  <a href="photos/drywall/photo-randall-screw-before-deficiency_before.jpeg" target="_blank">
+    <img src="photos/drywall/photo-randall-screw-before-deficiency_before.jpeg" alt="deficiency_before" loading="lazy">
+  </a>
+  <div class="photo-meta">
+    <strong>deficiency_before</strong><br>
+    drywall · 2026-03-01
+  </div>
+</div>
+<div class="photo-card">
+  <a href="photos/drywall/photo-randall-screw-after-deficiency_after.jpeg" target="_blank">
+    <img src="photos/drywall/photo-randall-screw-after-deficiency_after.jpeg" alt="deficiency_after" loading="lazy">
+  </a>
+  <div class="photo-meta">
+    <strong>deficiency_after</strong><br>
+    drywall · 2026-03-02
+  </div>
+</div>
+<div class="photo-card">
+  <a href="photos/finishing/photo-randall-skim-before-deficiency_before.jpeg" target="_blank">
+    <img src="photos/finishing/photo-randall-skim-before-deficiency_before.jpeg" alt="deficiency_before" loading="lazy">
+  </a>
+  <div class="photo-meta">
+    <strong>deficiency_before</strong><br>
+    finishing · 2026-03-15
+  </div>
+</div>
+<div class="photo-card">
+  <a href="photos/finishing/photo-randall-skim-after-deficiency_after.jpeg" target="_blank">
+    <img src="photos/finishing/photo-randall-skim-after-deficiency_after.jpeg" alt="deficiency_after" loading="lazy">
+  </a>
+  <div class="photo-meta">
+    <strong>deficiency_after</strong><br>
+    finishing · 2026-03-17
+  </div>
+</div>
+<div class="photo-card">
+  <a href="photos/insulation/photo-randall-insulation-general-general.jpeg" target="_blank">
+    <img src="photos/insulation/photo-randall-insulation-general-general.jpeg" alt="general" loading="lazy">
+  </a>
+  <div class="photo-meta">
+    <strong>general</strong><br>
+    insulation · 2026-02-05
+  </div>
+</div>
+<div class="photo-card">
+  <a href="photos/drywall/photo-randall-drywall-general-general.jpeg" target="_blank">
+    <img src="photos/drywall/photo-randall-drywall-general-general.jpeg" alt="general" loading="lazy">
+  </a>
+  <div class="photo-meta">
+    <strong>general</strong><br>
+    drywall · 2026-02-20
+  </div>
+</div>
+<div class="photo-card">
+  <a href="photos/finishing/photo-randall-finishing-general-general.jpeg" target="_blank">
+    <img src="photos/finishing/photo-randall-finishing-general-general.jpeg" alt="general" loading="lazy">
+  </a>
+  <div class="photo-meta">
+    <strong>general</strong><br>
+    finishing · 2026-03-10
+  </div>
+</div>
+<div class="photo-card">
+  <a href="photos/attic-check/photo-randall-attic-attic_check.jpeg" target="_blank">
+    <img src="photos/attic-check/photo-randall-attic-attic_check.jpeg" alt="attic_check" loading="lazy">
+  </a>
+  <div class="photo-meta">
+    <strong>attic_check</strong><br>
+    general · 2026-03-19
+  </div>
+</div></div>
+</section>
+    <section id="subcontractors">
+  <h2>Subcontractors</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Subcontractor ID</th><th>Display Name</th><th>Company Name</th><th>Trade</th><th>Phone</th><th>Email</th><th>Active</th><th>Notes</th><th>Created At</th><th>Updated At</th></tr></thead>
+    <tbody><tr><td>sub-5</td><td>Sarah Johnson</td><td>Eco Insulation</td><td>insulation</td><td>555-0205</td><td>sarah@ecoinsulation.example</td><td>✓</td><td></td><td>2026-02-18T14:55:11.696Z</td><td>2026-05-14T14:55:11.696Z</td></tr><tr><td>sub-12</td><td>Jenny Kim</td><td>Perfect Finish Drywall</td><td>drywall</td><td>555-0212</td><td>jenny@perfectfinish.example</td><td>✓</td><td></td><td>2026-03-02T14:55:11.696Z</td><td>2026-05-13T14:55:11.696Z</td></tr><tr><td>sub-15</td><td>Steve Anderson</td><td>Premier Paint</td><td>finishing</td><td>555-0215</td><td>steve@premierpaint.example</td><td>✓</td><td></td><td>2026-02-21T14:55:11.696Z</td><td>2026-05-14T14:55:11.696Z</td></tr></tbody>
+  </table></div>
+</section>
+    <section id="project-equipment">
+  <h2>Project Equipment</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Equipment Log ID</th><th>Item Key</th><th>Item Label</th><th>Quantity</th><th>Updated At</th></tr></thead>
+    <tbody><tr><td>equipment-randall-baker-scaffold</td><td>baker_scaffold</td><td>Baker Scaffolds</td><td>1</td><td>2026-03-18T16:30:00.000Z</td></tr><tr><td>equipment-randall-drywall-lift</td><td>drywall_lift</td><td>Drywall Lifts</td><td>1</td><td>2026-03-18T16:30:00.000Z</td></tr><tr><td>equipment-randall-extension-ladders</td><td>extension_ladders</td><td>Extension Ladders</td><td>2</td><td>2026-03-18T16:30:00.000Z</td></tr><tr><td>equipment-randall-site-lighting</td><td>site_lighting</td><td>Temporary Site Lighting</td><td>3</td><td>2026-03-18T16:30:00.000Z</td></tr></tbody>
+  </table></div>
+</section>
+    <section id="phase-materials">
+  <h2>Phase Materials</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Material Log ID</th><th>Phase ID</th><th>Phase Type</th><th>Item Key</th><th>Item Label</th><th>Quantity</th><th>Updated At</th></tr></thead>
+    <tbody><tr><td>material-randall-insulation-r20-batt</td><td>proj-randall-perfect-archive-phase-insulation</td><td>insulation</td><td>r20_batt</td><td>R-20 Batts</td><td>28</td><td>2026-02-14T16:00:00.000Z</td></tr><tr><td>material-randall-insulation-r22-batt</td><td>proj-randall-perfect-archive-phase-insulation</td><td>insulation</td><td>r22_batt</td><td>R-22 Batts</td><td>16</td><td>2026-02-14T16:00:00.000Z</td></tr><tr><td>material-randall-drywall-half-inch</td><td>proj-randall-perfect-archive-phase-drywall</td><td>drywall</td><td>half_inch_regular_board</td><td>1/2&quot; Regular Board</td><td>108</td><td>2026-03-03T17:00:00.000Z</td></tr><tr><td>material-randall-drywall-type-x</td><td>proj-randall-perfect-archive-phase-drywall</td><td>drywall</td><td>type_x_board</td><td>5/8&quot; Type X Board</td><td>32</td><td>2026-03-03T17:00:00.000Z</td></tr><tr><td>material-randall-finishing-mud</td><td>proj-randall-perfect-archive-phase-finishing</td><td>finishing</td><td>all_purpose_mud</td><td>All-Purpose Mud</td><td>18</td><td>2026-03-18T16:30:00.000Z</td></tr><tr><td>material-randall-finishing-corner-bead</td><td>proj-randall-perfect-archive-phase-finishing</td><td>finishing</td><td>outside_corner_bead</td><td>90° Outside Corner Bead</td><td>48</td><td>2026-03-18T16:30:00.000Z</td></tr></tbody>
+  </table></div>
+</section>
+    <section id="inventory-pickups">
+  <h2>Inventory Pickups</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Pickup ID</th><th>Picked Up By User ID</th><th>Created At</th><th>Kind</th><th>Item Key</th><th>Item Label</th><th>Quantity</th><th>Note</th></tr></thead>
+    <tbody></tbody>
+  </table></div>
+</section>
+    <section id="phase-task-checklist">
+  <h2>Phase Task Checklist</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Checklist Item ID</th><th>Phase ID</th><th>Phase Type</th><th>Text</th><th>Completed</th><th>Created At</th><th>Updated At</th></tr></thead>
+    <tbody><tr><td>checklist-randall-insulation-baffles</td><td>proj-randall-perfect-archive-phase-insulation</td><td>insulation</td><td>Confirm attic baffles are installed at all eaves</td><td>✓</td><td>2026-02-01T08:00:00.000Z</td><td>2026-02-03T10:00:00.000Z</td></tr><tr><td>checklist-randall-insulation-vapor</td><td>proj-randall-perfect-archive-phase-insulation</td><td>insulation</td><td>Verify vapor barrier lap seals at exterior corners</td><td>✓</td><td>2026-02-01T08:00:00.000Z</td><td>2026-02-13T16:00:00.000Z</td></tr></tbody>
+  </table></div>
+</section>
+    <section id="activity-log">
+  <h2>Activity Log</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Event ID</th><th>Timestamp</th><th>Actor ID</th><th>Entity Type</th><th>Entity ID</th><th>Action</th><th>Previous Value</th><th>Next Value</th><th>Metadata</th></tr></thead>
+    <tbody><tr>
+        <td>audit-randall-archived</td>
+        <td>2026-05-17T14:55:11.696Z</td>
+        <td>user-admin</td>
+        <td>project</td>
+        <td>proj-randall-perfect-archive</td>
+        <td>archive_project</td>
+        <td><code>&quot;completed&quot;</code></td>
+        <td><code>&quot;archived&quot;</code></td>
+        <td><code></code></td>
+      </tr><tr>
+        <td>audit-randall-deficiencies-closed-3</td>
+        <td>2026-05-16T14:55:11.696Z</td>
+        <td>user-pm-1</td>
+        <td>deficiency</td>
+        <td>def-randall-skim</td>
+        <td>updated</td>
+        <td><code>{&quot;status&quot;:&quot;resolved&quot;}</code></td>
+        <td><code>{&quot;status&quot;:&quot;closed&quot;}</code></td>
+        <td><code></code></td>
+      </tr><tr>
+        <td>audit-randall-deficiencies-closed-2</td>
+        <td>2026-05-16T14:55:11.696Z</td>
+        <td>user-pm-1</td>
+        <td>deficiency</td>
+        <td>def-randall-screw</td>
+        <td>updated</td>
+        <td><code>{&quot;status&quot;:&quot;resolved&quot;}</code></td>
+        <td><code>{&quot;status&quot;:&quot;closed&quot;}</code></td>
+        <td><code></code></td>
+      </tr><tr>
+        <td>audit-randall-deficiencies-closed</td>
+        <td>2026-05-16T14:55:11.696Z</td>
+        <td>user-pm-1</td>
+        <td>deficiency</td>
+        <td>def-randall-baffle</td>
+        <td>updated</td>
+        <td><code>{&quot;status&quot;:&quot;resolved&quot;}</code></td>
+        <td><code>{&quot;status&quot;:&quot;closed&quot;}</code></td>
+        <td><code></code></td>
+      </tr><tr>
+        <td>audit-randall-project-completed</td>
+        <td>2026-05-15T14:55:11.696Z</td>
+        <td>user-pm-1</td>
+        <td>project</td>
+        <td>proj-randall-perfect-archive</td>
+        <td>complete_project</td>
+        <td><code>&quot;active&quot;</code></td>
+        <td><code>&quot;completed&quot;</code></td>
+        <td><code></code></td>
+      </tr><tr>
+        <td>audit-randall-attic-completed</td>
+        <td>2026-05-14T14:55:11.696Z</td>
+        <td>user-pm-1</td>
+        <td>gate</td>
+        <td>proj-randall-perfect-archive-gate-attic</td>
+        <td>attic_gate_updated</td>
+        <td><code></code></td>
+        <td><code></code></td>
+        <td><code></code></td>
+      </tr><tr>
+        <td>audit-randall-finishing-phase-closed</td>
+        <td>2026-05-11T14:55:11.696Z</td>
+        <td>user-pm-1</td>
+        <td>phase</td>
+        <td>proj-randall-perfect-archive-phase-finishing</td>
+        <td>phase_closed</td>
+        <td><code></code></td>
+        <td><code></code></td>
+        <td><code></code></td>
+      </tr><tr>
+        <td>audit-randall-finishing-inspection-passed</td>
+        <td>2026-05-11T14:55:11.696Z</td>
+        <td>user-pm-1</td>
+        <td>gate</td>
+        <td>proj-randall-perfect-archive-gate-finishing-inspection</td>
+        <td>inspection_passed</td>
+        <td><code></code></td>
+        <td><code></code></td>
+        <td><code>{&quot;phaseId&quot;:&quot;proj-randall-perfect-archive-phase-finishing&quot;,&quot;inspectorName&quot;:&quot;Sam Taylor&quot;}</code></td>
+      </tr><tr>
+        <td>audit-randall-skim-resolved</td>
+        <td>2026-05-09T14:55:11.696Z</td>
+        <td>user-pm-1</td>
+        <td>deficiency</td>
+        <td>def-randall-skim</td>
+        <td>updated</td>
+        <td><code>{&quot;status&quot;:&quot;open&quot;}</code></td>
+        <td><code>{&quot;status&quot;:&quot;resolved&quot;}</code></td>
+        <td><code></code></td>
+      </tr><tr>
+        <td>audit-randall-skim-deficiency-created</td>
+        <td>2026-05-07T14:55:11.696Z</td>
+        <td>user-pm-1</td>
+        <td>deficiency</td>
+        <td>def-randall-skim</td>
+        <td>create_deficiency</td>
+        <td><code></code></td>
+        <td><code></code></td>
+        <td><code></code></td>
+      </tr><tr>
+        <td>audit-randall-finishing-site-check</td>
+        <td>2026-04-29T14:55:11.696Z</td>
+        <td>user-pm-1</td>
+        <td>gate</td>
+        <td>proj-randall-perfect-archive-gate-finishing-site-check</td>
+        <td>site_check_completed</td>
+        <td><code></code></td>
+        <td><code></code></td>
+        <td><code></code></td>
+      </tr><tr>
+        <td>audit-randall-drywall-phase-closed</td>
+        <td>2026-04-17T14:55:11.696Z</td>
+        <td>user-pm-1</td>
+        <td>phase</td>
+        <td>proj-randall-perfect-archive-phase-drywall</td>
+        <td>phase_closed</td>
+        <td><code></code></td>
+        <td><code></code></td>
+        <td><code></code></td>
+      </tr><tr>
+        <td>audit-randall-drywall-inspection-passed</td>
+        <td>2026-04-17T14:55:11.696Z</td>
+        <td>user-pm-1</td>
+        <td>gate</td>
+        <td>proj-randall-perfect-archive-gate-drywall-inspection</td>
+        <td>inspection_passed</td>
+        <td><code></code></td>
+        <td><code></code></td>
+        <td><code>{&quot;phaseId&quot;:&quot;proj-randall-perfect-archive-phase-drywall&quot;,&quot;inspectorName&quot;:&quot;Chris Reed&quot;}</code></td>
+      </tr><tr>
+        <td>audit-randall-screw-resolved</td>
+        <td>2026-04-16T14:55:11.696Z</td>
+        <td>user-pm-1</td>
+        <td>deficiency</td>
+        <td>def-randall-screw</td>
+        <td>updated</td>
+        <td><code>{&quot;status&quot;:&quot;open&quot;}</code></td>
+        <td><code>{&quot;status&quot;:&quot;resolved&quot;}</code></td>
+        <td><code></code></td>
+      </tr><tr>
+        <td>audit-randall-screw-deficiency-created</td>
+        <td>2026-04-14T14:55:11.696Z</td>
+        <td>user-pm-1</td>
+        <td>deficiency</td>
+        <td>def-randall-screw</td>
+        <td>create_deficiency</td>
+        <td><code></code></td>
+        <td><code></code></td>
+        <td><code></code></td>
+      </tr><tr>
+        <td>audit-randall-drywall-site-check</td>
+        <td>2026-04-04T14:55:11.696Z</td>
+        <td>user-pm-1</td>
+        <td>gate</td>
+        <td>proj-randall-perfect-archive-gate-drywall-site-check</td>
+        <td>site_check_completed</td>
+        <td><code></code></td>
+        <td><code></code></td>
+        <td><code></code></td>
+      </tr><tr>
+        <td>audit-randall-insulation-phase-closed</td>
+        <td>2026-03-24T14:55:11.696Z</td>
+        <td>user-pm-1</td>
+        <td>phase</td>
+        <td>proj-randall-perfect-archive-phase-insulation</td>
+        <td>phase_closed</td>
+        <td><code></code></td>
+        <td><code></code></td>
+        <td><code></code></td>
+      </tr><tr>
+        <td>audit-randall-inspection-passed</td>
+        <td>2026-03-24T14:55:11.696Z</td>
+        <td>user-pm-1</td>
+        <td>gate</td>
+        <td>proj-randall-perfect-archive-gate-insulation-inspection</td>
+        <td>inspection_passed</td>
+        <td><code></code></td>
+        <td><code></code></td>
+        <td><code>{&quot;phaseId&quot;:&quot;proj-randall-perfect-archive-phase-insulation&quot;,&quot;inspectorName&quot;:&quot;Pat Miller&quot;}</code></td>
+      </tr><tr>
+        <td>audit-randall-baffle-resolved</td>
+        <td>2026-03-23T14:55:11.696Z</td>
+        <td>user-pm-1</td>
+        <td>deficiency</td>
+        <td>def-randall-baffle</td>
+        <td>updated</td>
+        <td><code>{&quot;status&quot;:&quot;open&quot;}</code></td>
+        <td><code>{&quot;status&quot;:&quot;resolved&quot;}</code></td>
+        <td><code></code></td>
+      </tr><tr>
+        <td>audit-randall-baffle-deficiency-created</td>
+        <td>2026-03-20T14:55:11.696Z</td>
+        <td>user-pm-1</td>
+        <td>deficiency</td>
+        <td>def-randall-baffle</td>
+        <td>create_deficiency</td>
+        <td><code></code></td>
+        <td><code></code></td>
+        <td><code></code></td>
+      </tr><tr>
+        <td>audit-randall-insulation-site-check</td>
+        <td>2026-03-12T14:55:11.696Z</td>
+        <td>user-pm-1</td>
+        <td>gate</td>
+        <td>proj-randall-perfect-archive-gate-insulation-site-check</td>
+        <td>site_check_completed</td>
+        <td><code></code></td>
+        <td><code></code></td>
+        <td><code></code></td>
+      </tr><tr>
+        <td>audit-randall-activate</td>
+        <td>2026-03-10T14:55:11.696Z</td>
+        <td>user-pm-1</td>
+        <td>project</td>
+        <td>proj-randall-perfect-archive</td>
+        <td>activate_project</td>
+        <td><code>&quot;draft&quot;</code></td>
+        <td><code>&quot;active&quot;</code></td>
+        <td><code></code></td>
+      </tr><tr>
+        <td>audit-create-randall</td>
+        <td>2026-02-28T14:55:11.696Z</td>
+        <td>user-admin</td>
+        <td>project</td>
+        <td>proj-randall-perfect-archive</td>
+        <td>create_project</td>
+        <td><code></code></td>
+        <td><code></code></td>
+        <td><code></code></td>
+      </tr></tbody>
+  </table></div>
+</section>
+  </main>
+</body>
+</html>

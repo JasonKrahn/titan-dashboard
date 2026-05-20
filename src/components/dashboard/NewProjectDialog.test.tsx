@@ -30,7 +30,7 @@ const project: Project = {
   clientId: "client-1",
   projectNumber: "TP-2026-001",
   name: "Oak Bend",
-  siteAddress: "14 Oak Bend Way",
+  siteAddress: "99 Mill Rock Road",
   status: "active",
   scheduledStart: "2026-04-25T17:34:25.551Z",
   scheduledEnd: "2026-06-10T17:34:25.551Z",

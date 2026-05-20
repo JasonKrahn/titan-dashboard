@@ -10,7 +10,7 @@ function project(overrides: Partial<Project> & { id: string }): Project {
     clientId: "client-1",
     projectNumber: `TP-${overrides.id}`,
     name: overrides.id,
-    siteAddress: "100 Main St",
+    siteAddress: "123 Main St, Winnipeg, MB R3C 1A3",
     status: "active",
     atticCheckStatus: "passed",
     createdAt: NOW,

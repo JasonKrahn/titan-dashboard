@@ -37,6 +37,7 @@ export function InspectionResultDialog({
   const [inspectionDate, setInspectionDate] = useState<Date | undefined>(undefined);
   const [notes, setNotes] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
+  const [photos, setPhotos] = useState<File[]>([]);
   const [deficiencyTitle, setDeficiencyTitle] = useState("");
   const [deficiencyDescription, setDeficiencyDescription] = useState("");
   const [deficiencySeverity, setDeficiencySeverity] = useState<"low" | "medium" | "high" | "critical">("medium");
@@ -47,9 +48,11 @@ export function InspectionResultDialog({
     setInspectionDate(undefined);
     setNotes("");
     setPhoto(null);
+    setPhotos([]);
     setDeficiencyTitle("");
     setDeficiencyDescription("");
     setDeficiencySeverity("medium");
+    if (fileRef.current) fileRef.current.value = "";
   };
 
   const mutation = useMutation({
@@ -104,6 +107,7 @@ export function InspectionResultDialog({
       inspectionDate: inspectionDate ? format(inspectionDate, "yyyy-MM-dd") : "",
       notes: notes.trim() || undefined,
       photo: photo ?? undefined,
+      photos: mode === "passed" ? photos : undefined,
       deficiencyTitle: mode === "failed" ? deficiencyTitle.trim() : undefined,
       deficiencyDescription: mode === "failed" ? deficiencyDescription.trim() : undefined,
       deficiencySeverity: mode === "failed" ? deficiencySeverity : undefined,
@@ -167,8 +171,18 @@ export function InspectionResultDialog({
               id="ir-photo"
               type="file"
               accept="image/*"
+              multiple={mode === "passed"}
               className="hidden"
-              onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+              onChange={(e) => {
+                const selected = Array.from(e.target.files ?? []);
+                if (mode === "passed") {
+                  setPhotos(selected);
+                  setPhoto(null);
+                } else {
+                  setPhoto(selected[0] ?? null);
+                  setPhotos([]);
+                }
+              }}
             />
             <Button
               type="button"
@@ -176,10 +190,12 @@ export function InspectionResultDialog({
               className="justify-start gap-2"
               onClick={() => fileRef.current?.click()}
             >
-              {photo ? (
+              {(mode === "passed" ? photos.length > 0 : !!photo) ? (
                 <>
                   <Camera className="h-4 w-4" />
-                  {photo.name}
+                  {mode === "passed"
+                    ? photos.length === 1 ? photos[0].name : `${photos.length} photos selected`
+                    : photo?.name}
                 </>
               ) : (
                 <>
@@ -188,13 +204,17 @@ export function InspectionResultDialog({
                 </>
               )}
             </Button>
-            {photo && (
+            {(mode === "passed" ? photos.length > 0 : !!photo) && (
               <button
                 type="button"
                 className="text-xs text-muted-foreground underline text-left"
-                onClick={() => { setPhoto(null); if (fileRef.current) fileRef.current.value = ""; }}
+                onClick={() => {
+                  setPhoto(null);
+                  setPhotos([]);
+                  if (fileRef.current) fileRef.current.value = "";
+                }}
               >
-                Remove photo
+                Remove {mode === "passed" && photos.length > 1 ? "photos" : "photo"}
               </button>
             )}
           </div>

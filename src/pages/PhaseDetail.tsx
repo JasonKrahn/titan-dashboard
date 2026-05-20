@@ -1,15 +1,32 @@
 import { useMemo, useState, useEffect, useRef, type RefObject } from "react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   AlertTriangle,
-  
   Camera,
   Calendar,
   CheckCircle2,
   Clock,
   FileText,
+  GripVertical,
   Image as ImageIcon,
   Plus,
   ShieldCheck,
@@ -19,7 +36,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { BadgeTone } from "@/components/ui/badge";
+import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -48,7 +65,8 @@ import { PhotoViewerDialog, type PhotoViewerItem } from "@/components/dashboard/
 import { PhotoUploadDialog } from "@/components/dashboard/PhotoUploadDialog";
 import { QuantityStepperModal } from "@/components/dashboard/QuantityStepperModal";
 import { DatePicker } from "@/components/ui/date-picker";
-import { assignSubcontractorToPhase, createPhaseChecklistItem, deletePhaseChecklistItem, getCurrentUser, getPhase, getPhaseMaterials, getPhotoViewUrl, getProjectInventoryPickups, markPhaseReadyForInspection, updatePhase, updatePhaseChecklistItem, updatePhaseMaterials } from "@/lib/api";
+import { assignSubcontractorToPhase, createPhaseChecklistItem, deletePhaseChecklistItem, getCurrentUser, getPhase, getPhaseMaterials, getPhotoViewUrl, getProjectInventoryPickups, markPhaseReadyForInspection, unblockSiteCheck, updatePhase, updatePhaseChecklistItem, updatePhaseMaterials } from "@/lib/api";
+import type { UnblockSiteCheckInput } from "@/lib/api";
 import { formatDateWithOptions } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import type { Deficiency, Gate, InventoryPickup, MaterialLog, PhaseChecklistItem, PhaseStatus, PhotoEvidence } from "@/lib/types";
@@ -63,14 +81,6 @@ import {
   relativeTime,
 } from "@/lib/derived";
 import { PHASE_MATERIAL_CATALOGS } from "@/lib/inventoryCatalog";
-
-const GATE_BADGE_CLASS: Record<StatusTone, string> = {
-  "not-started": "bg-status-not-started/15 text-status-not-started",
-  "in-progress": "bg-status-in-progress/15 text-status-in-progress",
-  ready: "bg-status-ready/15 text-status-ready",
-  blocked: "bg-status-blocked/15 text-status-blocked",
-  closed: "bg-status-closed/15 text-status-closed",
-};
 
 function formatMaterialPickupSummary(pickup: InventoryPickup, itemKeys: Set<string>, labelByKey: Map<string, string>) {
   const parts = pickup.items
@@ -87,6 +97,67 @@ const EMPTY_PHASE_LOOKUPS = {
   subcontractors: [],
   materials: [],
 };
+
+function SortableTaskRow({
+  task,
+  onToggle,
+  onDelete,
+}: {
+  task: PhaseChecklistItem;
+  onToggle: (task: PhaseChecklistItem) => void;
+  onDelete: (task: PhaseChecklistItem) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: task.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2"
+    >
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+        aria-label="Drag to reorder"
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <Checkbox
+        checked={task.completed}
+        onCheckedChange={() => onToggle(task)}
+        id={`task-${task.id}`}
+      />
+      <label
+        htmlFor={`task-${task.id}`}
+        className={cn(
+          "flex-1 cursor-pointer text-sm",
+          task.completed && "line-through text-muted-foreground"
+        )}
+      >
+        {task.text}
+      </label>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-7 w-7 shrink-0"
+        aria-label={`Delete ${task.text}`}
+        onClick={() => onDelete(task)}
+      >
+        <X className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
 
 export default function PhaseDetailPage() {
   const { projectId, phaseId } = useParams<{ projectId: string; phaseId: string }>();
@@ -132,6 +203,17 @@ export default function PhaseDetailPage() {
     },
   });
 
+  const unblockSiteCheckMutation = useMutation({
+    mutationFn: (input: UnblockSiteCheckInput) => unblockSiteCheck(input),
+    onSuccess: (res) => {
+      if (res.ok) {
+        qc.invalidateQueries({ queryKey: ["project", projectId] });
+        qc.invalidateQueries({ queryKey: ["phase", phaseId] });
+        return;
+      }
+    },
+  });
+
   const updatePhaseMutation = useMutation({
     mutationFn: ({ phaseId, scheduledStart, scheduledEnd }: { phaseId: string; scheduledStart?: string; scheduledEnd?: string }) =>
       updatePhase({ phaseId, scheduledStart, scheduledEnd }),
@@ -148,6 +230,7 @@ export default function PhaseDetailPage() {
   const [siteCheckOpen, setSiteCheckOpen] = useState(false);
   const [siteBlockOpen, setSiteBlockOpen] = useState(false);
   const [siteUnblockOpen, setSiteUnblockOpen] = useState(false);
+  const [siteClearedPhotoUploadOpen, setSiteClearedPhotoUploadOpen] = useState(false);
   const [inspectionResultOpen, setInspectionResultOpen] = useState(false);
   const [inspectionResultMode, setInspectionResultMode] = useState<"passed" | "failed">("passed");
   const [selectedGateId, setSelectedGateId] = useState<string | null>(null);
@@ -170,6 +253,75 @@ export default function PhaseDetailPage() {
   const [materialDraft, setMaterialDraft] = useState<Record<string, number>>({});
   const [materialSaveError, setMaterialSaveError] = useState<string | null>(null);
   const [newTaskText, setNewTaskText] = useState("");
+  const [orderedTasks, setOrderedTasks] = useState<PhaseChecklistItem[]>([]);
+  const [deficiencyPhotoUrls, setDeficiencyPhotoUrls] = useState<Record<string, string>>({});
+  const [gatePhotoUrls, setGatePhotoUrls] = useState<Record<string, string>>({});
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  useEffect(() => {
+    if (detail?.checklistItems) {
+      setOrderedTasks(detail.checklistItems);
+    }
+  }, [detail?.checklistItems]);
+
+  useEffect(() => {
+    if (!detail) return;
+    
+    const deficiencyPhotos = detail.photoEvidence.filter(
+      (p) => p.purpose === "deficiency_before" || p.purpose === "deficiency_after"
+    );
+    
+    if (deficiencyPhotos.length === 0) return;
+
+    deficiencyPhotos.forEach((photo) => {
+      getPhotoViewUrl(photo.id).then((res) => {
+        if (res.ok) {
+          setDeficiencyPhotoUrls((prev) => ({
+            ...prev,
+            [photo.id]: res.data.url,
+          }));
+        }
+      });
+    });
+  }, [detail]);
+
+  useEffect(() => {
+    if (!detail) return;
+    
+    const gatePhotos = detail.photoEvidence.filter(
+      (p) => p.gateId !== undefined
+    );
+    
+    if (gatePhotos.length === 0) return;
+
+    gatePhotos.forEach((photo) => {
+      getPhotoViewUrl(photo.id).then((res) => {
+        if (res.ok) {
+          setGatePhotoUrls((prev) => ({
+            ...prev,
+            [photo.id]: res.data.url,
+          }));
+        }
+      });
+    });
+  }, [detail]);
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setOrderedTasks((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
 
   const saveMaterialsMutation = useMutation({
     mutationFn: async ({
@@ -266,6 +418,17 @@ export default function PhaseDetailPage() {
       return { photo, caption: `${PHASE_LABEL[detail.phase.type]}, ${purposeLabel}` };
     });
   }, [detail]);
+  useEffect(() => {
+    if (!detail || detail.phase.status === "closed") {
+      registerEditAction(null);
+    } else {
+      registerEditAction(() => setScheduleOpen(true));
+    }
+
+    return () => {
+      registerEditAction(null);
+    };
+  }, [detail?.phase.status, registerEditAction]);
 
   if (phaseQ.isLoading) {
     return (
@@ -358,17 +521,6 @@ export default function PhaseDetailPage() {
 
     saveMaterialsMutation.mutate({ phaseId: phase.id, projectId: project.id, changes });
   };
-  useEffect(() => {
-    if (detail && detail.phase.status !== "closed") {
-      registerEditAction(() => setScheduleOpen(true));
-    } else {
-      registerEditAction(null);
-    }
-
-    return () => {
-      registerEditAction(null);
-    };
-  }, [detail?.phase.status, registerEditAction]);
   const showReadyButton =
     !!inspectionGate &&
     (phase.status === "in_progress" || (phase.status === "blocked" && inspectionGate.status === "failed")) &&
@@ -433,7 +585,7 @@ export default function PhaseDetailPage() {
             label: "Site cleared",
             icon: <ShieldCheck className="h-4 w-4" />,
             helperText: "Clear the site check block",
-            onClick: () => setSiteUnblockOpen(true),
+            onClick: () => setSiteClearedPhotoUploadOpen(true),
           },
         ]
       : []),
@@ -631,25 +783,33 @@ export default function PhaseDetailPage() {
                           <span className="flex items-center gap-2">
                             <span className="truncate text-sm font-semibold text-foreground">{GATE_LABEL[g.type]}</span>
                             {gatePhotos.length > 0 ? (
-                              <button
-                                type="button"
+                              <Badge
+                                tone={statusToTone(gateStatusTone(g.status))}
+                                appearance="soft"
+                                size="xs"
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`${gatePhotos.length} photo${gatePhotos.length === 1 ? "" : "s"}`}
+                                className="cursor-pointer hover:opacity-80"
                                 onClick={() => { setSelectedPhoto(gatePhotos[0]); setPhotoViewerOpen(true); }}
-                                className={cn(
-                                  "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide cursor-pointer hover:opacity-80",
-                                  GATE_BADGE_CLASS[gateStatusTone(g.status)],
-                                )}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    setSelectedPhoto(gatePhotos[0]);
+                                    setPhotoViewerOpen(true);
+                                  }
+                                }}
                               >
                                 {gatePhotos.length} photo{gatePhotos.length === 1 ? "" : "s"}
-                              </button>
+                              </Badge>
                             ) : (
-                              <span
-                                className={cn(
-                                  "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                                  GATE_BADGE_CLASS[gateStatusTone(g.status)],
-                                )}
+                              <Badge
+                                tone={statusToTone(gateStatusTone(g.status))}
+                                appearance="soft"
+                                size="xs"
                               >
                                 {STATUS_LABEL[g.status]}
-                              </span>
+                              </Badge>
                             )}
                           </span>
                           <span className="mt-1 block text-xs text-muted-foreground">
@@ -675,7 +835,7 @@ export default function PhaseDetailPage() {
                           </div>
                         )}
                         {g.type === "site_check" && g.status === "blocked" && (
-                          <Button size="sm" variant="outline" className="h-8 px-2 text-xs" onClick={() => setSiteUnblockOpen(true)}>
+                          <Button size="sm" variant="outline" className="h-8 px-2 text-xs" onClick={() => setSiteClearedPhotoUploadOpen(true)}>
                             Site Cleared
                           </Button>
                         )}
@@ -762,16 +922,35 @@ export default function PhaseDetailPage() {
                           {gatePhotos.length > 0 ? (
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <Camera className="h-3.5 w-3.5" />
-                              {gatePhotos.map((p) => (
-                                <button
-                                  key={p.id}
-                                  onClick={() => { setSelectedPhoto(p); setPhotoViewerOpen(true); }}
-                                  className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/30 px-2 py-0.5 text-xs hover:bg-muted/50"
-                                >
-                                  <ImageIcon className="h-3 w-3" />
-                                  {PURPOSE_LABEL[p.purpose] ?? p.purpose}
-                                </button>
-                              ))}
+                              {gatePhotos.map((p) => {
+                                const photoUrl = gatePhotoUrls[p.id];
+                                const label = PURPOSE_LABEL[p.purpose] ?? p.purpose;
+                                return (
+                                  <button
+                                    key={p.id}
+                                    onClick={() => { setSelectedPhoto(p); setPhotoViewerOpen(true); }}
+                                    aria-label={`View ${label} photo`}
+                                    className="relative h-12 w-12 shrink-0 rounded-md border border-border bg-muted/30 overflow-hidden hover:ring-2 hover:ring-primary transition-all"
+                                  >
+                                    {photoUrl ? (
+                                      <>
+                                        <img
+                                          src={photoUrl}
+                                          alt={label}
+                                          className="h-full w-full object-cover"
+                                        />
+                                        <span className="absolute bottom-1 right-1 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded font-medium">
+                                          {label}
+                                        </span>
+                                      </>
+                                    ) : (
+                                      <div className="h-full w-full flex items-center justify-center">
+                                        <div className="h-full w-full bg-muted animate-pulse" />
+                                      </div>
+                                    )}
+                                  </button>
+                                );
+                              })}
                             </div>
                           ) : (
                             <div className="flex items-center gap-1.5">
@@ -797,7 +976,7 @@ export default function PhaseDetailPage() {
                         )}
                         {g.type === "site_check" && g.status === "blocked" && (
                           <div className="mt-4">
-                            <Button size="sm" variant="outline" className="flex-1" onClick={() => setSiteUnblockOpen(true)}>
+                            <Button size="sm" variant="outline" className="flex-1" onClick={() => setSiteClearedPhotoUploadOpen(true)}>
                               <ShieldCheck className="mr-1.5 h-4 w-4" /> Site Cleared
                             </Button>
                           </div>
@@ -922,41 +1101,23 @@ export default function PhaseDetailPage() {
                       className="flex-1"
                     />
                   </div>
-                  {checklistItems.length === 0 ? (
+                  {orderedTasks.length === 0 ? (
                     <div className="text-sm text-muted-foreground">No tasks yet</div>
                   ) : (
-                    <div className="space-y-2">
-                      {checklistItems.map((task) => (
-                        <div
-                          key={task.id}
-                          className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2"
-                        >
-                          <Checkbox
-                            checked={task.completed}
-                            onCheckedChange={() => toggleTask(task)}
-                            id={`task-${task.id}`}
-                          />
-                          <label
-                            htmlFor={`task-${task.id}`}
-                            className={cn(
-                              "flex-1 cursor-pointer text-sm",
-                              task.completed && "line-through text-muted-foreground"
-                            )}
-                          >
-                            {task.text}
-                          </label>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 shrink-0"
-                            aria-label={`Delete ${task.text}`}
-                            onClick={() => deleteTask(task)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                      <SortableContext items={orderedTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                        <div className="space-y-2">
+                          {orderedTasks.map((task) => (
+                            <SortableTaskRow
+                              key={task.id}
+                              task={task}
+                              onToggle={toggleTask}
+                              onDelete={deleteTask}
+                            />
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      </SortableContext>
+                    </DndContext>
                   )}
                 </Card>
 
@@ -1099,41 +1260,23 @@ export default function PhaseDetailPage() {
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
-                {checklistItems.length === 0 ? (
+                {orderedTasks.length === 0 ? (
                   <div className="text-sm text-muted-foreground">No tasks yet</div>
                 ) : (
-                  <div className="space-y-2">
-                    {checklistItems.map((task) => (
-                      <div
-                        key={task.id}
-                        className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2"
-                      >
-                        <Checkbox
-                          checked={task.completed}
-                          onCheckedChange={() => toggleTask(task)}
-                          id={`mobile-task-${task.id}`}
-                        />
-                        <label
-                          htmlFor={`mobile-task-${task.id}`}
-                          className={cn(
-                            "flex-1 cursor-pointer text-sm",
-                            task.completed && "line-through text-muted-foreground"
-                          )}
-                        >
-                          {task.text}
-                        </label>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 shrink-0"
-                          aria-label={`Delete ${task.text}`}
-                          onClick={() => deleteTask(task)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                    <SortableContext items={orderedTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                      <div className="space-y-2">
+                        {orderedTasks.map((task) => (
+                          <SortableTaskRow
+                            key={task.id}
+                            task={task}
+                            onToggle={toggleTask}
+                            onDelete={deleteTask}
+                          />
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </SortableContext>
+                  </DndContext>
                 )}
               </div>
             </Card>
@@ -1244,7 +1387,7 @@ export default function PhaseDetailPage() {
           {/* Deficiencies */}
           <TabsContent value="deficiencies">
             {project.status !== "completed" && project.status !== "archived" && (
-              <div className="mb-4 flex justify-end">
+              <div className="mb-4 flex justify-start">
                 <Button size="sm" onClick={() => { setDeficiencyDialogMode("create"); setSelectedDeficiencyId(null); setDeficiencyDialogOpen(true); }}>
                   Add Deficiency
                 </Button>
@@ -1272,16 +1415,35 @@ export default function PhaseDetailPage() {
                           <div className="mt-1.5"><SeverityBadge severity={d.severity} size="xs" /></div>
                           {deficiencyPhotos.length > 0 && (
                             <div className="mt-2 flex gap-2">
-                              {deficiencyPhotos.map((p) => (
-                                <button
-                                  key={p.id}
-                                  onClick={() => { setSelectedPhoto(p); setPhotoViewerOpen(true); }}
-                                  className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/30 px-2 py-1 text-xs hover:bg-muted/50"
-                                >
-                                  <ImageIcon className="h-3 w-3" />
-                                  {p.purpose === "deficiency_before" ? "Before" : "After"}
-                                </button>
-                              ))}
+                              {deficiencyPhotos.map((p) => {
+                                const photoUrl = deficiencyPhotoUrls[p.id];
+                                const label = p.purpose === "deficiency_before" ? "Before" : "After";
+                                return (
+                                  <button
+                                    key={p.id}
+                                    onClick={() => { setSelectedPhoto(p); setPhotoViewerOpen(true); }}
+                                    aria-label={`View ${label} photo`}
+                                    className="relative h-12 w-12 shrink-0 rounded-md border border-border bg-muted/30 overflow-hidden hover:ring-2 hover:ring-primary transition-all"
+                                  >
+                                    {photoUrl ? (
+                                      <>
+                                        <img
+                                          src={photoUrl}
+                                          alt={label}
+                                          className="h-full w-full object-cover"
+                                        />
+                                        <span className="absolute bottom-1 right-1 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded font-medium">
+                                          {label}
+                                        </span>
+                                      </>
+                                    ) : (
+                                      <div className="h-full w-full flex items-center justify-center">
+                                        <Skeleton className="h-full w-full" />
+                                      </div>
+                                    )}
+                                  </button>
+                                );
+                              })}
                             </div>
                           )}
                         </div>
@@ -1291,7 +1453,7 @@ export default function PhaseDetailPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-7 px-2 text-xs"
+                                className="h-9 sm:h-7 px-3 sm:px-2 text-xs"
                                 onClick={() => { setDeficiencyDialogMode("edit"); setSelectedDeficiencyId(d.id); setDeficiencyDialogOpen(true); }}
                               >
                                 Edit
@@ -1299,7 +1461,7 @@ export default function PhaseDetailPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-7 px-2 text-xs"
+                                className="h-9 sm:h-7 px-3 sm:px-2 text-xs"
                                 onClick={() => { setDeficiencyDialogMode("resolve"); setSelectedDeficiencyId(d.id); setDeficiencyDialogOpen(true); }}
                               >
                                 Resolve
@@ -1320,7 +1482,7 @@ export default function PhaseDetailPage() {
 
           {/* Photos */}
           <TabsContent value="photos">
-            <div className="mb-4 flex justify-end">
+            <div className="mb-4 flex justify-start">
               <Button size="sm" onClick={() => setPhotoUploadOpen(true)}>
                 <Camera className="mr-1.5 h-4 w-4" />
                 Upload Photo
@@ -1394,6 +1556,24 @@ export default function PhaseDetailPage() {
               phaseId={phase.id}
               projectId={project.id}
               phaseLabel={PHASE_LABEL[phase.type]}
+              photoEvidence={detail.photoEvidence}
+            />
+            <PhotoUploadDialog
+              open={siteClearedPhotoUploadOpen}
+              onOpenChange={setSiteClearedPhotoUploadOpen}
+              phases={[phase]}
+              defaultPhaseId={phase.id}
+              projectId={project.id}
+              deficiencies={detail.deficiencies}
+              defaultPurpose="site_check"
+              hidePurpose={true}
+              onUploadSuccess={() => {
+                unblockSiteCheckMutation.mutate({
+                  gateId: siteGate.id,
+                  phaseId: phase.id,
+                  projectId: project.id,
+                });
+              }}
             />
           </>
         ) : null;
@@ -1598,7 +1778,7 @@ function PhotoCard({
           </div>
         )}
       </button>
-      <div className="flex flex-col gap-0.5 p-2">
+      <div className="flex flex-col items-start gap-0.5 p-2">
         <span className="text-xs font-medium">{PURPOSE_LABEL[photo.purpose] ?? photo.purpose}</span>
         {photo.fileSizeBytes && (
           <span className="text-[10px] text-muted-foreground">{(photo.fileSizeBytes / 1024).toFixed(0)} KB</span>

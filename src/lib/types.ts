@@ -9,6 +9,7 @@ export interface User {
   email: string;
   phone?: string;
   adminOverviewEnabled?: boolean;
+  inventoryEnabled?: boolean;
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -304,6 +305,7 @@ export interface CompleteInspectionInput {
   inspectionDate: string;
   notes?: string;
   photo?: File;
+  photos?: File[];
   deficiencyTitle?: string;
   deficiencyDescription?: string;
   deficiencySeverity?: DeficiencySeverity;

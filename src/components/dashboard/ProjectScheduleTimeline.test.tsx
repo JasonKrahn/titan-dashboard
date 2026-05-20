@@ -9,7 +9,7 @@ function project(overrides: Partial<Project> = {}): Project {
     clientId: "client-1",
     projectNumber: "TP-2026-001",
     name: "Oak Bend",
-    siteAddress: "14 Oak Bend Way",
+    siteAddress: "99 Mill Rock Road",
     status: "active",
     scheduledStart: "2026-05-01",
     scheduledEnd: "2026-05-31",
