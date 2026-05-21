@@ -54,6 +54,7 @@ async function getProject(id: string): Promise<ApiResult<ProjectDetail>>;
 async function getPhase(id: string): Promise<ApiResult<PhaseDetail>>;
 async function getPhaseMaterials(phaseId: string): Promise<ApiResult<MaterialLog[]>>;
 async function getProjectEquipment(projectId: string): Promise<ApiResult<EquipmentLog[]>>;
+async function getCompanyHardwareStock(): Promise<ApiResult<CompanyHardwareStock[]>>;
 async function getAuditEvents(input: { entityType?: AuditEntityType; entityId?: string; projectId?: string }): Promise<ApiResult<AuditEvent[]>>;
 async function getSubcontractorContacts(): Promise<ApiResult<SubcontractorContact[]>>;
 async function getPhotoViewUrl(photoId: string): Promise<ApiResult<{ url: string; expiresAt: string }>>;
@@ -77,6 +78,7 @@ async function updateProject(id: string, input: UpdateProjectInput): Promise<Api
 async function updatePhase(id: string, input: UpdatePhaseInput): Promise<ApiResult<Phase>>;
 async function updatePhaseMaterial(input: { phaseId: string; projectId: string; itemKey: string; quantity: number }): Promise<ApiResult<MaterialLog>>;
 async function updateProjectEquipment(input: { projectId: string; itemKey: string; quantity: number }): Promise<ApiResult<EquipmentLog>>;
+async function updateCompanyHardwareStock(input: { itemKey: string; totalQuantity: number }): Promise<ApiResult<CompanyHardwareStock>>;
 async function updatePhaseGate(input: UpdateGateInput): Promise<ApiResult<Gate>>;
 async function completeInspection(input: CompleteInspectionInput): Promise<ApiResult<Gate>>;
 async function completeAtticCheck(input: CompleteAtticCheckInput): Promise<ApiResult<Project>>;
@@ -192,6 +194,8 @@ interface UploadPhotoEvidenceInput {
 - PM calls must fail with `FORBIDDEN` for Admin-only mutations.
 - PM calls must fail with `FORBIDDEN` when the target project is not assigned to the current Project Manager.
 - `inventory_viewer` calls to `getProjects()` always return only `status: "active"` projects regardless of filters, with cross-PM visibility. All write functions must fail with `FORBIDDEN` for `inventory_viewer` role.
+- `updateCompanyHardwareStock()` is Admin-only and must reject totals below the currently allocated reusable equipment quantity.
+- `updateProjectEquipment()` and batch equipment updates must reject positive quantity deltas that exceed company hardware availability; reductions are always allowed.
 - `deletePhotoEvidence()` must write an audit event and fail with `STATE_VIOLATION` if the photo is the sole evidence for a passed gate or completed attic check.
 - `deactivateUser()` must fail with `STATE_VIOLATION` if the user has active assigned projects, unless projects are reassigned first.
 - `reassignProject()` must write an audit event recording the previous and new PM.
