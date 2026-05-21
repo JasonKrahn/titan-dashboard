@@ -148,23 +148,34 @@ function findEventContext(event: AuditEvent, lookups: AuditLookups) {
   const gate = event.entityType === "gate"
     ? lookups.gates.find((item) => item.id === event.entityId)
     : undefined;
-  const deficiency = event.entityType === "deficiency"
+  const directDeficiency = event.entityType === "deficiency"
     ? lookups.deficiencies.find((item) => item.id === event.entityId)
     : undefined;
+  const photo = event.entityType === "photo_evidence"
+    ? lookups.photoEvidence?.find((item) => item.id === event.entityId)
+    : undefined;
+  const deficiency =
+    directDeficiency ??
+    (photo?.deficiencyId ? lookups.deficiencies.find((item) => item.id === photo.deficiencyId) : undefined);
 
   const derivedPhase =
     phase ??
     (deficiency?.phaseId ? lookups.phases.find((item) => item.id === deficiency.phaseId) : undefined) ??
-    (gate?.phaseId ? lookups.phases.find((item) => item.id === gate.phaseId) : undefined);
+    (gate?.phaseId ? lookups.phases.find((item) => item.id === gate.phaseId) : undefined) ??
+    (photo?.phaseId ? lookups.phases.find((item) => item.id === photo.phaseId) : undefined);
+  const derivedGate =
+    gate ??
+    (photo?.gateId ? lookups.gates.find((item) => item.id === photo.gateId) : undefined);
   const derivedProject =
     project ??
     (derivedPhase ? lookups.projects.find((item) => item.id === derivedPhase.projectId) : undefined) ??
-    (gate ? lookups.projects.find((item) => item.id === gate.projectId) : undefined) ??
-    (deficiency ? lookups.projects.find((item) => item.id === deficiency.projectId) : undefined);
+    (derivedGate ? lookups.projects.find((item) => item.id === derivedGate.projectId) : undefined) ??
+    (deficiency ? lookups.projects.find((item) => item.id === deficiency.projectId) : undefined) ??
+    (photo ? lookups.projects.find((item) => item.id === photo.projectId) : undefined);
 
   return {
     deficiency,
-    gate,
+    gate: derivedGate,
     phase: derivedPhase,
     project: derivedProject,
   };
@@ -254,11 +265,13 @@ export function resolveProjectId(
   phases: { id: string; projectId: string }[],
   gates: { id: string; projectId: string }[],
   deficiencies: { id: string; projectId: string }[],
+  photoEvidence: { id: string; projectId: string }[] = [],
 ) {
   if (event.entityType === "project") return event.entityId;
   if (event.entityType === "phase") return phases.find((item) => item.id === event.entityId)?.projectId;
   if (event.entityType === "gate") return gates.find((item) => item.id === event.entityId)?.projectId;
   if (event.entityType === "deficiency") return deficiencies.find((item) => item.id === event.entityId)?.projectId;
+  if (event.entityType === "photo_evidence") return photoEvidence.find((item) => item.id === event.entityId)?.projectId;
   return undefined;
 }
 

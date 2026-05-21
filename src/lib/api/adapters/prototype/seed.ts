@@ -5,6 +5,7 @@ import type {
   AppNotification,
   AuditEvent,
   ClientRecord,
+  CompanyHardwareStock,
   Deficiency,
   EquipmentLog,
   Gate,
@@ -29,6 +30,7 @@ export const seedUsers: User[] = [
     fullName: "Jason Krahn",
     email: "james@titanpm.io",
     adminOverviewEnabled: false,
+    clientActivityRailEnabled: false,
     inventoryEnabled: false,
     active: true,
     createdAt: iso(-days(120)),
@@ -1491,6 +1493,25 @@ export const seedEquipmentLogs: EquipmentLog[] = [
   },
 ];
 
+export const seedCompanyHardwareStock: CompanyHardwareStock[] = [
+  { itemKey: "five_by_five_frame_sections", totalQuantity: 20, allocatedQuantity: 0, availableQuantity: 20, updatedAt: iso(-days(7)) },
+  { itemKey: "cross_braces", totalQuantity: 20, allocatedQuantity: 0, availableQuantity: 20, updatedAt: iso(-days(7)) },
+  { itemKey: "leveling_jacks", totalQuantity: 16, allocatedQuantity: 0, availableQuantity: 16, updatedAt: iso(-days(7)) },
+  { itemKey: "coupling_pins", totalQuantity: 20, allocatedQuantity: 0, availableQuantity: 20, updatedAt: iso(-days(7)) },
+  { itemKey: "aluminum_walk_planks", totalQuantity: 10, allocatedQuantity: 0, availableQuantity: 10, updatedAt: iso(-days(7)) },
+  { itemKey: "guardrails", totalQuantity: 12, allocatedQuantity: 0, availableQuantity: 12, updatedAt: iso(-days(7)) },
+  { itemKey: "baker_scaffold", totalQuantity: 4, allocatedQuantity: 0, availableQuantity: 4, updatedAt: iso(-days(7)) },
+  { itemKey: "four_foot_step_ladders", totalQuantity: 8, allocatedQuantity: 0, availableQuantity: 8, updatedAt: iso(-days(7)) },
+  { itemKey: "six_foot_step_ladders", totalQuantity: 8, allocatedQuantity: 0, availableQuantity: 8, updatedAt: iso(-days(7)) },
+  { itemKey: "eight_foot_step_ladders", totalQuantity: 6, allocatedQuantity: 0, availableQuantity: 6, updatedAt: iso(-days(7)) },
+  { itemKey: "extension_ladders", totalQuantity: 6, allocatedQuantity: 0, availableQuantity: 6, updatedAt: iso(-days(7)) },
+  { itemKey: "drywall_lift", totalQuantity: 4, allocatedQuantity: 0, availableQuantity: 4, updatedAt: iso(-days(7)) },
+  { itemKey: "stilts", totalQuantity: 6, allocatedQuantity: 0, availableQuantity: 6, updatedAt: iso(-days(7)) },
+  { itemKey: "site_lighting", totalQuantity: 10, allocatedQuantity: 0, availableQuantity: 10, updatedAt: iso(-days(7)) },
+  { itemKey: "portable_heaters", totalQuantity: 4, allocatedQuantity: 0, availableQuantity: 4, updatedAt: iso(-days(7)) },
+  { itemKey: "air_scrubbers", totalQuantity: 4, allocatedQuantity: 0, availableQuantity: 4, updatedAt: iso(-days(7)) },
+];
+
 export const seedInventoryPickups: InventoryPickup[] = [
   {
     id: "pickup-finishing-active-mixed",
@@ -1520,6 +1541,17 @@ export const seedInventoryPickups: InventoryPickup[] = [
     ],
     note: "Full closeout pickup after final walkthrough.",
     createdAt: iso(-days(1)),
+  },
+  {
+    id: "pickup-randall-closeout",
+    projectId: "proj-randall-perfect-archive",
+    pickedUpByUserId: "user-inventory-1",
+    items: [
+      { kind: "equipment", itemKey: "site_lighting", quantity: 1 },
+      { kind: "material", itemKey: "all_purpose_mud", quantity: 3 },
+    ],
+    note: "Closeout pickup completed before archive.",
+    createdAt: "2026-03-19T20:00:00.000Z",
   },
 ];
 
@@ -2502,6 +2534,7 @@ export const seedAuditEvents: AuditEvent[] = [
   audit("audit-randall-finishing-phase-closed", "phase", "proj-randall-perfect-archive-phase-finishing", "phase_closed", "user-pm-1", 8),
   audit("audit-randall-attic-completed", "gate", "proj-randall-perfect-archive-gate-attic", "attic_gate_updated", "user-pm-1", 5),
   audit("audit-randall-attic-photo", "photo_evidence", "photo-randall-attic", "photo_uploaded", "user-pm-1", 5),
+  audit("audit-randall-closeout-pickup", "project", "proj-randall-perfect-archive", "inventory_picked_up", "user-inventory-1", 5, { metadata: { pickupId: "pickup-randall-closeout", summary: "Temporary Site Lighting ×1, All-Purpose Mud ×3", note: "Closeout pickup completed before archive." } }),
   audit("audit-randall-project-completed", "project", "proj-randall-perfect-archive", "complete_project", "user-pm-1", 4, { previousValue: "active", nextValue: "completed" }),
   audit("audit-randall-deficiencies-closed", "deficiency", "def-randall-baffle", "updated", "user-pm-1", 3, { previousValue: { status: "resolved" }, nextValue: { status: "closed" } }),
   audit("audit-randall-deficiencies-closed-2", "deficiency", "def-randall-screw", "updated", "user-pm-1", 3, { previousValue: { status: "resolved" }, nextValue: { status: "closed" } }),

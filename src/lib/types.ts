@@ -9,6 +9,7 @@ export interface User {
   email: string;
   phone?: string;
   adminOverviewEnabled?: boolean;
+  clientActivityRailEnabled?: boolean;
   inventoryEnabled?: boolean;
   active: boolean;
   createdAt: string;
@@ -97,6 +98,14 @@ export interface EquipmentLog {
   projectId: string;
   itemKey: string;
   quantity: number;
+  updatedAt: string;
+}
+
+export interface CompanyHardwareStock {
+  itemKey: string;
+  totalQuantity: number;
+  allocatedQuantity: number;
+  availableQuantity: number;
   updatedAt: string;
 }
 

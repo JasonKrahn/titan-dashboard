@@ -356,6 +356,7 @@ const DashboardPage = () => {
             onArchiveProject={(id, name) => setArchiveTarget({ id, name })}
             onEditProject={(id) => setEditProjectId(id)}
             isAdmin={isAdmin}
+            clientActivityRailEnabled={me?.clientActivityRailEnabled === true}
           />
         ) : activeView === "clients" || activeView === "client-projects" ? (
           <ClientDirectory

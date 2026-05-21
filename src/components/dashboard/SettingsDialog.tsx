@@ -31,7 +31,7 @@ export function SettingsDialog({ open, onOpenChange, user, onUpdated }: Settings
         fullName: user.fullName,
         phone: user.phone,
         email: user.email,
-        ...(user.role === "admin" ? { adminOverviewEnabled: user.adminOverviewEnabled === true, inventoryEnabled: user.inventoryEnabled === true } : {}),
+        ...(user.role === "admin" ? { adminOverviewEnabled: user.adminOverviewEnabled === true, clientActivityRailEnabled: user.clientActivityRailEnabled === true, inventoryEnabled: user.inventoryEnabled === true } : {}),
       });
     } else {
       setForm(empty);
@@ -183,6 +183,17 @@ export function SettingsDialog({ open, onOpenChange, user, onUpdated }: Settings
                   id="admin-overview"
                   checked={form.adminOverviewEnabled === true}
                   onCheckedChange={(enabled) => setField("adminOverviewEnabled", enabled)}
+                />
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <div className="space-y-0.5">
+                  <Label htmlFor="client-activity-rail">Client activity rail</Label>
+                  <p className="text-xs text-muted-foreground">Show recent activity beside client projects</p>
+                </div>
+                <Switch
+                  id="client-activity-rail"
+                  checked={form.clientActivityRailEnabled === true}
+                  onCheckedChange={(enabled) => setField("clientActivityRailEnabled", enabled)}
                 />
               </div>
               <div className="flex items-center justify-between py-2">

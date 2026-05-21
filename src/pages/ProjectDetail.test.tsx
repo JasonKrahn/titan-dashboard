@@ -5,13 +5,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import ProjectDetailPage from "./ProjectDetail";
 import type { InventoryPickup, ProjectDetail } from "@/lib/types";
 
-const { getProject, getCurrentUser, getPhotoViewUrl, getUsers, setCurrentUser, getProjectEquipment, getPhaseMaterials, getPhase, getProjectInventoryPickups, updateProjectEquipmentBatch, exportProjectZip } = vi.hoisted(() => ({
+const { getProject, getCurrentUser, getPhotoViewUrl, getUsers, setCurrentUser, getProjectEquipment, getCompanyHardwareStock, getPhaseMaterials, getPhase, getProjectInventoryPickups, updateProjectEquipmentBatch, exportProjectZip } = vi.hoisted(() => ({
   getProject: vi.fn(),
   getCurrentUser: vi.fn(),
   getPhotoViewUrl: vi.fn(),
   getUsers: vi.fn(),
   setCurrentUser: vi.fn(),
   getProjectEquipment: vi.fn(),
+  getCompanyHardwareStock: vi.fn(),
   getPhaseMaterials: vi.fn(),
   getPhase: vi.fn(),
   getProjectInventoryPickups: vi.fn(),
@@ -29,6 +30,7 @@ vi.mock("@/lib/api", async () => {
     getUsers,
     setCurrentUser,
     getProjectEquipment,
+    getCompanyHardwareStock,
     getPhaseMaterials,
     getPhase,
     getProjectInventoryPickups,
@@ -188,7 +190,17 @@ describe("ProjectDetailPage schedule", () => {
     getPhotoViewUrl.mockResolvedValue({ ok: true, data: { url: "https://example.com/photo.jpg" } });
     getUsers.mockResolvedValue({ ok: true, data: [] });
     getProjectEquipment.mockResolvedValue({ ok: true, data: equipmentLogs });
-    getPhaseMaterials.mockResolvedValue({ ok: true, data: [materialLog] });
+    getCompanyHardwareStock.mockResolvedValue({
+      ok: true,
+      data: [
+        { itemKey: "baker_scaffold", totalQuantity: 3, allocatedQuantity: 2, availableQuantity: 1, updatedAt: "2026-05-01T00:00:00.000Z" },
+        { itemKey: "drywall_lift", totalQuantity: 2, allocatedQuantity: 1, availableQuantity: 1, updatedAt: "2026-05-01T00:00:00.000Z" },
+      ],
+    });
+    getPhaseMaterials.mockImplementation((phaseId: string) => Promise.resolve({
+      ok: true,
+      data: [{ ...materialLog, id: `material-${phaseId}-r20-batt`, phaseId }],
+    }));
     getPhase.mockResolvedValue({ ok: true, data: { phase: {}, project: {}, gates: [], deficiencies: [], photoEvidence: [], subcontractors: [], auditEvents: [], checklistItems: [] } });
     getProjectInventoryPickups.mockResolvedValue({ ok: true, data: [] });
     exportProjectZip.mockResolvedValue(undefined);
@@ -220,7 +232,7 @@ describe("ProjectDetailPage schedule", () => {
     renderPage();
 
     expect(await screen.findByRole("heading", { name: "Project Photos" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Upload Photo" })).toHaveClass("hidden", "md:inline-flex");
+    expect(screen.getByRole("button", { name: "Upload Photos" })).toHaveClass("hidden", "md:inline-flex");
   });
 
   it("opens the mobile project action sheet from the floating project action button with the fixed action order", async () => {
@@ -234,7 +246,7 @@ describe("ProjectDetailPage schedule", () => {
     const labels = within(dialog)
       .getAllByRole("button")
       .map((button) => button.textContent?.replace(/\s+/g, " ").trim())
-      .filter(Boolean);
+      .filter((label) => label && label !== "Close");
 
     expect(labels).toEqual([
       "Upload photoAdd photo evidence to this project",
@@ -331,12 +343,12 @@ describe("ProjectDetailPage schedule", () => {
     const photosSection = heading.closest("section") as HTMLElement;
     expect(within(photosSection).getAllByText("Attic Check").length).toBeGreaterThan(0);
     expect(within(photosSection).getByText("General")).toBeInTheDocument();
-    expect(within(photosSection).queryByText("Before")).not.toBeInTheDocument();
+    expect(within(photosSection).getByText("Before")).toBeInTheDocument();
 
     fireEvent.click(await within(photosSection).findByRole("button", { name: "Attic Check" }));
 
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(await screen.findByText("Photo 1 of 2")).toBeInTheDocument();
+    expect(await screen.findByText("Photo 1 of 3")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Next photo" })).toBeInTheDocument();
   });
 
@@ -459,8 +471,8 @@ describe("ProjectDetailPage schedule", () => {
     expect(atticDetailsCard).not.toBeNull();
     const atticDetails = within(atticDetailsCard!);
     expect(await screen.findByRole("heading", { name: "Attic Check Details" })).toBeInTheDocument();
-    expect(atticDetails.getByText("May 1, 2026")).toBeInTheDocument();
-    expect(atticDetails.getByText("May 8, 2026")).toBeInTheDocument();
+    expect(atticDetails.getByText("May 2, 2026")).toBeInTheDocument();
+    expect(atticDetails.getByText("May 9, 2026")).toBeInTheDocument();
     expect(atticDetails.getByText("Dale Insulation · Thermal Shield")).toBeInTheDocument();
     expect(atticDetails.getByText("Attic access confirmed for the morning shift.")).toBeInTheDocument();
     const deficienciesHeading = screen.getByRole("heading", { name: "Deficiencies" });
@@ -474,7 +486,8 @@ describe("ProjectDetailPage schedule", () => {
 
     renderPage();
 
-    fireEvent.click(await screen.findByRole("button", { name: /View Full Project Details/i }));
+    const detailButtons = await screen.findAllByRole("button", { name: /View Full Project Details/i });
+    fireEvent.click(detailButtons[0]);
 
     expect(await screen.findByRole("heading", { name: "Phases" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Enable Editing" })).toBeInTheDocument();
@@ -540,7 +553,17 @@ describe("ProjectDetailPage equipment", () => {
     getPhotoViewUrl.mockResolvedValue({ ok: true, data: { url: "https://example.com/photo.jpg" } });
     getUsers.mockResolvedValue({ ok: true, data: [] });
     getProjectEquipment.mockResolvedValue({ ok: true, data: equipmentLogs });
-    getPhaseMaterials.mockResolvedValue({ ok: true, data: [materialLog] });
+    getCompanyHardwareStock.mockResolvedValue({
+      ok: true,
+      data: [
+        { itemKey: "baker_scaffold", totalQuantity: 3, allocatedQuantity: 2, availableQuantity: 1, updatedAt: "2026-05-01T00:00:00.000Z" },
+        { itemKey: "drywall_lift", totalQuantity: 2, allocatedQuantity: 1, availableQuantity: 1, updatedAt: "2026-05-01T00:00:00.000Z" },
+      ],
+    });
+    getPhaseMaterials.mockImplementation((phaseId: string) => Promise.resolve({
+      ok: true,
+      data: [{ ...materialLog, id: `material-${phaseId}-r20-batt`, phaseId }],
+    }));
     getPhase.mockResolvedValue({ ok: true, data: { phase: {}, project: {}, gates: [], deficiencies: [], photoEvidence: [], subcontractors: [], auditEvents: [], checklistItems: [] } });
     getProjectInventoryPickups.mockResolvedValue({ ok: true, data: [] });
     exportProjectZip.mockResolvedValue(undefined);
@@ -592,8 +615,7 @@ describe("ProjectDetailPage equipment", () => {
     expect(await screen.findByText("Picked up:")).toBeInTheDocument();
     expect(screen.getAllByText("Baker Scaffolds ×1").length).toBeGreaterThan(0);
     expect(screen.getByText("Inventory picked up")).toBeInTheDocument();
-    expect(screen.getByText("Picked up: Baker Scaffolds ×1")).toBeInTheDocument();
-    expect(screen.getByText("“North side”")).toBeInTheDocument();
+    expect(screen.getByText("Picked up: Baker Scaffolds ×1 · Note: North side")).toBeInTheDocument();
   });
 
   it("exports equipment, pickups, and phase materials with the project archive", async () => {
@@ -629,10 +651,72 @@ describe("ProjectDetailPage equipment", () => {
       {
         equipmentLogs,
         inventoryPickups: [equipmentPickup],
-        materialLogs: [materialLog, materialLog, materialLog],
+        materialLogs: [
+          { ...materialLog, id: "material-phase-insulation-r20-batt", phaseId: "phase-insulation" },
+          { ...materialLog, id: "material-phase-drywall-r20-batt", phaseId: "phase-drywall" },
+          { ...materialLog, id: "material-phase-finishing-r20-batt", phaseId: "phase-finishing" },
+        ],
         checklistItems: [],
       },
     );
+  });
+
+  it("renders archived detail materials and normalized photo activity", async () => {
+    getCurrentUser.mockResolvedValue({ ok: true, data: projectManagerUser });
+    getProject.mockResolvedValue({
+      ok: true,
+      data: {
+        ...detail,
+        project: {
+          ...detail.project,
+          status: "archived",
+        },
+        gates: [
+          {
+            id: "gate-inspection",
+            projectId: "proj-1",
+            phaseId: "phase-insulation",
+            type: "inspection",
+            status: "passed",
+            requiredPhotoEvidence: true,
+            createdAt: "2026-05-01T00:00:00.000Z",
+            updatedAt: "2026-05-01T00:00:00.000Z",
+          },
+        ],
+        photoEvidence: [
+          {
+            id: "photo-inspection",
+            projectId: "proj-1",
+            phaseId: "phase-insulation",
+            gateId: "gate-inspection",
+            purpose: "inspection",
+            objectKey: "inspection.jpg",
+            mimeType: "image/jpeg",
+            status: "confirmed",
+            uploadedByUserId: "user-pm",
+            createdAt: "2026-05-04T00:00:00.000Z",
+            updatedAt: "2026-05-04T00:00:00.000Z",
+          },
+        ],
+        auditEvents: [
+          {
+            id: "audit-photo",
+            entityType: "photo_evidence",
+            entityId: "photo-inspection",
+            action: "photo_uploaded",
+            actorUserId: "user-pm",
+            createdAt: "2026-05-04T00:00:00.000Z",
+          },
+        ],
+      },
+    });
+
+    renderPage({ initialMobileTab: "activity" });
+
+    expect(await screen.findByRole("heading", { name: "Materials" })).toBeInTheDocument();
+    expect(screen.getAllByText("R-20 Batts").length).toBeGreaterThan(0);
+    expect(screen.getByText("Photo uploaded")).toBeInTheDocument();
+    expect(screen.getByText("Oak Bend · Insulation · Inspection")).toBeInTheDocument();
   });
 
   it("opens the equipment catalog and saves only changed draft quantities", async () => {
@@ -657,5 +741,27 @@ describe("ProjectDetailPage equipment", () => {
       projectId: "proj-1",
       changes: [{ itemKey: "drywall_lift", quantity: 1 }],
     });
+  });
+
+  it("shows equipment availability and prevents increasing past company stock", async () => {
+    getCompanyHardwareStock.mockResolvedValue({
+      ok: true,
+      data: [
+        { itemKey: "baker_scaffold", totalQuantity: 3, allocatedQuantity: 2, availableQuantity: 1, updatedAt: "2026-05-01T00:00:00.000Z" },
+        { itemKey: "drywall_lift", totalQuantity: 1, allocatedQuantity: 1, availableQuantity: 0, updatedAt: "2026-05-01T00:00:00.000Z" },
+      ],
+    });
+    renderPage();
+
+    await screen.findByRole("heading", { name: "Equipment" });
+    fireEvent.click(screen.getByRole("button", { name: "Manage" }));
+
+    expect(await screen.findByText("Available ×0")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Increase Drywall Lifts" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Increase Drywall Lifts" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(updateProjectEquipmentBatch).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Clock } from "lucide-react";
+import type { ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 import { IconWell } from "@/components/ui/icon-well";
 import { ActionBadge } from "@/components/ui/action-badge";
@@ -17,11 +18,13 @@ interface ActivityCardProps {
     linkUrl?: string;
     priorityBorderClass?: string;
   };
+  children?: ReactNode;
 }
 
 export function ActivityCard({
   event,
   display,
+  children,
 }: ActivityCardProps) {
   const mainContent = (
     <div>
@@ -72,6 +75,7 @@ export function ActivityCard({
       ) : (
         mainContent
       )}
+      {children}
     </Card>
   );
 }

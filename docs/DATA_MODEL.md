@@ -123,6 +123,20 @@ interface EquipmentLog {
 
 Equipment logs track project-scoped equipment quantities by stable catalog-style `itemKey` values.
 
+### CompanyHardwareStock
+
+```ts
+interface CompanyHardwareStock {
+  itemKey: string;
+  totalQuantity: number;
+  allocatedQuantity: number;
+  availableQuantity: number;
+  updatedAt: string;
+}
+```
+
+Company hardware stock tracks the finite reusable equipment pool. `allocatedQuantity` is derived from project equipment logs, and `availableQuantity` is derived from `totalQuantity - allocatedQuantity`.
+
 ### Gate
 
 ```ts

@@ -64,6 +64,7 @@ describe("inventory catalogs", () => {
     expect(labels(FINISHING_MATERIALS)).toEqual([
       "Yellow Mud Box",
       "Green Mud Box",
+      "All-Purpose Mud",
       "Setting-type Compound (90 min)",
       "Setting-type Compound (45 min)",
       "Setting-type Compound (20 min)",

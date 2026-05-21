@@ -13,6 +13,12 @@ function photoFolder(photo: PhotoEvidence, phases: Phase[]): string {
   return "general";
 }
 
+function photoRelPath(photo: PhotoEvidence, phases: Phase[]): string {
+  const folder = photoFolder(photo, phases);
+  const ext = photo.mimeType?.split("/")[1] ?? "jpg";
+  return `photos/${folder}/${photo.id}-${photo.purpose}.${ext}`;
+}
+
 function escapeCsvField(value: unknown): string {
   if (value === null || value === undefined) return "";
   const str = typeof value === "object" ? JSON.stringify(value) : String(value);
@@ -332,44 +338,120 @@ function htmlSection(id: string, title: string, headers: string[], rows: string[
 </section>`;
 }
 
+interface ProjectHtmlOptions {
+  photoWarnings?: string[];
+}
+
+function formatDate(value: string | undefined): string {
+  if (!value) return "Not recorded";
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00.000Z`) : new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+}
+
+function labelFromKey(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "Not recorded";
+  return String(value)
+    .replace(/[_-]+/g, " ")
+    .replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+}
+
+function countLabel(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function fileSizeLabel(value: number | undefined): string {
+  if (!value) return "Unknown size";
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function photoPurposeLabel(photo: PhotoEvidence): string {
+  if (photo.purpose === "deficiency_before") return "Before correction";
+  if (photo.purpose === "deficiency_after") return "After correction";
+  return labelFromKey(photo.purpose);
+}
+
+function photoWarningFor(photo: PhotoEvidence, warnings: string[]): string | undefined {
+  return warnings.find((warning) => warning.includes(`photo ${photo.id} `));
+}
+
+function renderPhotoCard(photo: PhotoEvidence, phasesById: Map<string, Phase>, warnings: string[], caption?: string): string {
+  const relPath = photoRelPath(photo, [...phasesById.values()]);
+  const phase = phasesById.get(photo.phaseId ?? "");
+  const warning = photoWarningFor(photo, warnings);
+  const title = caption ?? photoPurposeLabel(photo);
+  const context = [
+    phase ? labelFromKey(phase.type) : undefined,
+    formatDate(photo.createdAt),
+    fileSizeLabel(photo.fileSizeBytes),
+  ].filter(Boolean).join(" - ");
+
+  return `<article class="photo-card${warning ? " photo-card-warning" : ""}">
+  <a href="${escapeHtml(relPath)}" target="_blank" rel="noreferrer">
+    ${warning ? `<div class="photo-missing">Photo missing from export</div>` : `<img src="${escapeHtml(relPath)}" alt="${escapeHtml(title)}" loading="lazy">`}
+  </a>
+  <div class="photo-meta">
+    <strong>${escapeHtml(title)}</strong>
+    <span>${escapeHtml(context)}</span>
+    ${warning ? `<em>${escapeHtml(warning)}</em>` : ""}
+  </div>
+</article>`;
+}
+
+function renderSummaryItem(label: string, value: string, detail?: string): string {
+  return `<div class="summary-item">
+  <span>${escapeHtml(label)}</span>
+  <strong>${escapeHtml(value)}</strong>
+  ${detail ? `<small>${escapeHtml(detail)}</small>` : ""}
+</div>`;
+}
+
+function renderSimpleTable(headers: string[], rows: unknown[][]): string {
+  if (rows.length === 0) return `<p class="empty-state">No records.</p>`;
+  return `<div class="table-wrap"><table>
+  <thead>${htmlHeaderRow(headers)}</thead>
+  <tbody>${rows.map((row) => htmlRow(row)).join("")}</tbody>
+</table></div>`;
+}
+
 export function buildProjectHtml(
   detail: ProjectDetail,
   client: ClientRecord,
   pm: User | undefined,
   exportData: ProjectExportData = {},
+  options: ProjectHtmlOptions = {},
 ): string {
   const { project, auditEvents, phases, gates, deficiencies, photoEvidence } = detail;
   const { equipmentLogs = [], inventoryPickups = [], materialLogs = [], checklistItems = [] } = exportData;
   const phasesById = new Map(phases.map((p) => [p.id, p]));
+  const photoWarnings = options.photoWarnings ?? [];
 
   const exportDate = new Date().toISOString().slice(0, 10);
 
-  // ── Embedded styles ──────────────────────────────────────────────────────────
   const style = `
     :root {
-      --bg: hsl(222 22% 7%);
-      --fg: hsl(210 20% 96%);
-      --card: hsl(222 18% 11%);
-      --surface-elevated: hsl(222 18% 13%);
-      --border: hsl(222 14% 18%);
-      --border-strong: hsl(222 16% 22%);
-      --primary: hsl(220 95% 53%);
-      --muted-fg: hsl(215 16% 62%);
-      --header-bg: hsl(222 18% 9%);
+      --bg: #f7f8fb;
+      --fg: #172033;
+      --card: #ffffff;
+      --surface-elevated: #f1f4f8;
+      --border: #dbe2ea;
+      --border-strong: #c7d1dc;
+      --primary: #185abc;
+      --muted-fg: #657184;
+      --warning: #9a3412;
+      --warning-bg: #fff7ed;
     }
     @media print {
-      :root {
-        --bg: #ffffff;
-        --fg: hsl(222 22% 12%);
-        --card: #ffffff;
-        --surface-elevated: hsl(220 20% 99%);
-        --border: hsl(220 13% 87%);
-        --border-strong: hsl(220 13% 82%);
-        --primary: hsl(220 95% 43%);
-        --muted-fg: hsl(215 16% 45%);
-        --header-bg: hsl(220 13% 96%);
-      }
-      .no-print { display: none; }
+      body { background: #ffffff; }
+      .report-section, .photo-group, .deficiency-card { break-inside: avoid; page-break-inside: avoid; }
+      .raw-appendix { break-before: page; page-break-before: always; }
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
@@ -383,30 +465,81 @@ export function buildProjectHtml(
       padding: 0 0 3rem;
     }
     header.report-header {
-      background: var(--header-bg);
+      background: var(--card);
       border-bottom: 1px solid var(--border-strong);
-      padding: 1.5rem 2rem;
+      padding: 2rem;
     }
     header.report-header h1 {
-      font-size: 1.25rem;
+      font-size: 2rem;
       font-weight: 700;
-      letter-spacing: -0.02em;
     }
     header.report-header .meta {
-      font-size: 0.75rem;
+      font-size: 0.875rem;
       color: var(--muted-fg);
       margin-top: 0.25rem;
     }
-    main { max-width: 1200px; margin: 0 auto; padding: 1.5rem 2rem; }
-    section { margin-bottom: 2.5rem; }
+    main { max-width: 1180px; margin: 0 auto; padding: 1.5rem 2rem; }
+    .report-section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      margin-bottom: 1.25rem;
+      padding: 1.25rem;
+    }
+    section { margin-bottom: 2rem; }
     h2 {
-      font-size: 0.625rem;
+      font-size: 1.125rem;
       font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted-fg);
+      color: var(--fg);
       margin-bottom: 0.625rem;
     }
+    h3 { font-size: 0.95rem; margin: 1rem 0 0.5rem; }
+    .toc {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      list-style: none;
+    }
+    .toc a {
+      display: inline-block;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 0.35rem 0.7rem;
+      background: var(--surface-elevated);
+      font-size: 0.8125rem;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    .summary-item {
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+      background: var(--surface-elevated);
+    }
+    .summary-item span, .photo-meta span, .summary-item small {
+      display: block;
+      color: var(--muted-fg);
+      font-size: 0.75rem;
+    }
+    .summary-item strong { display: block; font-size: 1rem; margin-top: 0.15rem; }
+    .notes {
+      border-left: 3px solid var(--primary);
+      color: var(--muted-fg);
+      margin-top: 1rem;
+      padding-left: 0.75rem;
+    }
+    .warning-box {
+      background: var(--warning-bg);
+      border: 1px solid #fed7aa;
+      border-radius: 0.5rem;
+      color: var(--warning);
+      padding: 0.875rem;
+    }
+    .warning-box ul { margin: 0.5rem 0 0 1rem; }
     .table-wrap { overflow-x: auto; border-radius: 0.5rem; border: 1px solid var(--border); }
     table { width: max-content; min-width: 100%; border-collapse: collapse; }
     th {
@@ -431,10 +564,16 @@ export function buildProjectHtml(
     }
     tr:last-child td { border-bottom: none; }
     code { font-size: 0.75rem; font-family: ui-monospace, monospace; color: var(--muted-fg); }
+    .photo-group, .deficiency-card {
+      border: 1px solid var(--border);
+      border-radius: 0.625rem;
+      padding: 0.875rem;
+      margin-top: 0.875rem;
+    }
     .gallery-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 1rem;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 0.875rem;
     }
     .photo-card {
       background: var(--card);
@@ -442,6 +581,7 @@ export function buildProjectHtml(
       border-radius: 0.5rem;
       overflow: hidden;
     }
+    .photo-card-warning { border-color: #fed7aa; }
     .photo-card a { display: block; }
     .photo-card img {
       width: 100%;
@@ -449,25 +589,30 @@ export function buildProjectHtml(
       object-fit: cover;
       display: block;
     }
+    .photo-missing {
+      align-items: center;
+      aspect-ratio: 4/3;
+      background: var(--warning-bg);
+      color: var(--warning);
+      display: flex;
+      font-weight: 700;
+      justify-content: center;
+      padding: 1rem;
+      text-align: center;
+    }
     .photo-card .photo-meta {
-      padding: 0.5rem 0.625rem;
-      font-size: 0.6875rem;
+      padding: 0.625rem 0.75rem;
+      font-size: 0.75rem;
       color: var(--muted-fg);
       line-height: 1.4;
     }
-    .photo-card .photo-meta strong { color: var(--fg); font-size: 0.75rem; }
+    .photo-card .photo-meta strong { color: var(--fg); display: block; font-size: 0.8125rem; }
+    .photo-card .photo-meta em { color: var(--warning); display: block; font-style: normal; margin-top: 0.25rem; }
+    .empty-state { color: var(--muted-fg); font-size: 0.875rem; }
+    .raw-appendix section { margin-bottom: 1.5rem; }
     a { color: var(--primary); text-decoration: none; }
     a:hover { text-decoration: underline; }
   `;
-
-  // ── Helper to compute photo relative path (mirrors exportProjectZip logic) ──
-  function photoRelPath(photo: PhotoEvidence): string {
-    const folder = photoFolder(photo, phases);
-    const ext = photo.mimeType?.split("/")[1] ?? "jpg";
-    return `photos/${folder}/${photo.id}-${photo.purpose}.${ext}`;
-  }
-
-  // ── Sections ─────────────────────────────────────────────────────────────────
 
   const projectSection = htmlSection("project-details", "Project Details",
     ["Project ID", "Project Number", "Name", "Client ID", "Client", "Project Manager ID", "Project Manager",
@@ -527,7 +672,7 @@ export function buildProjectHtml(
     ["Photo ID", "Phase ID", "Gate ID", "Deficiency ID", "Purpose", "Object Key",
       "Content Hash", "MIME Type", "File Size Bytes", "Status", "Uploaded By User ID", "Created At", "Updated At"],
     photoEvidence.map((photo) => {
-      const relPath = photoRelPath(photo);
+      const relPath = photoRelPath(photo, phases);
       const idCell = `<a href="${escapeHtml(relPath)}" target="_blank">${escapeHtml(photo.id)}</a>`;
       return `<tr>
         <td>${idCell}</td>
@@ -546,25 +691,6 @@ export function buildProjectHtml(
       </tr>`;
     }),
   );
-
-  const galleryCards = photoEvidence.map((photo) => {
-    const relPath = photoRelPath(photo);
-    const phase = phasesById.get(photo.phaseId ?? "");
-    const phaseLabel = phase ? phase.type : "general";
-    return `<div class="photo-card">
-  <a href="${escapeHtml(relPath)}" target="_blank">
-    <img src="${escapeHtml(relPath)}" alt="${escapeHtml(photo.purpose)}" loading="lazy">
-  </a>
-  <div class="photo-meta">
-    <strong>${escapeHtml(photo.purpose)}</strong><br>
-    ${escapeHtml(phaseLabel)} · ${escapeHtml(photo.createdAt.slice(0, 10))}
-  </div>
-</div>`;
-  });
-  const gallerySection = `<section id="photo-gallery">
-  <h2>Photo Gallery</h2>
-  ${galleryCards.length > 0 ? `<div class="gallery-grid">${galleryCards.join("\n")}</div>` : `<p style="color:var(--muted-fg);font-size:0.8125rem">No photos.</p>`}
-</section>`;
 
   const subcontractorsSection = htmlSection("subcontractors", "Subcontractors",
     ["Subcontractor ID", "Display Name", "Company Name", "Trade", "Phone", "Email", "Active", "Notes", "Created At", "Updated At"],
@@ -632,6 +758,144 @@ export function buildProjectHtml(
     }),
   );
 
+  const executiveSection = `<section id="executive-summary" class="report-section">
+  <h2>Executive Summary</h2>
+  <p>${escapeHtml(client.name)} - ${escapeHtml(project.siteAddress)}</p>
+  <div class="summary-grid">
+    ${renderSummaryItem("Project", project.projectNumber, project.name)}
+    ${renderSummaryItem("Project Manager", pm?.fullName ?? "Unassigned", pm?.email)}
+    ${renderSummaryItem("Status", labelFromKey(project.status), `Completed ${formatDate(project.completedAt)}`)}
+    ${renderSummaryItem("Attic", `Attic ${labelFromKey(project.atticCheckStatus)}`)}
+    ${renderSummaryItem("Schedule", `${formatDate(project.scheduledStart)} to ${formatDate(project.scheduledEnd)}`)}
+    ${renderSummaryItem("Phases", countLabel(phases.length, "phase"))}
+    ${renderSummaryItem("Deficiencies", countLabel(deficiencies.length, "deficiency", "deficiencies"))}
+    ${renderSummaryItem("Photos", countLabel(photoEvidence.length, "photo"))}
+  </div>
+  ${project.notes ? `<p class="notes">${escapeHtml(project.notes)}</p>` : ""}
+</section>`;
+
+  const tocSection = `<nav id="table-of-contents" class="report-section" aria-label="Table of Contents">
+  <h2>Table of Contents</h2>
+  <ul class="toc">
+    <li><a href="#executive-summary">Executive Summary</a></li>
+    <li><a href="#photo-gallery">Photo Evidence Gallery</a></li>
+    <li><a href="#deficiency-closeout">Deficiency Closeout</a></li>
+    <li><a href="#phase-timeline">Phase Timeline</a></li>
+    <li><a href="#inventory-materials">Inventory and Materials</a></li>
+    <li><a href="#raw-data-appendix">Raw Data Appendix</a></li>
+  </ul>
+</nav>`;
+
+  const warningSection = photoWarnings.length > 0 ? `<section id="export-warnings" class="report-section">
+  <h2>Export Warnings</h2>
+  <div class="warning-box">
+    <strong>${escapeHtml(countLabel(photoWarnings.length, "photo warning"))}</strong>
+    <ul>${photoWarnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul>
+  </div>
+</section>` : "";
+
+  const photoGroups = phases.map((phase) => {
+    const groupPhotos = photoEvidence.filter((photo) => photo.phaseId === phase.id);
+    if (groupPhotos.length === 0) return "";
+    return `<div class="photo-group">
+  <h3>${escapeHtml(labelFromKey(phase.type))}</h3>
+  <div class="gallery-grid">${groupPhotos.map((photo) => renderPhotoCard(photo, phasesById, photoWarnings)).join("")}</div>
+</div>`;
+  }).join("");
+  const unphasedPhotos = photoEvidence.filter((photo) => !photo.phaseId);
+  const unphasedGroup = unphasedPhotos.length > 0 ? `<div class="photo-group">
+  <h3>General</h3>
+  <div class="gallery-grid">${unphasedPhotos.map((photo) => renderPhotoCard(photo, phasesById, photoWarnings)).join("")}</div>
+</div>` : "";
+  const photoGallerySection = `<section id="photo-gallery" class="report-section">
+  <h2>Photo Evidence Gallery</h2>
+  ${photoEvidence.length > 0 ? `${photoGroups}${unphasedGroup}` : `<p class="empty-state">No photos were exported for this project.</p>`}
+</section>`;
+
+  const deficiencyCloseoutCards = deficiencies.map((deficiency) => {
+    const phase = phasesById.get(deficiency.phaseId);
+    const beforePhotos = photoEvidence.filter((photo) => photo.deficiencyId === deficiency.id && photo.purpose === "deficiency_before");
+    const afterPhotos = photoEvidence.filter((photo) => photo.deficiencyId === deficiency.id && photo.purpose === "deficiency_after");
+    return `<article class="deficiency-card">
+  <h3>${escapeHtml(deficiency.title)}</h3>
+  <p>${escapeHtml([labelFromKey(deficiency.severity), labelFromKey(deficiency.status), phase ? labelFromKey(phase.type) : undefined].filter(Boolean).join(" - "))}</p>
+  ${deficiency.description ? `<p class="notes">${escapeHtml(deficiency.description)}</p>` : ""}
+  <div class="gallery-grid">
+    ${beforePhotos.length > 0 ? beforePhotos.map((photo) => renderPhotoCard(photo, phasesById, photoWarnings, "Before correction")).join("") : `<p class="empty-state">No before photo exported.</p>`}
+    ${afterPhotos.length > 0 ? afterPhotos.map((photo) => renderPhotoCard(photo, phasesById, photoWarnings, "After correction")).join("") : `<p class="empty-state">No after photo exported.</p>`}
+  </div>
+</article>`;
+  }).join("");
+  const deficiencyCloseoutSection = `<section id="deficiency-closeout" class="report-section">
+  <h2>Deficiency Closeout</h2>
+  ${deficiencyCloseoutCards || `<p class="empty-state">No deficiencies recorded.</p>`}
+</section>`;
+
+  const phaseTimelineSection = `<section id="phase-timeline" class="report-section">
+  <h2>Phase Timeline</h2>
+  ${renderSimpleTable(
+    ["Phase", "Status", "Scheduled", "Closed", "Subcontractor"],
+    phases.map((phase) => {
+      const subcontractor = detail.subcontractors.find((candidate) => candidate.id === phase.assignedSubcontractorId);
+      return [
+        labelFromKey(phase.type),
+        labelFromKey(phase.status),
+        `${formatDate(phase.scheduledStart)} to ${formatDate(phase.scheduledEnd)}`,
+        formatDate(phase.closedAt),
+        subcontractor?.displayName ?? "Unassigned",
+      ];
+    }),
+  )}
+</section>`;
+
+  const inventorySection = `<section id="inventory-materials" class="report-section">
+  <h2>Inventory and Materials</h2>
+  <h3>Project Equipment</h3>
+  ${renderSimpleTable(
+    ["Item", "Quantity", "Updated"],
+    equipmentLogs.map((log) => [equipmentLabel(log.itemKey), log.quantity, formatDate(log.updatedAt)]),
+  )}
+  <h3>Phase Materials</h3>
+  ${renderSimpleTable(
+    ["Phase", "Item", "Quantity", "Updated"],
+    materialLogs.map((log) => {
+      const phase = phasesById.get(log.phaseId);
+      return [phase ? labelFromKey(phase.type) : "Not recorded", materialLabel(log.itemKey, phase), log.quantity, formatDate(log.updatedAt)];
+    }),
+  )}
+  <h3>Inventory Pickups</h3>
+  ${renderSimpleTable(
+    ["Date", "Item", "Quantity", "Note"],
+    inventoryPickups.flatMap((pickup) => pickup.items.map((item) => {
+      const phase = item.kind === "material"
+        ? phases.find((candidate) => PHASE_MATERIAL_CATALOGS[candidate.type].some((catalogItem) => catalogItem.itemKey === item.itemKey))
+        : undefined;
+      return [
+        formatDate(pickup.createdAt),
+        item.kind === "equipment" ? equipmentLabel(item.itemKey) : materialLabel(item.itemKey, phase),
+        item.quantity,
+        pickup.note ?? "",
+      ];
+    })),
+  )}
+</section>`;
+
+  const rawAppendixSection = `<section id="raw-data-appendix" class="report-section raw-appendix">
+  <h2>Raw Data Appendix</h2>
+  ${projectSection}
+  ${clientSection}
+  ${phasesSection}
+  ${gatesSection}
+  ${deficienciesSection}
+  ${photoEvidenceSection}
+  ${subcontractorsSection}
+  ${equipmentSection}
+  ${materialsSection}
+  ${pickupsSection}
+  ${checklistSection}
+  ${activitySection}
+</section>`;
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -643,22 +907,17 @@ export function buildProjectHtml(
 <body>
   <header class="report-header">
     <h1>${escapeHtml(project.name)}</h1>
-    <div class="meta">${escapeHtml(project.projectNumber)} · ${escapeHtml(project.siteAddress)} · Exported ${escapeHtml(exportDate)}</div>
+    <div class="meta">${escapeHtml(project.projectNumber)} - ${escapeHtml(project.siteAddress)} - Exported ${escapeHtml(formatDate(exportDate))}</div>
   </header>
   <main>
-    ${projectSection}
-    ${clientSection}
-    ${phasesSection}
-    ${gatesSection}
-    ${deficienciesSection}
-    ${photoEvidenceSection}
-    ${gallerySection}
-    ${subcontractorsSection}
-    ${equipmentSection}
-    ${materialsSection}
-    ${pickupsSection}
-    ${checklistSection}
-    ${activitySection}
+    ${executiveSection}
+    ${tocSection}
+    ${warningSection}
+    ${photoGallerySection}
+    ${deficiencyCloseoutSection}
+    ${phaseTimelineSection}
+    ${inventorySection}
+    ${rawAppendixSection}
   </main>
 </body>
 </html>`;
@@ -674,11 +933,9 @@ export async function exportProjectZip(
 
   const zip = new JSZip();
 
-  // Add CSV and HTML
+  // Add CSV before photo fetches; HTML is added after warnings are known.
   const csv = buildProjectCsv(detail, client, pm, exportData);
   zip.file("project-details.csv", csv);
-  const html = buildProjectHtml(detail, client, pm, exportData);
-  zip.file("project-details.html", html);
 
   // Add photos into phase-specific folders
   const photosFolder = zip.folder("photos")!;
@@ -708,9 +965,8 @@ export async function exportProjectZip(
         }
         const blob = await response.blob();
 
-        const folder = photoFolder(photo, phases);
-        const ext = photo.mimeType?.split("/")[1] ?? "jpg";
-        const filename = `${photo.id}-${photo.purpose}.${ext}`;
+        const relPath = photoRelPath(photo, phases);
+        const [, folder, filename] = relPath.split("/");
 
         const target = subfolders[folder] ?? subfolders["general"];
         target.file(filename, blob);
@@ -723,6 +979,8 @@ export async function exportProjectZip(
   if (warnings.length > 0) {
     zip.file("export-warnings.txt", warnings.join("\n"));
   }
+  const html = buildProjectHtml(detail, client, pm, exportData, { photoWarnings: warnings });
+  zip.file("project-details.html", html);
 
   // Generate and trigger download
   const zipBlob = await zip.generateAsync({ type: "blob" });

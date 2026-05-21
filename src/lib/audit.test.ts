@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { AuditEvent, Deficiency, Gate, Phase, Project, User } from "@/lib/types";
-import { formatAuditEvent } from "./audit";
+import type { AuditEvent, Deficiency, Gate, Phase, PhotoEvidence, Project, User } from "@/lib/types";
+import { formatAuditEvent, resolveProjectId } from "./audit";
 
 const baseProject: Project = {
   id: "project-1",
@@ -51,6 +51,20 @@ const baseUser: User = {
   fullName: "Avery Stone",
   email: "avery@example.com",
   active: true,
+  createdAt: "2026-05-01T10:00:00.000Z",
+  updatedAt: "2026-05-01T10:00:00.000Z",
+};
+
+const basePhoto: PhotoEvidence = {
+  id: "photo-1",
+  projectId: "project-1",
+  phaseId: "phase-1",
+  gateId: "gate-1",
+  purpose: "inspection",
+  objectKey: "photo-1.jpg",
+  mimeType: "image/jpeg",
+  status: "confirmed",
+  uploadedByUserId: "user-1",
   createdAt: "2026-05-01T10:00:00.000Z",
   updatedAt: "2026-05-01T10:00:00.000Z",
 };
@@ -142,5 +156,21 @@ describe("formatAuditEvent", () => {
     );
 
     expect(display.statusText).toBe("Resolved");
+  });
+
+  it("resolves photo evidence activity back to the project", () => {
+    const projectId = resolveProjectId(
+      event({
+        entityType: "photo_evidence",
+        entityId: "photo-1",
+        action: "photo_uploaded",
+      }),
+      [basePhase],
+      [baseGate],
+      [baseDeficiency],
+      [basePhoto],
+    );
+
+    expect(projectId).toBe("project-1");
   });
 });

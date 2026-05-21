@@ -67,6 +67,18 @@ describe("SettingsDialog", () => {
     expect(screen.getByRole("switch", { name: "Admin overview" })).toHaveAttribute("aria-checked", "false");
   });
 
+  it("defaults the client activity rail setting off for admins", () => {
+    renderDialog(admin);
+
+    expect(screen.getByRole("switch", { name: "Client activity rail" })).toHaveAttribute("aria-checked", "false");
+  });
+
+  it("defaults the inventory setting off for admins", () => {
+    renderDialog(admin);
+
+    expect(screen.getByRole("switch", { name: "Inventory" })).toHaveAttribute("aria-checked", "false");
+  });
+
   it("saves admin overview toggle changes", async () => {
     renderDialog(admin);
 
@@ -77,6 +89,19 @@ describe("SettingsDialog", () => {
       fullName: "James Harrison",
       email: "james@titanpm.io",
       adminOverviewEnabled: true,
+    })));
+  });
+
+  it("saves client activity rail toggle changes", async () => {
+    renderDialog(admin);
+
+    fireEvent.click(screen.getByRole("switch", { name: "Client activity rail" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(updateUser).toHaveBeenCalledWith("admin-1", expect.objectContaining({
+      fullName: "James Harrison",
+      email: "james@titanpm.io",
+      clientActivityRailEnabled: true,
     })));
   });
 });

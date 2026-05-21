@@ -18,15 +18,17 @@ import {
   getCurrentUser,
   createInventoryAuditRequest,
   createInventoryPickup,
+  getCompanyHardwareStock,
   getOutstandingInventoryAuditRequests,
   getProjectEquipment,
   getProjectInventoryPickups,
   getProjects,
   getPhaseMaterials,
   getUsers,
+  updateCompanyHardwareStock,
 } from "@/lib/api";
 import { EQUIPMENT_ITEMS, PHASE_MATERIAL_CATALOGS } from "@/lib/inventoryCatalog";
-import type { AppNotification, EquipmentLog, InventoryAuditRequestType, InventoryPickup, InventoryPickupItemKind, MaterialLog, Phase, Project } from "@/lib/types";
+import type { AppNotification, CompanyHardwareStock, EquipmentLog, InventoryAuditRequestType, InventoryPickup, InventoryPickupItemKind, MaterialLog, Phase, Project } from "@/lib/types";
 
 interface AggregatedItem {
   itemKey: string;
@@ -226,6 +228,76 @@ function InventorySection({ title, items, query }: { title: string; items: Aggre
   );
 }
 
+interface CompanyHardwarePanelProps {
+  stock: CompanyHardwareStock[];
+  draft: Record<string, number>;
+  errors: Record<string, string>;
+  isSaving: boolean;
+  onDraftChange: (itemKey: string, totalQuantity: number) => void;
+  onSave: (itemKey: string) => void;
+}
+
+function CompanyHardwarePanel({ stock, draft, errors, isSaving, onDraftChange, onSave }: CompanyHardwarePanelProps) {
+  const labelByKey = new Map(EQUIPMENT_ITEMS.map((item) => [item.itemKey, item.label]));
+
+  return (
+    <Card className="space-y-3 p-3 shadow-card sm:p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold leading-tight">Company Hardware</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">Reusable equipment pool available to project managers.</p>
+        </div>
+      </div>
+
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+        {stock.map((item) => {
+          const label = labelByKey.get(item.itemKey) ?? item.itemKey;
+          const draftQuantity = draft[item.itemKey] ?? item.totalQuantity;
+          const hasChanged = draftQuantity !== item.totalQuantity;
+          return (
+            <div key={item.itemKey} className="rounded-md border border-border bg-muted/15 p-2.5">
+              <div className="mb-2 flex items-start justify-between gap-2">
+                <p className="min-w-0 truncate text-sm font-semibold">{label}</p>
+                <span className="shrink-0 rounded-full bg-foreground/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums">
+                  {item.availableQuantity} free
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+                <span>Allocated</span>
+                <span className="text-right font-semibold tabular-nums text-foreground">{item.allocatedQuantity}</span>
+                <span>Available</span>
+                <span className="text-right font-semibold tabular-nums text-foreground">{item.availableQuantity}</span>
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={0}
+                  step={1}
+                  inputMode="numeric"
+                  aria-label={`Total quantity for ${label}`}
+                  value={draftQuantity}
+                  onChange={(event) => onDraftChange(item.itemKey, parseQuantityInput(event.target.value))}
+                  className="h-9"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={!hasChanged || isSaving}
+                  onClick={() => onSave(item.itemKey)}
+                >
+                  Save
+                </Button>
+              </div>
+              {errors[item.itemKey] && <p className="mt-1 text-xs text-destructive">{errors[item.itemKey]}</p>}
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
 function ProjectCard({ project, pmName, pmPhone, equipment, materials, pickups, auditRequestTypes, query, onRequestAudit, onPickup }: ProjectCardProps) {
   const noInventory = equipment.length === 0 && materials.length === 0;
   const hasPickedUp = pickups.length > 0;
@@ -341,6 +413,8 @@ const InventoryTrackerPage = () => {
   const [pickupDraft, setPickupDraft] = useState<Record<string, number>>({});
   const [pickupNote, setPickupNote] = useState("");
   const [pickupError, setPickupError] = useState<string | null>(null);
+  const [hardwareDraft, setHardwareDraft] = useState<Record<string, number>>({});
+  const [hardwareErrors, setHardwareErrors] = useState<Record<string, string>>({});
 
   const meQ = useQuery({ queryKey: ["me"], queryFn: getCurrentUser });
   const usersQ = useQuery({ queryKey: ["users"], queryFn: getUsers });
@@ -351,6 +425,21 @@ const InventoryTrackerPage = () => {
   const users = useMemo(() => (usersQ.data?.ok ? usersQ.data.data : []), [usersQ.data]);
   const projects = useMemo(() => (projectsQ.data?.ok ? projectsQ.data.data : []), [projectsQ.data]);
   const phases = useMemo(() => (phasesQ.data?.ok ? phasesQ.data.data : []), [phasesQ.data]);
+
+  const companyHardwareQ = useQuery({
+    queryKey: ["company-hardware-stock"],
+    queryFn: getCompanyHardwareStock,
+    enabled: me?.role === "admin",
+  });
+  const companyHardwareStock: CompanyHardwareStock[] = useMemo(
+    () => (companyHardwareQ.data?.ok ? companyHardwareQ.data.data : []),
+    [companyHardwareQ.data],
+  );
+
+  useEffect(() => {
+    if (companyHardwareStock.length === 0) return;
+    setHardwareDraft(Object.fromEntries(companyHardwareStock.map((item) => [item.itemKey, item.totalQuantity])));
+  }, [companyHardwareStock]);
 
   const phasesByProject = useMemo(() => {
     const map: Record<string, Phase[]> = {};
@@ -433,7 +522,8 @@ const InventoryTrackerPage = () => {
     equipmentQueries.isLoading ||
     materialsQueries.isLoading ||
     pickupsQueries.isLoading ||
-    auditRequestsQ.isLoading;
+    auditRequestsQ.isLoading ||
+    companyHardwareQ.isLoading;
 
   const inventoryCards = useMemo(() => {
     const equipmentByProject = equipmentQueries.data ?? {};
@@ -531,6 +621,23 @@ const InventoryTrackerPage = () => {
     auditRequestMutation.mutate();
   };
 
+  const hardwareStockMutation = useMutation({
+    mutationFn: ({ itemKey, totalQuantity }: { itemKey: string; totalQuantity: number }) =>
+      updateCompanyHardwareStock({ itemKey, totalQuantity }),
+    onSuccess: async (res, variables) => {
+      if (res.ok === false) {
+        setHardwareErrors((current) => ({ ...current, [variables.itemKey]: res.error.fieldErrors?.totalQuantity ?? res.error.message }));
+        return;
+      }
+      setHardwareErrors((current) => ({ ...current, [variables.itemKey]: "" }));
+      await qc.invalidateQueries({ queryKey: ["company-hardware-stock"] });
+    },
+  });
+
+  const saveHardwareStock = (itemKey: string) => {
+    hardwareStockMutation.mutate({ itemKey, totalQuantity: hardwareDraft[itemKey] ?? 0 });
+  };
+
   const closePickupSheet = () => {
     setPickupProject(null);
     setPickupItems([]);
@@ -611,6 +718,20 @@ const InventoryTrackerPage = () => {
           <h1 className="text-xl font-bold leading-tight">Inventory Tracker</h1>
           <p className="text-xs text-muted-foreground mt-0.5">Active job sites · materials and hardware on site</p>
         </div>
+
+        {me?.role === "admin" && (
+          <CompanyHardwarePanel
+            stock={companyHardwareStock}
+            draft={hardwareDraft}
+            errors={hardwareErrors}
+            isSaving={hardwareStockMutation.isPending}
+            onDraftChange={(itemKey, totalQuantity) => {
+              setHardwareDraft((current) => ({ ...current, [itemKey]: totalQuantity }));
+              setHardwareErrors((current) => ({ ...current, [itemKey]: "" }));
+            }}
+            onSave={saveHardwareStock}
+          />
+        )}
 
         <div className="grid grid-cols-5 gap-1 sm:gap-2">
           {inventoryStatCards.map((stat) => {

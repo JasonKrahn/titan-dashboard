@@ -6,6 +6,7 @@ import {
   createInventoryAuditRequest,
   createInventoryPickup,
   getAllPhases,
+  getCompanyHardwareStock,
   getNotifications,
   getOutstandingInventoryAuditRequests,
   getPhaseMaterials,
@@ -143,6 +144,21 @@ describe("admin inventory access", () => {
       expect(project.status).toBe("active");
     }
   });
+
+  it("shows company hardware totals and availability for admins", async () => {
+    setCurrentUser("user-admin");
+    const stock = await getCompanyHardwareStock();
+    expect(stock.ok).toBe(true);
+    if (!stock.ok) return;
+
+    renderInventoryTracker();
+
+    expect(await screen.findByRole("heading", { name: "Company Hardware" })).toBeInTheDocument();
+    expect(await screen.findByRole("spinbutton", { name: "Total quantity for Cross Braces" })).toBeInTheDocument();
+    expect(screen.getByText("Cross Braces")).toBeInTheDocument();
+    expect(screen.getAllByText("Allocated").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Available").length).toBeGreaterThan(0);
+  }, 10_000);
 });
 
 describe("inventory summary filters UI", () => {

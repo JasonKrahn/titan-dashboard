@@ -275,10 +275,10 @@ export default function ActivityLogPage() {
 
   const nonArchivedEvents = useMemo(
     () => events.filter((e) => {
-      const pid = resolveProjectId(e, phases, gates, deficiencies);
+      const pid = resolveProjectId(e, phases, gates, deficiencies, photos);
       return pid === undefined || !archivedProjectIds.has(pid);
     }),
-    [events, archivedProjectIds, phases, gates, deficiencies],
+    [events, archivedProjectIds, phases, gates, deficiencies, photos],
   );
 
   const allActions = useMemo(() => {
@@ -317,7 +317,7 @@ export default function ActivityLogPage() {
     }
     if (projectFilter !== "all") {
       result = result.filter(({ event }) => {
-        const pid = resolveProjectId(event, phases, gates, deficiencies);
+        const pid = resolveProjectId(event, phases, gates, deficiencies, photos);
         return pid === undefined || pid === projectFilter;
       });
     }
@@ -326,7 +326,7 @@ export default function ActivityLogPage() {
         projects.filter((p) => p.clientId === clientFilter).map((p) => p.id),
       );
       result = result.filter(({ event }) => {
-        const pid = resolveProjectId(event, phases, gates, deficiencies);
+        const pid = resolveProjectId(event, phases, gates, deficiencies, photos);
         return pid === undefined || clientProjectIds.has(pid);
       });
     }
@@ -335,7 +335,7 @@ export default function ActivityLogPage() {
         projects.filter((p) => p.assignedProjectManagerId === pmFilter).map((p) => p.id),
       );
       result = result.filter(({ event }) => {
-        const pid = resolveProjectId(event, phases, gates, deficiencies);
+        const pid = resolveProjectId(event, phases, gates, deficiencies, photos);
         return pid === undefined || pmProjectIds.has(pid);
       });
     }
@@ -347,7 +347,7 @@ export default function ActivityLogPage() {
       });
     }
     return result;
-  }, [actionFilter, clientFilter, deficiencies, displayRows, gates, phases, pmFilter, projectFilter, projects, search]);
+  }, [actionFilter, clientFilter, deficiencies, displayRows, gates, phases, photos, pmFilter, projectFilter, projects, search]);
 
   const grouped = useMemo(() => {
     const groups: Partial<Record<DateGroup, typeof filtered>> = {};
@@ -508,14 +508,13 @@ export default function ActivityLogPage() {
                 </SectionHeading>
                 <div className="space-y-2">
                   {grouped[group]!.map(({ event, display, photoItems }) => (
-                    <div key={event.id}>
-                      <ActivityCard event={event} display={display} />
+                    <ActivityCard key={event.id} event={event} display={display}>
                       <ActivityPhotoStrip
                         items={photoItems}
                         context={display.context}
                         onOpen={(photoId) => openPhotoViewer(photoItems, photoId)}
                       />
-                    </div>
+                    </ActivityCard>
                   ))}
                 </div>
               </div>

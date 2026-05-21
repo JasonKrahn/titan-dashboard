@@ -56,9 +56,10 @@ import { PhotoViewerDialog, type PhotoViewerItem } from "@/components/dashboard/
 import { DeficiencyDialog } from "@/components/dashboard/DeficiencyDialog";
 import { PhotoUploadDialog } from "@/components/dashboard/PhotoUploadDialog";
 import { InventoryDisplayCard, type InventoryDisplayItem, type InventoryPickupSummaryItem } from "@/components/dashboard/InventoryDisplayCard";
+import { ActivityList } from "@/components/dashboard/ActivityList";
 import { QuantityStepperModal } from "@/components/dashboard/QuantityStepperModal";
 import { useShortcutActions } from "@/components/dashboard/ShortcutActionsContext";
-import { getCurrentUser, getProject, getProjectEquipment, getPhaseMaterials, getPhase, getProjectInventoryPickups, updateProjectEquipmentBatch, updateAtticGate, getPhotoViewUrl, updatePhaseSchedules } from "@/lib/api";
+import { getCurrentUser, getProject, getProjectEquipment, getCompanyHardwareStock, getPhaseMaterials, getPhase, getProjectInventoryPickups, updateProjectEquipmentBatch, updateAtticGate, getPhotoViewUrl, updatePhaseSchedules } from "@/lib/api";
 import { exportProjectZip } from "@/lib/projectExport";
 import { formatDateWithOptions, type PhaseScheduleChange } from "@/lib/schedule";
 import type { EquipmentLog, Gate, InventoryPickup, MaterialLog, Phase, PhaseChecklistItem, PhotoEvidence, ProjectDetail as ProjectDetailData } from "@/lib/types";
@@ -75,20 +76,8 @@ import {
   relativeTime,
   type PhaseHealthTone,
 } from "@/lib/derived";
-import { ActionBadge } from "@/components/ui/action-badge";
 import { SeverityBadge } from "@/components/ui/severity-badge";
 import { useToast } from "@/hooks/use-toast";
-
-const ENTITY_LABEL: Record<string, string> = {
-  project: "Project",
-  phase: "Phase",
-  gate: "Gate",
-  deficiency: "Deficiency",
-  photo_evidence: "Photo",
-  client_record: "Client",
-  subcontractor_contact: "Subcontractor",
-  user: "User",
-};
 
 const PHASE_CARD_ACCENT: Record<PhaseHealthTone, { rail: string; ring: string; footer: string; chevron: string }> = {
   blocked: {
@@ -185,6 +174,11 @@ export default function ProjectDetailPage() {
     queryFn: () => getProjectEquipment(detail!.project.id),
     enabled: !!detail?.project.id,
   });
+  const companyHardwareQ = useQuery({
+    queryKey: ["company-hardware-stock"],
+    queryFn: getCompanyHardwareStock,
+    enabled: !!detail?.project.id,
+  });
   const pickupsQ = useQuery({
     queryKey: ["project-inventory-pickups", detail?.project.id],
     queryFn: () => getProjectInventoryPickups(detail!.project.id),
@@ -198,7 +192,7 @@ export default function ProjectDetailPage() {
       if (failed?.ok === false) throw new Error(failed.error.message);
       return results.flatMap((result) => (result.ok ? result.data : []));
     },
-    enabled: !!detail?.project.id && isAdmin && viewMode === "summary",
+    enabled: !!detail?.project.id && ((isAdmin && viewMode === "summary") || detail.project.status === "archived"),
   });
 
   useEffect(() => {
@@ -269,6 +263,7 @@ export default function ProjectDetailPage() {
         return;
       }
       await qc.invalidateQueries({ queryKey: ["project-equipment", variables.projectId] });
+      await qc.invalidateQueries({ queryKey: ["company-hardware-stock"] });
       await qc.invalidateQueries({ queryKey: ["project", variables.projectId] });
       setEquipmentOpen(false);
       setEquipmentDraft({});
@@ -513,6 +508,8 @@ export default function ProjectDetailPage() {
   const equipmentLogs: EquipmentLog[] = equipmentQ.data?.ok ? equipmentQ.data.data : [];
   const equipmentLabelByKey = new Map(EQUIPMENT_ITEMS.map((item) => [item.itemKey, item.label]));
   const equipmentQuantityByKey = new Map(equipmentLogs.map((log) => [log.itemKey, log.quantity]));
+  const companyHardwareStock = companyHardwareQ.data?.ok ? companyHardwareQ.data.data : [];
+  const companyHardwareByKey = new Map(companyHardwareStock.map((item) => [item.itemKey, item]));
   const equipmentItems: InventoryDisplayItem[] = equipmentLogs
     .filter((log) => log.quantity > 0)
     .map((log) => ({
@@ -527,9 +524,13 @@ export default function ProjectDetailPage() {
     })
     .filter((item): item is InventoryPickupSummaryItem => Boolean(item))
     .slice(0, 3);
+  const projectMaterialLogs = materialSummaryQ.data ?? [];
+  const materialError = materialSummaryQ.error instanceof Error ? materialSummaryQ.error.message : undefined;
   const equipmentModalItems = EQUIPMENT_ITEMS.map((item) => ({
     ...item,
     quantity: equipmentDraft[item.itemKey] ?? equipmentQuantityByKey.get(item.itemKey) ?? 0,
+    maxQuantity: (equipmentQuantityByKey.get(item.itemKey) ?? 0) + (companyHardwareByKey.get(item.itemKey)?.availableQuantity ?? Number.MAX_SAFE_INTEGER),
+    availableQuantity: companyHardwareByKey.get(item.itemKey)?.availableQuantity,
   }));
   const openEquipmentModal = () => {
     setEquipmentDraft(
@@ -661,9 +662,9 @@ export default function ProjectDetailPage() {
           <AdminProjectSummary
             detail={detail}
             equipmentItems={equipmentItems}
-            materialLogs={materialSummaryQ.data ?? []}
+            materialLogs={projectMaterialLogs}
             materialsLoading={materialSummaryQ.isLoading}
-            materialsError={materialSummaryQ.error instanceof Error ? materialSummaryQ.error.message : undefined}
+            materialsError={materialError}
             onOpenPhoto={(photo) => {
               setSelectedPhoto(photo);
               setPhotoViewerOpen(true);
@@ -1353,6 +1354,17 @@ export default function ProjectDetailPage() {
           />
         </section>
 
+        {p.status === "archived" && (
+          <section className={mobileTab === "overview" ? "" : "hidden md:block"}>
+            <ProjectMaterialsCard
+              detail={detail}
+              materialLogs={projectMaterialLogs}
+              loading={materialSummaryQ.isLoading}
+              error={materialError}
+            />
+          </section>
+        )}
+
         {/* Project Photos */}
         {detail && (
           <section className={mobileTab === "photos" ? "" : "hidden md:block"}>
@@ -1402,49 +1414,17 @@ export default function ProjectDetailPage() {
             <SectionHeading as="h3" className="mb-3">Recent activity</SectionHeading>
             <Card className="border-border bg-card shadow-card">
               <CardContent className="p-5">
-                <ol className="space-y-3">
-                  {detail.auditEvents.slice(0, 6).map((a) => {
-                    const phase = detail.phases.find((ph) => ph.id === a.entityId);
-                    const gate = detail.gates.find((g) => g.id === a.entityId);
-                    const deficiency = detail.deficiencies.find((d) => d.id === a.entityId);
-                    return (
-                      <li key={a.id} className="flex items-start gap-3 text-sm">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
-                            <ActionBadge action={a.action} size="xs" />
-                            {phase && <span className="text-xs text-muted-foreground">{PHASE_LABEL[phase.type] ?? phase.type}</span>}
-                            {gate && <span className="text-xs text-muted-foreground">{GATE_LABEL[gate.type] ?? gate.type}</span>}
-                            {deficiency && <span className="text-xs text-muted-foreground">{deficiency.title}</span>}
-                            {typeof a.previousValue === "string" && typeof a.nextValue === "string" && (
-                              <span className="text-xs text-muted-foreground">
-                                <span className="font-medium">{a.nextValue.replace(/_/g, " ")}</span>
-                              </span>
-                            )}
-                            {typeof a.metadata?.notes === "string" && (
-                              <span className="text-xs text-muted-foreground italic">&ldquo;{a.metadata.notes}&rdquo;</span>
-                            )}
-                            {typeof a.metadata?.summary === "string" && (
-                              <span className="text-xs text-muted-foreground">Picked up: {a.metadata.summary}</span>
-                            )}
-                            {typeof a.metadata?.note === "string" && (
-                              <span className="text-xs text-muted-foreground italic">&ldquo;{a.metadata.note}&rdquo;</span>
-                            )}
-                            <IconWell
-                              tone="primary"
-                              size="sm"
-                              shape="pill"
-                              className="text-eyebrow font-semibold"
-                              title={detail.assignedProjectManager?.fullName ?? "System"}
-                            >
-                              {initials(detail.assignedProjectManager?.fullName ?? "System")}
-                            </IconWell>
-                            <span className="ml-auto text-xs text-muted-foreground">{relativeTime(a.createdAt)}</span>
-                          </div>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ol>
+                <ActivityList
+                  events={detail.auditEvents}
+                  lookups={{
+                    projects: [detail.project],
+                    phases: detail.phases,
+                    gates: detail.gates,
+                    deficiencies: detail.deficiencies,
+                    users: detail.assignedProjectManager ? [detail.assignedProjectManager] : [],
+                    photoEvidence: detail.photoEvidence,
+                  }}
+                />
               </CardContent>
             </Card>
           </section>
@@ -1934,6 +1914,59 @@ function ReadOnlyInventoryCard({ title, items, emptyText }: { title: string; ite
               </li>
             ))}
           </ul>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function ProjectMaterialsCard({
+  detail,
+  materialLogs,
+  loading,
+  error,
+}: {
+  detail: ProjectDetailData;
+  materialLogs: MaterialLog[];
+  loading: boolean;
+  error?: string;
+}) {
+  const visibleMaterialLogs = materialLogs.filter((log) => log.quantity > 0);
+
+  return (
+    <Card className="p-5 shadow-card">
+      <SectionHeading as="h3">Materials</SectionHeading>
+      <div className="mt-3 space-y-3">
+        {loading ? (
+          <Skeleton className="h-20" />
+        ) : error ? (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Couldn't load materials</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : visibleMaterialLogs.length === 0 ? (
+          <EmptyInline text="No materials logged" />
+        ) : (
+          PHASE_ORDER.map((type) => {
+            const phase = detail.phases.find((item) => item.type === type);
+            const phaseLogs = phase ? visibleMaterialLogs.filter((log) => log.phaseId === phase.id) : [];
+            if (phaseLogs.length === 0) return null;
+            const labelByKey = new Map(PHASE_MATERIAL_CATALOGS[type].map((item) => [item.itemKey, item.label]));
+            return (
+              <div key={type} className="rounded-md border border-border bg-muted/20 p-3">
+                <div className="text-sm font-semibold">{PHASE_LABEL[type]}</div>
+                <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                  {phaseLogs.map((log) => (
+                    <li key={log.id} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="truncate text-muted-foreground">{labelByKey.get(log.itemKey) ?? log.itemKey}</span>
+                      <span className="font-semibold tabular-nums">{log.quantity}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })
         )}
       </div>
     </Card>

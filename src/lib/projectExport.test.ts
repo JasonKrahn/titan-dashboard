@@ -260,7 +260,43 @@ describe("buildProjectCsv", () => {
 });
 
 describe("buildProjectHtml", () => {
-  it("includes all data sections and a photo gallery with relative links", () => {
+  it("renders a human-readable closeout report before the raw data appendix", () => {
+    const detailWithCloseoutPhotos: ProjectDetail = {
+      ...detail,
+      photoEvidence: [
+        ...detail.photoEvidence,
+        {
+          id: "photo-before",
+          projectId: "proj-1",
+          phaseId: "phase-insulation",
+          deficiencyId: "def-1",
+          purpose: "deficiency_before",
+          objectKey: "photos/photo-before.jpg",
+          contentHash: "hash-before",
+          mimeType: "image/jpeg",
+          fileSizeBytes: 22345,
+          status: "confirmed",
+          uploadedByUserId: "user-pm-1",
+          createdAt: "2026-05-10T10:00:00.000Z",
+          updatedAt: "2026-05-10T10:00:00.000Z",
+        },
+        {
+          id: "photo-after",
+          projectId: "proj-1",
+          phaseId: "phase-insulation",
+          deficiencyId: "def-1",
+          purpose: "deficiency_after",
+          objectKey: "photos/photo-after.jpg",
+          contentHash: "hash-after",
+          mimeType: "image/jpeg",
+          fileSizeBytes: 32345,
+          status: "confirmed",
+          uploadedByUserId: "user-pm-1",
+          createdAt: "2026-05-11T10:00:00.000Z",
+          updatedAt: "2026-05-11T10:00:00.000Z",
+        },
+      ],
+    };
     const html = buildProjectHtml(detail, detail.client, detail.assignedProjectManager, {
       equipmentLogs: [
         { id: "equipment-1", projectId: "proj-1", itemKey: "baker_scaffold", quantity: 2, updatedAt: "2026-05-12T00:00:00.000Z" },
@@ -283,7 +319,17 @@ describe("buildProjectHtml", () => {
 
     expect(html).toContain("<!DOCTYPE html>");
     expect(html).toContain("Oak Bend");
-    // All section IDs present
+    expect(html.indexOf('id="executive-summary"')).toBeLessThan(html.indexOf('id="raw-data-appendix"'));
+    expect(html).toContain("Executive Summary");
+    expect(html).toContain("Pat Manager");
+    expect(html).toContain("Completed May 31, 2026");
+    expect(html).toContain("Archived");
+    expect(html).toContain("Attic Passed");
+    expect(html).toContain("1 phase");
+    expect(html).toContain("1 deficiency");
+    expect(html).toContain("1 photo");
+    expect(html).toContain("Table of Contents");
+    expect(html).toContain("Raw Data Appendix");
     expect(html).toContain('id="project-details"');
     expect(html).toContain('id="client-details"');
     expect(html).toContain('id="phases"');
@@ -297,19 +343,24 @@ describe("buildProjectHtml", () => {
     expect(html).toContain('id="inventory-pickups"');
     expect(html).toContain('id="phase-task-checklist"');
     expect(html).toContain('id="activity-log"');
-    // Photo gallery has a relative link to the ZIP photo path
     expect(html).toContain("photos/attic-check/photo-1-attic_check.jpeg");
-    // Checklist item text is present
     expect(html).toContain("Verify air sealing");
-    // Bool values render as symbols
     expect(html).toContain("✗");
-    // Activity log entries present
     expect(html).toContain("inventory_picked_up");
-    // Equipment data present
     expect(html).toContain("Baker Scaffolds");
-    // HTML-escaping works for XSS: the test fixture notes field has no special chars,
-    // but verify the structure is valid HTML
     expect(html).toContain("</html>");
+
+    const closeoutHtml = buildProjectHtml(detailWithCloseoutPhotos, detail.client, detail.assignedProjectManager);
+    expect(closeoutHtml).toContain("Deficiency Closeout");
+    expect(closeoutHtml).toContain("Air sealing gap");
+    expect(closeoutHtml).toContain("Before correction");
+    expect(closeoutHtml).toContain("After correction");
+    expect(closeoutHtml).toContain("Attic Check");
+    expect(closeoutHtml).toContain("Insulation");
+    expect(closeoutHtml).toContain("photos/insulation/photo-before-deficiency_before.jpeg");
+    expect(closeoutHtml).toContain("photos/insulation/photo-after-deficiency_after.jpeg");
+    expect(closeoutHtml).not.toContain("<strong>deficiency_before</strong>");
+    expect(closeoutHtml.indexOf('id="photo-gallery"')).toBeLessThan(closeoutHtml.indexOf('id="deficiency-closeout"'));
   });
 });
 
@@ -347,6 +398,8 @@ describe("exportProjectZip photo warning manifest", () => {
 
     expect(capturedFiles["export-warnings.txt"]).toBeDefined();
     expect(capturedFiles["export-warnings.txt"]).toContain("photo-1");
+    expect(capturedFiles["project-details.html"]).toContain("Export Warnings");
+    expect(capturedFiles["project-details.html"]).toContain("photo photo-1 (attic_check): URL not available");
   });
 
   it("omits export-warnings.txt when there are no photos to fetch", async () => {

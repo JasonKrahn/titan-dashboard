@@ -4,6 +4,7 @@ import type {
   ApiResult,
   AuditEvent,
   ClientRecord,
+  CompanyHardwareStock,
   CompleteInspectionInput,
   CreateDeficiencyInput,
   CreateSubcontractorInput,
@@ -71,6 +72,7 @@ import {
   seedAuditEvents,
   seedChecklistItems,
   seedClients,
+  seedCompanyHardwareStock,
   seedDeficiencies,
   seedEquipmentLogs,
   seedGates,
@@ -85,6 +87,32 @@ import {
 } from "./seed";
 
 const SIMULATED_LATENCY_MS = 250;
+
+function cloneSeed<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+const initialSeedState = {
+  auditEvents: cloneSeed(seedAuditEvents),
+  checklistItems: cloneSeed(seedChecklistItems),
+  clients: cloneSeed(seedClients),
+  companyHardwareStock: cloneSeed(seedCompanyHardwareStock),
+  deficiencies: cloneSeed(seedDeficiencies),
+  equipmentLogs: cloneSeed(seedEquipmentLogs),
+  gates: cloneSeed(seedGates),
+  inventoryPickups: cloneSeed(seedInventoryPickups),
+  materialLogs: cloneSeed(seedMaterialLogs),
+  notifications: cloneSeed(seedNotifications),
+  phases: cloneSeed(seedPhases),
+  photos: cloneSeed(seedPhotos),
+  projects: cloneSeed(seedProjects),
+  subcontractors: cloneSeed(seedSubcontractors),
+  users: cloneSeed(seedUsers),
+};
+
+function resetArray<T>(target: T[], source: T[]) {
+  target.splice(0, target.length, ...cloneSeed(source));
+}
 
 export const photoBlobUrls = new Map<string, string>([
   ["photo-active-insulation-site-check", imgInsulationSiteCheck],
@@ -183,6 +211,11 @@ export interface UpdateProjectEquipmentBatchInput {
   }>;
 }
 
+export interface UpdateCompanyHardwareStockInput {
+  itemKey: string;
+  totalQuantity: number;
+}
+
 export interface CreateInventoryPickupInput {
   projectId: string;
   items: InventoryPickupItem[];
@@ -238,16 +271,35 @@ export function setCurrentUser(userId: string) {
   currentUserId = userId;
 }
 
+export function resetPrototypeSeed() {
+  resetArray(seedAuditEvents, initialSeedState.auditEvents);
+  resetArray(seedChecklistItems, initialSeedState.checklistItems);
+  resetArray(seedClients, initialSeedState.clients);
+  resetArray(seedCompanyHardwareStock, initialSeedState.companyHardwareStock);
+  resetArray(seedDeficiencies, initialSeedState.deficiencies);
+  resetArray(seedEquipmentLogs, initialSeedState.equipmentLogs);
+  resetArray(seedGates, initialSeedState.gates);
+  resetArray(seedInventoryPickups, initialSeedState.inventoryPickups);
+  resetArray(seedMaterialLogs, initialSeedState.materialLogs);
+  resetArray(seedNotifications, initialSeedState.notifications);
+  resetArray(seedPhases, initialSeedState.phases);
+  resetArray(seedPhotos, initialSeedState.photos);
+  resetArray(seedProjects, initialSeedState.projects);
+  resetArray(seedSubcontractors, initialSeedState.subcontractors);
+  resetArray(seedUsers, initialSeedState.users);
+  currentUserId = "user-admin";
+}
+
 export async function getCurrentUser(): Promise<ApiResult<User>> {
   const u = seedUsers.find((x) => x.id === currentUserId);
   if (!u) {
     return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
   }
-  return delay(ok(u));
+  return delay(ok({ ...u }));
 }
 
 export async function getUsers(): Promise<ApiResult<User[]>> {
-  return delay(ok(seedUsers));
+  return delay(ok(seedUsers.map((user) => ({ ...user }))));
 }
 
 export interface CreateUserInput {
@@ -292,6 +344,7 @@ export async function updateUser(userId: string, input: UpdateUserInput): Promis
     phone: user.phone,
     role: user.role,
     adminOverviewEnabled: user.adminOverviewEnabled === true,
+    clientActivityRailEnabled: user.clientActivityRailEnabled === true,
   };
   if (user.role === "admin" && user.active && input.role !== undefined && input.role !== "admin") {
     const activeAdmins = seedUsers.filter((u) => u.role === "admin" && u.active);
@@ -305,6 +358,9 @@ export async function updateUser(userId: string, input: UpdateUserInput): Promis
   if (me.role === "admin" && input.role !== undefined) user.role = input.role;
   if (user.role === "admin" && input.adminOverviewEnabled !== undefined) {
     user.adminOverviewEnabled = input.adminOverviewEnabled;
+  }
+  if (user.role === "admin" && input.clientActivityRailEnabled !== undefined) {
+    user.clientActivityRailEnabled = input.clientActivityRailEnabled;
   }
   if (user.role === "admin" && input.inventoryEnabled !== undefined) {
     user.inventoryEnabled = input.inventoryEnabled;
@@ -324,6 +380,7 @@ export async function updateUser(userId: string, input: UpdateUserInput): Promis
       phone: user.phone,
       role: user.role,
       adminOverviewEnabled: user.adminOverviewEnabled === true,
+      clientActivityRailEnabled: user.clientActivityRailEnabled === true,
     },
     createdAt: nowIso,
   });
@@ -356,6 +413,7 @@ export async function createUser(input: CreateUserInput): Promise<ApiResult<User
     email: input.email.trim(),
     phone: input.phone?.trim() || undefined,
     adminOverviewEnabled: input.role === "admin" ? false : undefined,
+    clientActivityRailEnabled: input.role === "admin" ? false : undefined,
     active: true,
     createdAt: nowIso,
     updatedAt: nowIso,
@@ -573,6 +631,10 @@ export async function getProject(id: string): Promise<ApiResult<ProjectDetail>> 
         if (a.entityType === "deficiency") {
           const deficiency = seedDeficiencies.find((d) => d.id === a.entityId);
           return deficiency?.projectId === id;
+        }
+        if (a.entityType === "photo_evidence") {
+          const photo = seedPhotos.find((p) => p.id === a.entityId);
+          return photo?.projectId === id;
         }
         return false;
       })
@@ -858,6 +920,61 @@ function updateEquipmentLog(input: UpdateProjectEquipmentInput, nowIso: string) 
   return { log, previousQuantity };
 }
 
+function allocatedHardwareQuantity(itemKey: string) {
+  return seedEquipmentLogs
+    .filter((log) => log.itemKey === itemKey)
+    .reduce((total, log) => total + log.quantity, 0);
+}
+
+function hardwareStockSummary(itemKey: string): CompanyHardwareStock {
+  const stock = seedCompanyHardwareStock.find((item) => item.itemKey === itemKey);
+  const allocatedQuantity = allocatedHardwareQuantity(itemKey);
+  const totalQuantity = stock?.totalQuantity ?? 0;
+  return {
+    itemKey,
+    totalQuantity,
+    allocatedQuantity,
+    availableQuantity: Math.max(0, totalQuantity - allocatedQuantity),
+    updatedAt: stock?.updatedAt ?? new Date(0).toISOString(),
+  };
+}
+
+function validateHardwareStockInput(input: UpdateCompanyHardwareStockInput) {
+  const fieldErrors: Record<string, string> = {};
+  const itemKey = input.itemKey.trim();
+  const catalogItem = EQUIPMENT_ITEMS.find((item) => item.itemKey === itemKey);
+  if (!catalogItem) fieldErrors.itemKey = "Unknown hardware item";
+  if (!Number.isFinite(input.totalQuantity) || input.totalQuantity < 0 || !Number.isInteger(input.totalQuantity)) {
+    fieldErrors.totalQuantity = "Must be a non-negative whole number";
+  }
+
+  const allocatedQuantity = allocatedHardwareQuantity(itemKey);
+  if (!fieldErrors.totalQuantity && input.totalQuantity < allocatedQuantity) {
+    fieldErrors.totalQuantity = `Cannot be below ${allocatedQuantity} already allocated`;
+  }
+
+  return fieldErrors;
+}
+
+function validateHardwareAvailability(projectId: string, changes: UpdateProjectEquipmentBatchInput["changes"]) {
+  const fieldErrors: Record<string, string> = {};
+
+  for (const change of changes) {
+    const itemKey = change.itemKey.trim();
+    const previousQuantity = seedEquipmentLogs.find((item) => item.projectId === projectId && item.itemKey === itemKey)?.quantity ?? 0;
+    const delta = change.quantity - previousQuantity;
+    if (delta <= 0) continue;
+
+    const stock = hardwareStockSummary(itemKey);
+    if (delta > stock.availableQuantity) {
+      const label = EQUIPMENT_ITEMS.find((item) => item.itemKey === itemKey)?.label ?? itemKey;
+      fieldErrors[itemKey] = `${label} has ${stock.availableQuantity} available`;
+    }
+  }
+
+  return fieldErrors;
+}
+
 function inventoryItemLabel(item: InventoryPickupItem, projectPhases: Phase[]) {
   if (item.kind === "equipment") {
     return EQUIPMENT_ITEMS.find((catalogItem) => catalogItem.itemKey === item.itemKey)?.label ?? item.itemKey;
@@ -1013,6 +1130,43 @@ export async function getProjectEquipment(projectId: string): Promise<ApiResult<
   return delay(ok(seedEquipmentLogs.filter((log) => log.projectId === projectId)));
 }
 
+export async function getCompanyHardwareStock(): Promise<ApiResult<CompanyHardwareStock[]>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+
+  return delay(ok(EQUIPMENT_ITEMS.map((item) => hardwareStockSummary(item.itemKey))));
+}
+
+export async function updateCompanyHardwareStock(input: UpdateCompanyHardwareStockInput): Promise<ApiResult<CompanyHardwareStock>> {
+  const me = seedUsers.find((u) => u.id === currentUserId);
+  if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
+  if (me.role !== "admin") return delay({ ok: false, error: { code: "FORBIDDEN", message: "Admins only" } });
+
+  const fieldErrors = validateHardwareStockInput(input);
+  if (Object.keys(fieldErrors).length) {
+    return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Invalid company hardware stock", fieldErrors } });
+  }
+
+  const itemKey = input.itemKey.trim();
+  const nowIso = new Date().toISOString();
+  let stock = seedCompanyHardwareStock.find((item) => item.itemKey === itemKey);
+  if (!stock) {
+    stock = {
+      itemKey,
+      totalQuantity: input.totalQuantity,
+      allocatedQuantity: 0,
+      availableQuantity: input.totalQuantity,
+      updatedAt: nowIso,
+    };
+    seedCompanyHardwareStock.push(stock);
+  } else {
+    stock.totalQuantity = input.totalQuantity;
+    stock.updatedAt = nowIso;
+  }
+
+  return delay(ok(hardwareStockSummary(itemKey)));
+}
+
 export async function updateProjectEquipment(input: UpdateProjectEquipmentInput): Promise<ApiResult<EquipmentLog>> {
   const me = seedUsers.find((u) => u.id === currentUserId);
   if (!me) return delay({ ok: false, error: { code: "UNAUTHORIZED", message: "No active session" } });
@@ -1030,6 +1184,11 @@ export async function updateProjectEquipment(input: UpdateProjectEquipmentInput)
   }
 
   const itemKey = input.itemKey.trim();
+  const stockErrors = validateHardwareAvailability(input.projectId, [{ itemKey, quantity: input.quantity }]);
+  if (Object.keys(stockErrors).length) {
+    return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Insufficient company hardware available", fieldErrors: stockErrors } });
+  }
+
   const nowIso = new Date().toISOString();
   const { log } = updateEquipmentLog({ ...input, itemKey }, nowIso);
 
@@ -1056,6 +1215,11 @@ export async function updateProjectEquipmentBatch(input: UpdateProjectEquipmentB
   });
   if (Object.keys(fieldErrors).length) {
     return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Invalid equipment log", fieldErrors } });
+  }
+
+  const stockErrors = validateHardwareAvailability(input.projectId, input.changes);
+  if (Object.keys(stockErrors).length) {
+    return delay({ ok: false, error: { code: "VALIDATION_ERROR", message: "Insufficient company hardware available", fieldErrors: stockErrors } });
   }
 
   const nowIso = new Date().toISOString();
@@ -1316,6 +1480,7 @@ export interface UpdateUserInput {
   email?: string;
   role?: UserRole;
   adminOverviewEnabled?: boolean;
+  clientActivityRailEnabled?: boolean;
   inventoryEnabled?: boolean;
 }
 

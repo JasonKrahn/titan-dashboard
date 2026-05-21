@@ -29,6 +29,7 @@ interface ClientProjectsViewProps {
   onArchiveProject?: (id: string, name: string) => void;
   onEditProject?: (id: string) => void;
   isAdmin?: boolean;
+  clientActivityRailEnabled?: boolean;
 }
 
 const filters: { value: ClientProjectFilter; label: string }[] = [
@@ -54,6 +55,7 @@ export function ClientProjectsView({
   onArchiveProject,
   onEditProject,
   isAdmin = false,
+  clientActivityRailEnabled = false,
 }: ClientProjectsViewProps) {
   const [displayMode, setDisplayMode] = useState<ProjectDisplayMode>(() => {
     const saved = localStorage.getItem("clientProjectViewMode");
@@ -83,6 +85,7 @@ export function ClientProjectsView({
         project.siteAddress?.toLowerCase().includes(searchLower)
       );
     });
+  const showClientActivityRail = isAdmin && clientActivityRailEnabled === true;
 
   return (
     <section className="space-y-5 pb-20 md:pb-0">
@@ -118,7 +121,7 @@ export function ClientProjectsView({
       )}
 
       {isAdmin ? (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
+        <div className={`grid grid-cols-1 gap-6 ${showClientActivityRail ? "lg:grid-cols-[minmax(0,1fr)_340px]" : ""}`}>
           <div className="space-y-3">
             <div className="flex items-baseline gap-3">
               <SectionHeading>Projects</SectionHeading>
@@ -211,9 +214,11 @@ export function ClientProjectsView({
               showTitle={false}
             />
           </div>
-          <div className="hidden lg:block">
-            <ActivityTray projectIds={visibleProjects.map((p) => p.id)} clientId={client.id} />
-          </div>
+          {showClientActivityRail && (
+            <div className="hidden lg:block lg:sticky lg:top-24 lg:self-start">
+              <ActivityTray projectIds={visibleProjects.map((p) => p.id)} clientId={client.id} />
+            </div>
+          )}
         </div>
       ) : (
         <>

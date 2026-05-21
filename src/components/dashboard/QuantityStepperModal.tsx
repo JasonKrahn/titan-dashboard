@@ -15,6 +15,8 @@ export interface QuantityStepperItem {
   itemKey: string;
   label: string;
   quantity: number;
+  maxQuantity?: number;
+  availableQuantity?: number;
 }
 
 interface QuantityStepperModalProps {
@@ -66,13 +68,24 @@ export function QuantityStepperModal({
           <ul className="space-y-2">
             {items.map((item) => {
               const quantity = normalizeQuantity(item.quantity);
+              const maxQuantity = item.maxQuantity;
+              const canIncrease = maxQuantity === undefined || quantity < maxQuantity;
+              const updateQuantity = (nextQuantity: number) => {
+                const normalized = normalizeQuantity(nextQuantity);
+                onQuantityChange(item.itemKey, maxQuantity === undefined ? normalized : Math.min(maxQuantity, normalized));
+              };
 
               return (
                 <li
                   key={item.itemKey}
                   className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/20 p-2.5"
                 >
-                  <span className="min-w-0 truncate text-sm font-medium">{item.label}</span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium">{item.label}</span>
+                    {item.availableQuantity !== undefined && (
+                      <span className="block text-[11px] text-muted-foreground">Available ×{item.availableQuantity}</span>
+                    )}
+                  </span>
                   <div className="flex shrink-0 items-center gap-2">
                     <Button
                       type="button"
@@ -81,18 +94,19 @@ export function QuantityStepperModal({
                       className="h-11 w-11 md:h-8 md:w-8"
                       aria-label={`Decrease ${item.label}`}
                       disabled={quantity === 0}
-                      onClick={() => onQuantityChange(item.itemKey, Math.max(0, quantity - 1))}
+                      onClick={() => updateQuantity(quantity - 1)}
                     >
                       <Minus className="h-4 w-4" />
                     </Button>
                     <Input
                       type="number"
                       min={0}
+                      max={maxQuantity}
                       step={1}
                       inputMode="numeric"
                       aria-label={`Quantity for ${item.label}`}
                       value={quantity}
-                      onChange={(event) => onQuantityChange(item.itemKey, parseQuantityInput(event.target.value))}
+                      onChange={(event) => updateQuantity(parseQuantityInput(event.target.value))}
                       className="h-11 w-16 px-2 text-center text-base font-semibold tabular-nums md:h-8 md:text-sm"
                     />
                     <Button
@@ -101,7 +115,8 @@ export function QuantityStepperModal({
                       size="icon"
                       className="h-11 w-11 md:h-8 md:w-8"
                       aria-label={`Increase ${item.label}`}
-                      onClick={() => onQuantityChange(item.itemKey, quantity + 1)}
+                      disabled={!canIncrease}
+                      onClick={() => updateQuantity(quantity + 1)}
                     >
                       <Plus className="h-4 w-4" />
                     </Button>

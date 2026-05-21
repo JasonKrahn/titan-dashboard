@@ -1,9 +1,10 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   archiveProject,
   createPhaseChecklistItem,
   createProject,
   createUser,
+  createInventoryPickup,
   completeInspection,
   completeSiteCheck,
   deletePhaseChecklistItem,
@@ -16,6 +17,7 @@ import {
   getPhase,
   getPhaseMaterials,
   getClients,
+  getCompanyHardwareStock,
   getOutstandingInventoryAuditRequests,
   getProjectEquipment,
   getProjectInventoryPickups,
@@ -23,11 +25,13 @@ import {
   getProjects,
   getUsers,
   markPhaseReadyForInspection,
+  resetPrototypeSeed,
   setCurrentUser,
   updateAtticGate,
   updatePhaseChecklistItem,
   updatePhaseMaterial,
   updatePhaseMaterials,
+  updateCompanyHardwareStock,
   updateProjectEquipment,
   updateProjectEquipmentBatch,
   updatePhaseSchedules,
@@ -40,6 +44,11 @@ describe("prototype seed data", () => {
       ...URL,
       createObjectURL: vi.fn(() => "blob:test"),
     });
+  });
+
+  beforeEach(() => {
+    resetPrototypeSeed();
+    setCurrentUser("user-admin");
   });
 
   it("contains seeded projects across all project stages and demo scenarios", async () => {
@@ -238,7 +247,7 @@ describe("prototype seed data", () => {
       changes: [
         {
           phaseId: "proj-active-insulation-phase-insulation",
-          scheduledStart: "2026-05-01",
+          scheduledStart: "2026-05-03",
           scheduledEnd: "2026-05-10",
         },
         {
@@ -257,7 +266,7 @@ describe("prototype seed data", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data.map((phase) => [phase.id, phase.scheduledStart, phase.scheduledEnd])).toEqual([
-      ["proj-active-insulation-phase-insulation", "2026-05-01", "2026-05-10"],
+      ["proj-active-insulation-phase-insulation", "2026-05-03", "2026-05-10"],
       ["proj-active-insulation-phase-drywall", "2026-05-10", "2026-05-16"],
       ["proj-active-insulation-phase-finishing", "2026-05-16", "2026-05-22"],
     ]);
@@ -471,6 +480,105 @@ describe("prototype seed data", () => {
     expect(hardwareEventsAfter.ok).toBe(true);
     if (!hardwareEventsAfter.ok) return;
     expect(hardwareEventsAfter.data.filter((event) => event.action === "hardware_updated")).toHaveLength(hardwareEventsBefore + 1);
+  });
+
+  it("lets admins manage company hardware totals without dropping below allocated stock", async () => {
+    setCurrentUser("user-admin");
+    const stockBefore = await getCompanyHardwareStock();
+    expect(stockBefore.ok).toBe(true);
+    if (!stockBefore.ok) return;
+
+    const bakerStock = stockBefore.data.find((item) => item.itemKey === "baker_scaffold");
+    expect(bakerStock).toBeDefined();
+    if (!bakerStock) return;
+
+    const allowedTotal = bakerStock.allocatedQuantity + 1;
+    const updated = await updateCompanyHardwareStock({
+      itemKey: "baker_scaffold",
+      totalQuantity: allowedTotal,
+    });
+    expect(updated.ok).toBe(true);
+    if (!updated.ok) return;
+    expect(updated.data).toMatchObject({
+      itemKey: "baker_scaffold",
+      totalQuantity: allowedTotal,
+      allocatedQuantity: bakerStock.allocatedQuantity,
+      availableQuantity: 1,
+    });
+
+    const blocked = await updateCompanyHardwareStock({
+      itemKey: "baker_scaffold",
+      totalQuantity: bakerStock.allocatedQuantity - 1,
+    });
+    expect(blocked.ok).toBe(false);
+    if (blocked.ok) return;
+    expect(blocked.error.code).toBe("VALIDATION_ERROR");
+    expect(blocked.error.fieldErrors?.totalQuantity).toContain("allocated");
+  });
+
+  it("enforces company hardware availability for project equipment increases while allowing reductions", async () => {
+    setCurrentUser("user-admin");
+    const stock = await updateCompanyHardwareStock({ itemKey: "cross_braces", totalQuantity: 1 });
+    expect(stock.ok).toBe(true);
+
+    setCurrentUser("user-pm-2");
+    const firstAllocation = await updateProjectEquipmentBatch({
+      projectId: "proj-active-insulation",
+      changes: [{ itemKey: "cross_braces", quantity: 1 }],
+    });
+    expect(firstAllocation.ok).toBe(true);
+
+    const overAllocation = await updateProjectEquipmentBatch({
+      projectId: "proj-active-insulation",
+      changes: [{ itemKey: "cross_braces", quantity: 2 }],
+    });
+    expect(overAllocation.ok).toBe(false);
+    if (overAllocation.ok) return;
+    expect(overAllocation.error.code).toBe("VALIDATION_ERROR");
+    expect(overAllocation.error.fieldErrors?.cross_braces).toContain("available");
+
+    const reduction = await updateProjectEquipmentBatch({
+      projectId: "proj-active-insulation",
+      changes: [{ itemKey: "cross_braces", quantity: 0 }],
+    });
+    expect(reduction.ok).toBe(true);
+  });
+
+  it("returns picked up hardware to available company stock immediately", async () => {
+    setCurrentUser("user-admin");
+    const before = await getCompanyHardwareStock();
+    expect(before.ok).toBe(true);
+    if (!before.ok) return;
+
+    const siteLightingBefore = before.data.find((item) => item.itemKey === "site_lighting");
+    expect(siteLightingBefore).toBeDefined();
+    if (!siteLightingBefore) return;
+
+    const totalReset = await updateCompanyHardwareStock({
+      itemKey: "site_lighting",
+      totalQuantity: siteLightingBefore.allocatedQuantity,
+    });
+    expect(totalReset.ok).toBe(true);
+
+    setCurrentUser("user-inventory-1");
+    const pickup = await createInventoryPickup({
+      projectId: "proj-finishing-active",
+      items: [{ kind: "equipment", itemKey: "site_lighting", quantity: 1 }],
+    });
+    expect(pickup.ok).toBe(true);
+
+    setCurrentUser("user-admin");
+    const after = await getCompanyHardwareStock();
+    expect(after.ok).toBe(true);
+    if (!after.ok) return;
+
+    const siteLightingAfter = after.data.find((item) => item.itemKey === "site_lighting");
+    expect(siteLightingAfter).toMatchObject({
+      itemKey: "site_lighting",
+      totalQuantity: siteLightingBefore.allocatedQuantity,
+      allocatedQuantity: siteLightingBefore.allocatedQuantity - 1,
+      availableQuantity: 1,
+    });
   });
 
   it("enforces project manager visibility for material and equipment logs", async () => {
@@ -748,17 +856,20 @@ describe("prototype seed data", () => {
     expect(createdPm.data.active).toBe(true);
     expect(createdAdmin.data.role).toBe("admin");
     expect(createdAdmin.data.adminOverviewEnabled).toBe(false);
+    expect(createdAdmin.data.clientActivityRailEnabled).toBe(false);
 
     const roleChange = await updateUser(createdPm.data.id, {
       fullName: "Promoted Member",
       phone: "555-0200",
       role: "admin",
+      clientActivityRailEnabled: false,
     });
 
     expect(roleChange.ok).toBe(true);
     if (!roleChange.ok) return;
     expect(roleChange.data.role).toBe("admin");
     expect(roleChange.data.fullName).toBe("Promoted Member");
+    expect(roleChange.data.clientActivityRailEnabled).toBe(false);
 
     const auditResult = await getAuditEvents({ entityType: "user", entityId: createdPm.data.id });
     expect(auditResult.ok).toBe(true);
@@ -920,5 +1031,25 @@ describe("prototype seed data", () => {
     expect(detail.data.auditEvents.some((e) => e.action === "create_project")).toBe(true);
     expect(detail.data.auditEvents.some((e) => e.action === "complete_project")).toBe(true);
     expect(detail.data.auditEvents.some((e) => e.action === "archive_project")).toBe(true);
+    expect(detail.data.auditEvents.filter((e) => e.action === "photo_uploaded").length).toBeGreaterThanOrEqual(10);
+
+    // Verify archive inventory and checklist history are complete enough for closeout review
+    const equipment = await getProjectEquipment("proj-randall-perfect-archive");
+    const pickups = await getProjectInventoryPickups("proj-randall-perfect-archive");
+    expect(equipment.ok).toBe(true);
+    expect(pickups.ok).toBe(true);
+    if (!equipment.ok || !pickups.ok) return;
+    expect(equipment.data.filter((log) => log.quantity > 0).length).toBeGreaterThanOrEqual(4);
+    expect(pickups.data.length).toBeGreaterThanOrEqual(1);
+
+    const materialResults = await Promise.all(detail.data.phases.map((phase) => getPhaseMaterials(phase.id)));
+    expect(materialResults.every((result) => result.ok)).toBe(true);
+    const materialLogs = materialResults.flatMap((result) => (result.ok ? result.data : []));
+    expect(materialLogs.filter((log) => log.quantity > 0).length).toBeGreaterThanOrEqual(6);
+
+    const phaseDetails = await Promise.all(detail.data.phases.map((phase) => getPhase(phase.id)));
+    expect(phaseDetails.every((result) => result.ok)).toBe(true);
+    const checklistItems = phaseDetails.flatMap((result) => (result.ok ? result.data.checklistItems : []));
+    expect(checklistItems.length).toBeGreaterThanOrEqual(2);
   });
 });
