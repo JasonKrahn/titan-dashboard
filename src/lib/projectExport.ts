@@ -88,18 +88,18 @@ export function buildProjectCsv(
     client.name,
     project.assignedProjectManagerId ?? "",
     pm?.fullName ?? "Unassigned",
-    project.status,
+    labelFromKey(project.status),
     project.siteAddress,
-    project.atticCheckStatus,
+    labelFromKey(project.atticCheckStatus),
     project.finishLevel ?? "",
-    project.scheduledStart ?? "",
-    project.scheduledEnd ?? "",
-    project.completedAt ?? "",
+    formatDate(project.scheduledStart),
+    formatDate(project.scheduledEnd),
+    formatDate(project.completedAt),
     project.notes ?? "",
     project.notesLastEditedBy ?? "",
-    project.notesLastEditedAt ?? "",
-    project.createdAt,
-    project.updatedAt,
+    formatDate(project.notesLastEditedAt),
+    formatDate(project.createdAt),
+    formatDate(project.updatedAt),
   ]));
 
   lines.push("");
@@ -113,9 +113,9 @@ export function buildProjectCsv(
     client.email ?? "",
     client.billingAddress ?? "",
     client.notes ?? "",
-    client.archived,
-    client.createdAt,
-    client.updatedAt,
+    boolCell(client.archived),
+    formatDate(client.createdAt),
+    formatDate(client.updatedAt),
   ]));
 
   lines.push("");
@@ -124,14 +124,14 @@ export function buildProjectCsv(
   phases.forEach((phase) => {
     lines.push(buildRow([
       phase.id,
-      phase.type,
-      phase.status,
-      phase.scheduledStart ?? "",
-      phase.scheduledEnd ?? "",
-      phase.closedAt ?? "",
+      labelFromKey(phase.type),
+      labelFromKey(phase.status),
+      formatDate(phase.scheduledStart),
+      formatDate(phase.scheduledEnd),
+      formatDate(phase.closedAt),
       phase.assignedSubcontractorId ?? "",
-      phase.createdAt,
-      phase.updatedAt,
+      formatDate(phase.createdAt),
+      formatDate(phase.updatedAt),
     ]));
   });
 
@@ -142,17 +142,17 @@ export function buildProjectCsv(
     lines.push(buildRow([
       gate.id,
       gate.phaseId ?? "",
-      gate.type,
-      gate.status,
+      labelFromKey(gate.type),
+      labelFromKey(gate.status),
       gate.completedByUserId ?? "",
-      gate.completedAt ?? "",
-      gate.requiredPhotoEvidence,
+      formatDate(gate.completedAt),
+      boolCell(gate.requiredPhotoEvidence),
       gate.notes ?? "",
-      gate.callInDate ?? "",
-      gate.installDate ?? "",
+      formatDate(gate.callInDate),
+      formatDate(gate.installDate),
       gate.callInSubcontractorId ?? "",
-      gate.createdAt,
-      gate.updatedAt,
+      formatDate(gate.createdAt),
+      formatDate(gate.updatedAt),
     ]));
   });
 
@@ -165,13 +165,13 @@ export function buildProjectCsv(
       deficiency.phaseId,
       deficiency.title,
       deficiency.description ?? "",
-      deficiency.severity,
-      deficiency.status,
+      labelFromKey(deficiency.severity),
+      labelFromKey(deficiency.status),
       deficiency.assignedSubcontractorId ?? "",
-      deficiency.resolvedAt ?? "",
+      formatDate(deficiency.resolvedAt),
       deficiency.resolvedByUserId ?? "",
-      deficiency.createdAt,
-      deficiency.updatedAt,
+      formatDate(deficiency.createdAt),
+      formatDate(deficiency.updatedAt),
     ]));
   });
 
@@ -184,15 +184,15 @@ export function buildProjectCsv(
       photo.phaseId ?? "",
       photo.gateId ?? "",
       photo.deficiencyId ?? "",
-      photo.purpose,
+      photoPurposeLabel(photo),
       photo.objectKey,
       photo.contentHash ?? "",
       photo.mimeType,
-      photo.fileSizeBytes ?? "",
-      photo.status,
+      fileSizeLabel(photo.fileSizeBytes),
+      labelFromKey(photo.status),
       photo.uploadedByUserId,
-      photo.createdAt,
-      photo.updatedAt,
+      formatDate(photo.createdAt),
+      formatDate(photo.updatedAt),
     ]));
   });
 
@@ -207,10 +207,10 @@ export function buildProjectCsv(
       subcontractor.trade,
       subcontractor.phone ?? "",
       subcontractor.email ?? "",
-      subcontractor.active,
+      boolCell(subcontractor.active),
       subcontractor.notes ?? "",
-      subcontractor.createdAt,
-      subcontractor.updatedAt,
+      formatDate(subcontractor.createdAt),
+      formatDate(subcontractor.updatedAt),
     ]));
   });
 
@@ -223,7 +223,7 @@ export function buildProjectCsv(
       log.itemKey,
       equipmentLabel(log.itemKey),
       log.quantity,
-      log.updatedAt,
+      formatDate(log.updatedAt),
     ]));
   });
 
@@ -235,11 +235,11 @@ export function buildProjectCsv(
     lines.push(buildRow([
       log.id,
       log.phaseId,
-      phase?.type ?? "",
+      phase ? labelFromKey(phase.type) : "",
       log.itemKey,
       materialLabel(log.itemKey, phase),
       log.quantity,
-      log.updatedAt,
+      formatDate(log.updatedAt),
     ]));
   });
 
@@ -252,8 +252,8 @@ export function buildProjectCsv(
       lines.push(buildRow([
         pickup.id,
         pickup.pickedUpByUserId,
-        pickup.createdAt,
-        item.kind,
+        formatDate(pickup.createdAt),
+        labelFromKey(item.kind),
         item.itemKey,
         item.kind === "equipment" ? equipmentLabel(item.itemKey) : materialLabel(item.itemKey, phase),
         item.quantity,
@@ -270,11 +270,11 @@ export function buildProjectCsv(
     lines.push(buildRow([
       item.id,
       item.phaseId,
-      phase?.type ?? "",
+      phase ? labelFromKey(phase.type) : "",
       item.text,
-      item.completed,
-      item.createdAt,
-      item.updatedAt,
+      boolCell(item.completed),
+      formatDate(item.createdAt),
+      formatDate(item.updatedAt),
     ]));
   });
 
@@ -289,7 +289,7 @@ export function buildProjectCsv(
   for (const event of sorted) {
     lines.push(buildRow([
       event.id,
-      event.createdAt,
+      formatDate(event.createdAt),
       event.actorUserId,
       event.entityType,
       event.entityId,

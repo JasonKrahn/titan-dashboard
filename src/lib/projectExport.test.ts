@@ -224,25 +224,25 @@ describe("buildProjectCsv", () => {
     expect(csv).toContain("SECTION,CLIENT DETAILS");
     expect(csv).toContain("Acme Homes");
     expect(csv).toContain("SECTION,PHASES");
-    expect(csv).toContain("phase-insulation,insulation,closed");
+    expect(csv).toContain("phase-insulation,Insulation,Closed");
     expect(csv).toContain("SECTION,GATES");
-    expect(csv).toContain("gate-attic,phase-insulation,attic_check,passed");
+    expect(csv).toContain("gate-attic,phase-insulation,Attic Check,Passed");
     expect(csv).toContain("SECTION,DEFICIENCIES");
     expect(csv).toContain("Air sealing gap");
     expect(csv).toContain("SECTION,PHOTO EVIDENCE");
-    expect(csv).toContain("photo-1,phase-insulation,gate-attic,,attic_check");
+    expect(csv).toContain("photo-1,phase-insulation,gate-attic,,Attic Check");
     expect(csv).toContain("SECTION,SUBCONTRACTORS");
     expect(csv).toContain("Sam Sub");
     expect(csv).not.toContain("Unused Sub");
     expect(csv).toContain("SECTION,PROJECT EQUIPMENT");
     expect(csv).toContain("equipment-1,baker_scaffold,Baker Scaffolds,2");
     expect(csv).toContain("SECTION,PHASE MATERIALS");
-    expect(csv).toContain("material-1,phase-insulation,insulation,r20_batt,R-20 Batts,4");
+    expect(csv).toContain("material-1,phase-insulation,Insulation,r20_batt,R-20 Batts,4");
     expect(csv).toContain("SECTION,INVENTORY PICKUPS");
-    expect(csv).toContain("pickup-1,user-inventory-1,2026-05-13T11:00:00.000Z,equipment,baker_scaffold,Baker Scaffolds,1,North side");
-    expect(csv).toContain("pickup-1,user-inventory-1,2026-05-13T11:00:00.000Z,material,r20_batt,R-20 Batts,2,North side");
+    expect(csv).toContain('pickup-1,user-inventory-1,"May 13, 2026",Equipment,baker_scaffold,Baker Scaffolds,1,North side');
+    expect(csv).toContain('pickup-1,user-inventory-1,"May 13, 2026",Material,r20_batt,R-20 Batts,2,North side');
     expect(csv).toContain("SECTION,PHASE TASK CHECKLIST");
-    expect(csv).toContain("checklist-1,phase-insulation,insulation,Verify air sealing,false");
+    expect(csv).toContain("checklist-1,phase-insulation,Insulation,Verify air sealing,✗");
   });
 
   it("exports activity metadata for audit events", () => {
