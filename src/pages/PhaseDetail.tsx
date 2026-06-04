@@ -28,6 +28,7 @@ import {
   FileText,
   GripVertical,
   Image as ImageIcon,
+  Package,
   Plus,
   ShieldCheck,
   Upload,
@@ -66,6 +67,7 @@ import { PhotoUploadDialog } from "@/components/dashboard/PhotoUploadDialog";
 import { QuantityStepperModal } from "@/components/dashboard/QuantityStepperModal";
 import { DatePicker } from "@/components/ui/date-picker";
 import { assignSubcontractorToPhase, createPhaseChecklistItem, deletePhaseChecklistItem, getCurrentUser, getPhase, getPhaseMaterials, getPhotoViewUrl, getProjectInventoryPickups, markPhaseReadyForInspection, unblockSiteCheck, updatePhase, updatePhaseChecklistItem, updatePhaseMaterials } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 import type { UnblockSiteCheckInput } from "@/lib/api";
 import { formatDateWithOptions } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
@@ -181,6 +183,7 @@ export default function PhaseDetailPage() {
   const error = phaseQ.data?.ok === false ? phaseQ.data.error : undefined;
   const qc = useQueryClient();
   const { registerEditAction } = useShortcutActions();
+  const { toast } = useToast();
 
   const materialsQ = useQuery({
     queryKey: ["phase-materials", detail?.phase.id],
@@ -200,6 +203,13 @@ export default function PhaseDetailPage() {
       if (res.ok) {
         qc.invalidateQueries({ queryKey: ["phase", phaseId] });
       }
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to mark phase ready for inspection",
+        variant: "destructive",
+      });
     },
   });
 
@@ -354,6 +364,13 @@ export default function PhaseDetailPage() {
       await qc.invalidateQueries({ queryKey: ["phase", variables.phaseId] });
       setNewTaskText("");
     },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create checklist item",
+        variant: "destructive",
+      });
+    },
   });
 
   const updateChecklistItemMutation = useMutation({
@@ -363,6 +380,13 @@ export default function PhaseDetailPage() {
       if (result.ok === false) return;
       await qc.invalidateQueries({ queryKey: ["phase", variables.phaseId] });
     },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update checklist item",
+        variant: "destructive",
+      });
+    },
   });
 
   const deleteChecklistItemMutation = useMutation({
@@ -370,6 +394,13 @@ export default function PhaseDetailPage() {
     onSuccess: async (result, variables) => {
       if (result.ok === false) return;
       await qc.invalidateQueries({ queryKey: ["phase", variables.phaseId] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete checklist item",
+        variant: "destructive",
+      });
     },
   });
 
@@ -636,6 +667,16 @@ export default function PhaseDetailPage() {
               setSelectedDeficiencyId(null);
               setDeficiencyDialogOpen(true);
             },
+          },
+        ]
+      : []),
+    ...(materialsQ.data?.ok && materialsQ.data.data.length > 0 && phase.status !== "closed"
+      ? [
+          {
+            label: "Edit materials",
+            icon: <Package className="h-4 w-4" />,
+            helperText: "Update material quantities",
+            onClick: () => openMaterialsModal(),
           },
         ]
       : []),
@@ -1044,7 +1085,7 @@ export default function PhaseDetailPage() {
                         >
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-sm font-medium text-foreground">{d.title}</div>
-                            <div className="mt-0.5 text-xs text-muted-foreground">{STATUS_LABEL[phase.status]}</div>
+                            <div className="mt-0.5 text-xs text-muted-foreground">{STATUS_LABEL[d.status]}</div>
                           </div>
                           <div className="flex items-center gap-2">
                             <SeverityBadge severity={d.severity} size="xs" />
@@ -1143,8 +1184,12 @@ export default function PhaseDetailPage() {
                         onChange={(date) => {
                           if (date) {
                             const newStart = date.toISOString();
-                            if (newStart < project.scheduledStart || (phase.scheduledEnd && newStart > phase.scheduledEnd) || (project.scheduledEnd && newStart > project.scheduledEnd)) {
-                              setDateValidationError("Phase start must be on or before project end date.");
+                            if (project.scheduledStart && newStart < project.scheduledStart) {
+                              setDateValidationError("Phase start must be on or after project start date.");
+                              return;
+                            }
+                            if (phase.scheduledEnd && newStart > phase.scheduledEnd) {
+                              setDateValidationError("Phase start must be on or before phase end date.");
                               return;
                             }
                             updatePhaseMutation.mutate({ phaseId: phase.id, scheduledStart: newStart });
@@ -1162,8 +1207,12 @@ export default function PhaseDetailPage() {
                         onChange={(date) => {
                           if (date) {
                             const newEnd = date.toISOString();
-                            if (newEnd > project.scheduledEnd || (phase.scheduledStart && newEnd < phase.scheduledStart) || (project.scheduledStart && newEnd < project.scheduledStart)) {
-                              setDateValidationError("Phase end must be on or after project start date.");
+                            if (project.scheduledEnd && newEnd > project.scheduledEnd) {
+                              setDateValidationError("Phase end must be on or before project end date.");
+                              return;
+                            }
+                            if (phase.scheduledStart && newEnd < phase.scheduledStart) {
+                              setDateValidationError("Phase end must be on or after phase start date.");
                               return;
                             }
                             updatePhaseMutation.mutate({ phaseId: phase.id, scheduledEnd: newEnd });
@@ -1198,7 +1247,7 @@ export default function PhaseDetailPage() {
                             });
                           }}
                         >
-                          <SelectTrigger id="phase-subcontractor-select" name="phaseSubcontractor" aria-label="Assign subcontractor" className="h-9 border-input bg-background px-3 py-2 text-xs font-medium">
+                          <SelectTrigger id="phase-subcontractor-select" name="phaseSubcontractor" aria-label="Assign subcontractor" className="h-9 border-input bg-background px-3 py-2 text-base md:text-xs font-medium">
                             <SelectValue placeholder="Select subcontractor" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1653,9 +1702,18 @@ export default function PhaseDetailPage() {
               value={phase.scheduledStart ? new Date(phase.scheduledStart) : undefined}
               onChange={(date) => {
                 if (date) {
+                  const newStart = date.toISOString();
+                  if (project.scheduledStart && newStart < project.scheduledStart) {
+                    setDateValidationError("Phase start must be on or after project start date.");
+                    return;
+                  }
+                  if (phase.scheduledEnd && newStart > phase.scheduledEnd) {
+                    setDateValidationError("Phase start must be on or before phase end date.");
+                    return;
+                  }
                   updatePhaseMutation.mutate({
                     phaseId: phase.id,
-                    scheduledStart: date.toISOString(),
+                    scheduledStart: newStart,
                   });
                 }
               }}
@@ -1669,9 +1727,18 @@ export default function PhaseDetailPage() {
               value={phase.scheduledEnd ? new Date(phase.scheduledEnd) : undefined}
               onChange={(date) => {
                 if (date) {
+                  const newEnd = date.toISOString();
+                  if (project.scheduledEnd && newEnd > project.scheduledEnd) {
+                    setDateValidationError("Phase end must be on or before project end date.");
+                    return;
+                  }
+                  if (phase.scheduledStart && newEnd < phase.scheduledStart) {
+                    setDateValidationError("Phase end must be on or after phase start date.");
+                    return;
+                  }
                   updatePhaseMutation.mutate({
                     phaseId: phase.id,
-                    scheduledEnd: date.toISOString(),
+                    scheduledEnd: newEnd,
                   });
                 }
               }}
